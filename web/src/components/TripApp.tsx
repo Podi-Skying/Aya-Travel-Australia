@@ -68,18 +68,23 @@ const TABS = [
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
+// Stable for the page session even when localStorage is unavailable (private mode).
+let memoryVoterKey: string | null = null;
 function voterKey(): string {
   const K = "aya-voter-key";
   try {
-    let v = localStorage.getItem(K);
-    if (!v) {
-      v = crypto.randomUUID();
-      localStorage.setItem(K, v);
-    }
-    return v;
+    const v = localStorage.getItem(K);
+    if (v) return v;
   } catch {
-    return crypto.randomUUID();
+    /* storage blocked */
   }
+  memoryVoterKey ??= crypto.randomUUID();
+  try {
+    localStorage.setItem(K, memoryVoterKey);
+  } catch {
+    /* keep the in-memory key */
+  }
+  return memoryVoterKey;
 }
 
 export function TripApp(props: { mode: Mode; token?: string; initial: { doc: TripDoc; versionNo: number; syncedAt: string } }) {

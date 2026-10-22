@@ -47,9 +47,11 @@ function contextsOf(day: Day): Context[] {
 
 export function effectiveDay(day: Day): EffectiveDay {
   const ctx = contextsOf(day);
+  // Collect requirements before de-duplication so inconsistent contexts are reported, not hidden.
   const required = new Set<string>();
   if (day.needsDriver) required.add(day.needsDriver);
-  for (const c of ctx) if (c.needsDriver) required.add(c.needsDriver);
+  for (const a of day.attached ?? []) if (a.needsDriver) required.add(a.needsDriver);
+  for (const it of day.items) if (it.packageContext?.needsDriver) required.add(it.packageContext.needsDriver);
   const requiredDrivers = [...required];
   const needsDriver = day.needsDriver ?? ctx.find((c) => c.needsDriver)?.needsDriver;
 

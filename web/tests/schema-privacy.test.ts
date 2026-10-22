@@ -91,3 +91,33 @@ describe("dates and times (inspection R-01)", () => {
     expect(applyOp(doc, { op: "editItem", date: doc.days[0].date, itemId: it.id, fields: { time: "23:59" } }).ok).toBe(true);
   });
 });
+
+describe("inspection 2 findings", () => {
+  it("F-01: conflicting package contexts with one key are rejected and still reported as a driver conflict", () => {
+    const doc = seedDoc();
+    const pkg = doc.attractionPool.find((p) => p.key === "kunanyi")!;
+    const day = doc.days.find((d) => d.date === "2026-11-19")!;
+    day.items.push(
+      { ...pkg.items[0], originPackage: "kunanyi", packageContext: { key: "kunanyi", needsDriver: "Zayden", driveHrs: 1 } },
+      { ...pkg.items[1], originPackage: "kunanyi", packageContext: { key: "kunanyi", needsDriver: "JJ", driveHrs: 1 } },
+    );
+    doc.attractionPool = doc.attractionPool.filter((p) => p.key !== "kunanyi");
+    expect(parseTripDoc(doc).ok).toBe(false);
+    expect(effectiveDay(day).requiredDrivers.sort()).toEqual(["JJ", "Zayden"]);
+  });
+
+  it("F-02: a segment without a food estimate is rejected", () => {
+    const doc = seedDoc();
+    delete doc.meta.foodPerPersonPerDay.syd;
+    expect(parseTripDoc(doc).ok).toBe(false);
+  });
+
+  it("F-03: driver names are masked and checked case-insensitively", () => {
+    const doc = seedDoc();
+    doc.days[5].items[0].note = "zayden 和 ＪＪ 會來";
+    const json = JSON.stringify(toPublicDoc(doc));
+    expect(json.toLowerCase()).not.toContain("zayden");
+    expect(json.toLowerCase()).not.toContain("jj");
+    expect(() => assertPublicSafe({ note: "ZAYDEN" }, doc)).toThrow(PrivacyGuardError);
+  });
+});

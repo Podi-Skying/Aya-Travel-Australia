@@ -138,3 +138,19 @@ Both findings accepted and applied:
 - R-06 accepted: DEPLOY.md and PLAN.md section 7 now do authenticated manual checks on production (OAuth callback is bound to one URL); recorded as a plan change.
 - Additional fix found while verifying R-04 offline: after a new deploy, assets loaded before the new service worker took control were not cached, so the next offline visit had no JavaScript. Pages now send their loaded assets and data URLs to the worker ("warm"), and a newly activated worker asks open pages to re-send them. Verified: deploy → one online visit → server stopped → page and tabs work offline with the notice.
 - Proof after fixes: lint, typecheck, 77 tests, build — all exit 0.
+
+## Inspection 2 — fresh Codex session (MAX_INSPECTION_ROUNDS reached)
+- Result: /private/tmp/claude-501/-Users-tanghuakui-Downloads-claude-Aya------/658c8c6d-5439-4fec-9bcf-1d7cb7e5eb37/scratchpad/cx/inspect-2/claudex-*/result.json (snapshot 61ec80b); effective_model gpt-6-luna.
+- Verdict: REVISE. Inspection-1 fixes not repeated as findings. New: F-01 (medium) same-key package contexts with different drivers hid a driver conflict; F-02 (medium) missing food estimate for a segment gave NaN totals; F-03 (medium) driver-name masking was case-sensitive; F-04 (low) visitor key unstable without localStorage.
+
+### Fix round 2 (Claude) — dispositions
+- F-01 accepted: schema rejects inconsistent same-key contexts on a day; effectiveDay collects driver requirements before de-duplication.
+- F-02 accepted: schema requires a food estimate for every segment used by a day.
+- F-03 accepted: masking matches names case-insensitively including full-width letters, without rewriting other text; the guard compares NFKC-lowercased text.
+- F-04 accepted: in-memory fallback keeps one voter key per page session.
+- Proof after fixes: lint, typecheck, 80 tests, build — all exit 0.
+
+### Final status
+- Inspection budget (2) is used up. The fix-round-2 edits above have NOT been independently inspected; they are covered only by the host's tests.
+- Authorship: all code written by Claude (this session). Codex reviewed the plan (9 rounds) and inspected the code twice (snapshots e95117d and 61ec80b).
+- Not verified: owner pages with real GitHub login, Neon in production, Vercel deployment (owner steps in docs/DEPLOY.md).

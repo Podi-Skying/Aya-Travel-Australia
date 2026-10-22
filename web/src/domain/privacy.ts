@@ -15,8 +15,26 @@ export class PrivacyGuardError extends Error {
   }
 }
 
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\-]/g, "\\$&");
+const norm = (s: string) => s.normalize("NFKC").toLowerCase();
+
+/** Matches a name case-insensitively, including full-width letters, without rewriting other text. */
+function nameRegex(name: string): RegExp {
+  const cls = [...name]
+    .map((ch) => {
+      const forms = new Set([ch, ch.toLowerCase(), ch.toUpperCase()]);
+      for (const f of [...forms]) {
+        const c = f.charCodeAt(0);
+        if (c >= 0x21 && c <= 0x7e) forms.add(String.fromCharCode(c + 0xfee0));
+      }
+      return `[${[...forms].map(escapeRe).join("")}]`;
+    })
+    .join("");
+  return new RegExp(cls, "g");
+}
+
 function scrub(value: unknown, names: string[]): unknown {
-  if (typeof value === "string") return names.reduce((s, n) => s.split(n).join(PUBLIC_DRIVER_LABEL), value);
+  if (typeof value === "string") return names.reduce((acc, n) => acc.replace(nameRegex(n), PUBLIC_DRIVER_LABEL), value);
   if (Array.isArray(value)) return value.map((v) => scrub(v, names));
   if (value && typeof value === "object") {
     const out: Record<string, unknown> = {};
@@ -49,11 +67,12 @@ export type PublicDoc = ReturnType<typeof toPublicDoc>;
 export function assertPublicSafe(out: unknown, source: TripDoc): void {
   const json = JSON.stringify(out);
   if (/"(address|driverConfirmation)"\s*:/.test(json)) throw new PrivacyGuardError("private key present");
+  const text = norm(json);
   for (const name of Object.keys(source.drivers)) {
-    if (name && json.includes(name)) throw new PrivacyGuardError("driver name present");
+    if (name && text.includes(norm(name))) throw new PrivacyGuardError("driver name present");
   }
   for (const st of Object.values(source.stays)) {
-    const a = st.address.trim();
-    if (a && json.includes(a)) throw new PrivacyGuardError("address present");
+    const a = norm(st.address.trim());
+    if (a && text.includes(a)) throw new PrivacyGuardError("address present");
   }
 }

@@ -186,6 +186,18 @@ export const tripDocSchema = z
       if (d.driverConfirmation && !doc.drivers[d.driverConfirmation.driver])
         ctx.addIssue({ code: "custom", message: `未知的司機 ${d.driverConfirmation.driver}`, path: ["days", di, "driverConfirmation", "driver"] });
       d.items.forEach((it, ii) => note(it.id, d.date, ["days", di, "items", ii, "id"]));
+      if (doc.meta.foodPerPersonPerDay[d.seg] === undefined)
+        ctx.addIssue({ code: "custom", message: `目的地 ${d.seg} 缺少每人每日餐費估計`, path: ["meta", "foodPerPersonPerDay"] });
+      // Package contexts sharing a key on one day must agree (they describe the same package).
+      const byKey = new Map<string, string>();
+      const contexts = [...(d.attached ?? []).map((a) => ({ ...a, costs: undefined, title: undefined })), ...d.items.flatMap((i) => (i.packageContext ? [{ ...i.packageContext, title: undefined }] : []))];
+      for (const c of contexts) {
+        const sig = JSON.stringify([c.needsDriver ?? null, c.driveHrs, c.alt ?? null, !!c.ferry, !!c.hike, !!c.transfer]);
+        const prev = byKey.get(c.key);
+        if (prev !== undefined && prev !== sig)
+          ctx.addIssue({ code: "custom", message: `${d.date} 的景點組「${c.key}」資料不一致`, path: ["days", di] });
+        byKey.set(c.key, sig);
+      }
     });
     doc.attractionPool.forEach((p, pi) => {
       if (!doc.segments[p.seg]) ctx.addIssue({ code: "custom", message: `未知的目的地 ${p.seg}`, path: ["attractionPool", pi, "seg"] });
