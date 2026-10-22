@@ -7,6 +7,7 @@ import { alertStatus } from "@/domain/rules";
 import { dayDiff, fmtMD, fmtTs } from "@/domain/format";
 import { api, registerServiceWorker } from "@/client/api";
 import { keyFor, loadSnapshot, saveSnapshot, mergeVersions, type VersionMeta } from "@/client/offline";
+import { signIn, signOut } from "next-auth/react";
 import { useAsk, useToast, useToday } from "./ui";
 import { Overview } from "./Overview";
 import { DaysView } from "./DaysView";
@@ -308,16 +309,11 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
       <a className="skip" href="#main">
         跳到主要內容
       </a>
-      <Hero doc={doc} mode={mode} journeyHref={journeyHref} />
+      <Hero doc={doc} mode={mode} journeyHref={journeyHref} account={mode === "owner" ? "signout" : home ? "signin" : null} />
       {mode === "public" && (
         <div className="banner">
           {canVote ? "你正在檢視 Aya 的旅程（唯讀）。可以對活動按「我有興趣」！" : "你正在檢視 Aya 的旅程（唯讀公開版，住址與司機資訊已隱藏）。"}{" "}
-          {home && (
-            <>
-              {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- next-auth route, full navigation */}
-              <a href="/api/auth/signin?callbackUrl=%2F">擁有者登入</a>
-            </>
-          )}
+
         </div>
       )}
       {(!online || fromCache) && (
@@ -391,7 +387,7 @@ function Panel({ show, children }: { show: boolean; children: ReactNode }) {
   );
 }
 
-function Hero({ doc, mode, journeyHref }: { doc: TripDoc; mode: Mode; journeyHref: string }) {
+function Hero({ doc, mode, journeyHref, account }: { doc: TripDoc; mode: Mode; journeyHref: string; account: "signin" | "signout" | null }) {
   const segOrder = useMemo(() => {
     const out: string[] = [];
     doc.days.forEach((d) => {
@@ -409,8 +405,17 @@ function Hero({ doc, mode, journeyHref }: { doc: TripDoc; mode: Mode; journeyHre
         <path className="w1" d="M0,120 C240,170 480,70 720,110 C960,150 1200,80 1440,120 L1440,200 L0,200 Z" />
         <path className="w2" d="M0,150 C260,110 520,190 780,150 C1040,110 1240,170 1440,140 L1440,200 L0,200 Z" />
       </svg>
+      {account && (
+        <button
+          type="button"
+          className="hero-account"
+          onClick={() => void (account === "signin" ? signIn("github", { callbackUrl: "/" }) : signOut({ callbackUrl: "/" }))}
+        >
+          {account === "signin" ? "登入" : "擁有者・登出"}
+        </button>
+      )}
       <div className="hero-inner">
-        <p className="eyebrow">{mode === "owner" ? "私人測試版 · 擁有者" : "私人測試版 · 唯讀分享"}</p>
+        <p className="eyebrow">{mode === "owner" ? "私人測試版 · 擁有者" : "私人測試版 · 訪客瀏覽"}</p>
         <h1>{doc.meta.title}</h1>
         <p className="hero-sub">{doc.meta.subtitle}</p>
         <div className="hero-meta">

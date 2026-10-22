@@ -5,13 +5,14 @@ import { toPublicDoc } from "@/domain/privacy";
 import type { TripDoc } from "@/domain/schema";
 
 /*
- * Optional public home page (owner request, 2026-10-22): when PUBLIC_HOME=1, anyone
- * can read the owner's current trip through the same redacted view as share links.
- * Off by default. Writes still require the owner session; votes still need a share link.
+ * Public home page (owner request, 2026-10-22): by default anyone can read the owner's
+ * current trip at the site root through the same redacted view as share links; the owner
+ * signs in with the button in the top-right corner. Set PUBLIC_HOME=0 to require sign-in.
+ * Writes still require the owner session; votes still need a share link.
  */
 
 export function publicHomeEnabled(): boolean {
-  return process.env.PUBLIC_HOME?.trim() === "1";
+  return process.env.PUBLIC_HOME?.trim() !== "0";
 }
 
 export async function getPublicHomeTrip() {

@@ -209,11 +209,11 @@ describe("interest (AC7)", () => {
 });
 
 describe("public home (PUBLIC_HOME)", () => {
-  it("is off by default and serves only the redacted document when on; owner APIs stay protected", async () => {
-    delete process.env.PUBLIC_HOME;
+  it("is on by default with only the redacted document, off with PUBLIC_HOME=0; owner APIs stay protected", async () => {
     signedOut();
+    process.env.PUBLIC_HOME = "0";
     expect((await H.getPublicHome()).status).toBe(404);
-    process.env.PUBLIC_HOME = "1";
+    delete process.env.PUBLIC_HOME;
     const r = await H.getPublicHome();
     expect(r.status).toBe(200);
     const text = await r.text();
@@ -221,7 +221,6 @@ describe("public home (PUBLIC_HOME)", () => {
     expect(text).not.toMatch(/Zayden|JJ|"address"|"driverConfirmation"/);
     expect((await H.getTrip(req("GET", "/api/trip"))).status).toBe(401);
     expect((await op(1, { op: "setPartySize", partySize: 3 })).status).toBe(401);
-    delete process.env.PUBLIC_HOME;
   });
 });
 

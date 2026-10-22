@@ -36,8 +36,8 @@ Run `db:migrate` again after any change in `drizzle/`. `db:seed` creates version
 2. 版本與分享 → 建立分享連結. The link is shown once; open it in a private window to check what visitors see.
 3. On your phone, open the site once while online. Then turn on airplane mode and reload: the itinerary and the last sync time remain visible, with an offline notice.
 
-## Optional: public home page
-Set `PUBLIC_HOME=1` (Production) and redeploy to let anyone read the current trip at the site root without signing in. Visitors get the same redacted view as share links (no addresses, driver names, or driver time windows), cannot vote, and see an "擁有者登入" link. All pages send `noindex`. Remove the variable (or set it to `0`) and redeploy to turn it off. Share links keep working either way.
+## Public home page (default on)
+Anyone can read the current trip at the site root without signing in. Visitors get the same redacted view as share links (no addresses, driver names, or driver time windows) and cannot vote; the owner signs in with the 「登入」 button in the top-right corner. All pages send `noindex`. Set `PUBLIC_HOME=0` (Production) and redeploy to require sign-in again. Share links keep working either way.
 
 ## Local development
 ```bash
