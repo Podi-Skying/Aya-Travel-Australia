@@ -51,3 +51,16 @@ describe("journey page data", () => {
     expect(run("10/25|11/26|11/27|11/3|11/6")).toBe("");
   });
 });
+
+describe("route walk data", () => {
+  it("uses scheduled days only, in order, and stays redacted on the public document", async () => {
+    const { walkDays } = await import("@/domain/walk");
+    const doc = seedDoc();
+    const days = walkDays(toPublicDoc(doc));
+    expect(days).toHaveLength(25);
+    expect(days[0].date).toBe("2026-11-03");
+    const ids = new Set(doc.attractionPool.flatMap((p) => p.items.map((i) => i.name)));
+    expect(days.flatMap((d) => d.items.map((i) => i.name)).some((n) => ids.has(n))).toBe(false);
+    expect(JSON.stringify(days)).not.toMatch(/Zayden|JJ/);
+  });
+});

@@ -425,8 +425,13 @@ function Hero({ doc, mode, journeyHref, account }: { doc: TripDoc; mode: Mode; j
           <span className="chip-hero">📍 {segOrder.map((k) => `${doc.segments[k]?.name ?? k}（${doc.segments[k]?.range ?? ""}）`).join(" → ")}</span>
           {when && <span className="chip-hero">⏱️ {when}</span>}
         </div>
-        <p className="hero-link">
-          <a href={journeyHref}>✦ 進入 3D 旅程首頁 →</a>
+        <p className="hero-links">
+          <a className="hero-cta" href={journeyHref}>
+            ✦ 3D 旅程首頁
+          </a>
+          <a className="hero-cta" href={journeyHref.replace(/journey$/, "walk")}>
+            🚶 每日路線散步
+          </a>
         </p>
       </div>
     </header>
