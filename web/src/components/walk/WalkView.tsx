@@ -7,12 +7,32 @@ import { walkDays } from "@/domain/walk";
 import { api, registerServiceWorker } from "@/client/api";
 import { fmtTs } from "@/domain/format";
 
-/* Route-walk page (port of prototypes/route-walk). Always receives the redacted public document. */
-export function WalkView({ doc: initialDoc, backHref, dataUrl, syncedAt }: { doc: TripDoc; backHref: string; dataUrl: string; syncedAt: string }) {
+/*
+ * Route-walk page (port of prototypes/route-walk). Always receives the redacted public document.
+ * variant "hero" shows one day with a day switcher, for reuse as a home-page first view.
+ */
+export function WalkView({
+  doc: initialDoc,
+  backHref,
+  dataUrl,
+  syncedAt,
+  variant = "page",
+  initialDate,
+}: {
+  doc: TripDoc;
+  backHref: string;
+  dataUrl: string;
+  syncedAt: string;
+  variant?: "page" | "hero";
+  initialDate?: string;
+}) {
   const root = useRef<HTMLDivElement>(null);
   const [doc, setDoc] = useState(initialDoc);
   const [sync, setSync] = useState({ at: syncedAt, offline: false });
-  const days = useMemo(() => walkDays(doc), [doc]);
+  const allDays = useMemo(() => walkDays(doc), [doc]);
+  const [picked, setPicked] = useState<string | null>(null);
+  const heroDate = picked ?? (allDays.some((d) => d.date === initialDate) ? initialDate! : allDays[0]?.date);
+  const days = useMemo(() => (variant === "hero" ? allDays.filter((d) => d.date === heroDate) : allDays), [variant, allDays, heroDate]);
 
   useEffect(() => {
     registerServiceWorker([dataUrl]);
@@ -48,12 +68,24 @@ export function WalkView({ doc: initialDoc, backHref, dataUrl, syncedAt }: { doc
         <a className="brand" href="#rw-intro">
           每日路線散步
         </a>
-        <nav className="daynav" id="rw-daynav" aria-label="跳到某一天" />
+        <nav className="daynav" id="rw-daynav" aria-label="跳到某一天" hidden={variant === "hero"} />
+        {variant === "hero" && (
+          <label className="day-pick">
+            <span className="sr-only">選擇日期</span>
+            <select value={heroDate} onChange={(e) => setPicked(e.target.value)}>
+              {allDays.map((d, i) => (
+                <option key={d.date} value={d.date}>
+                  第 {i + 1} 天・{d.date.slice(5).replace("-", "/")} {d.title}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <a className="brand" href={backHref}>
           打開行程 →
         </a>
       </header>
-      <section className="intro" id="rw-intro">
+      <section className="intro" id="rw-intro" hidden={variant === "hero"}>
         <div>
           <h1>跟著 Aya 走一天</h1>
           <p>往下捲動，小人會沿著當天路線走過每個景點；走完最後一站就換到下一天。開車、搭船、坐飛機的路段會自動換交通工具。</p>
@@ -64,7 +96,7 @@ export function WalkView({ doc: initialDoc, backHref, dataUrl, syncedAt }: { doc
         </div>
       </section>
       <main id="rw-days" />
-      <section className="outro">
+      <section className="outro" hidden={variant === "hero"}>
         <div>
           <h2>旅程走完了</h2>
           <p className="note">路線為示意圖，距離與時間是估計值，非實際比例。尚未排入行程的景點不會出現。</p>
