@@ -52,6 +52,8 @@ export function DaysView({ active }: { active: boolean }) {
   useEffect(() => {
     if (!active) return;
     const onKey = (e: KeyboardEvent) => {
+      // The tablist handles its own arrows (RV-02).
+      if (e.defaultPrevented || (e.target as HTMLElement).closest?.('[role="tablist"]')) return;
       const el = document.activeElement;
       if (el && /INPUT|SELECT|TEXTAREA/.test(el.tagName)) return;
       if (document.querySelector("dialog[open]")) return;
@@ -154,13 +156,26 @@ export function DaysView({ active }: { active: boolean }) {
           const dt = parseDate(x.date);
           const w = checks(doc, effectiveDay(x), { showWindow: false }).some((c) => c.lv === "warn");
           return (
-            <button key={x.date} type="button" className="day-chip" data-day={i} aria-current={i === currentDay ? "true" : undefined} onClick={() => setCurrentDay(i)}>
+            <button
+              key={x.date}
+              type="button"
+              className="day-chip"
+              data-day={i}
+              aria-current={i === currentDay ? "true" : undefined}
+              aria-label={`${fmtDay(x.date)} ${x.title}${w ? "，有提醒" : ""}`}
+              onClick={() => setCurrentDay(i)}
+            >
               <span className={`d ${x.seg}`}>
                 {dt.getMonth() + 1}/{dt.getDate()}
                 <small>週{WD[dt.getDay()]}</small>
               </span>
               <span className="t">
-                {w && <span className="dot" aria-label="有提醒" />}
+                {w && (
+                  <span className="warn-tag" aria-hidden="true">
+                    <span className="dot" />
+                    提醒
+                  </span>
+                )}
                 {x.title}
               </span>
             </button>

@@ -109,7 +109,8 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
   const [pickedTab, setPickedTab] = useState<TabKey | null>(null);
   const [pickedDay, setPickedDay] = useState<number | null>(null);
   const url = useUrlState();
-  const urlTab = TABS.some((t) => t.key === url.tab) ? (url.tab as TabKey) : null;
+  // Only tabs this mode can show (visitors have no 版本與分享 tab) (RV-01).
+  const urlTab = TABS.some((t) => t.key === url.tab && (mode === "owner" || !("owner" in t))) ? (url.tab as TabKey) : null;
   const urlDayIdx = url.day ? doc.days.findIndex((d) => d.date === url.day) : -1;
   const tab: TabKey = pickedTab ?? urlTab ?? (urlDayIdx >= 0 || inTrip ? "days" : "overview");
   const todayIdx = today ? doc.days.findIndex((d) => d.date >= today) : -1;
@@ -348,7 +349,8 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
         跳到主要內容
       </a>
       <SiteHeader base={base} current="plan" account={mode === "owner" ? "signout" : home ? "signin" : null} />
-      <Hero doc={doc} mode={mode} walkHref={base || "/"} />
+      {/* Back to the walk at the selected day (RV-03). */}
+      <Hero doc={doc} mode={mode} walkHref={`${base || "/"}#rw-day-${doc.days[currentDay]?.date ?? ""}`} />
       {mode === "public" && (
         <div className="banner">
           {canVote ? "你正在檢視 Aya 的旅程（唯讀）。可以對活動按「我有興趣」！" : "你正在檢視 Aya 的旅程（唯讀公開版，住址與司機資訊已隱藏）。"}{" "}

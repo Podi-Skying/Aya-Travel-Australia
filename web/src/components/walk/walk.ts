@@ -183,7 +183,10 @@ type DayState = {
 };
 
 export function startWalk(root: HTMLElement, days: WalkDay[], opts: { planHref: string }): () => void {
-  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // Re-read when the user changes the preference while the page is open (RV-12).
+  const motionQuery = matchMedia("(prefers-reduced-motion: reduce)");
+  let reduce = motionQuery.matches;
+  let stageH = innerHeight; // measured stage height, used everywhere instead of innerHeight (RV-04)
   const container = root.querySelector<HTMLElement>("#rw-days")!;
   const jump = root.querySelector<HTMLSelectElement>("#rw-jump")!;
   const nowEl = root.querySelector<HTMLElement>("#rw-now")!;
@@ -212,7 +215,7 @@ export function startWalk(root: HTMLElement, days: WalkDay[], opts: { planHref: 
     container.appendChild(sec);
     const opt = document.createElement("option");
     opt.value = String(di);
-    opt.textContent = no + "｜" + md(d.date) + " " + d.title;
+    opt.textContent = no + "｜" + md(d.date) + " " + d.segName + "・" + d.title;
     jump.appendChild(opt);
     return { d, i: di, sec, track: sec.querySelector<HTMLElement>(".track")!, far: sec.querySelector<HTMLElement>(".far")!, title: sec.querySelector<HTMLElement>(".title")! } as DayState;
   });
@@ -221,6 +224,7 @@ export function startWalk(root: HTMLElement, days: WalkDay[], opts: { planHref: 
     const vw = innerWidth;
     // Stage size, not innerHeight: the stage is 100svh and mobile toolbars change innerHeight.
     const vh = container.querySelector<HTMLElement>(".stage")?.clientHeight || innerHeight;
+    stageH = vh;
     const small = vw < 680;
     const anchorX = vw * (small ? 0.34 : 0.4); // walker's fixed screen position (DESIGN.md)
     const gap = small ? Math.max(260, vw * 0.78) : Math.max(340, Math.min(480, vw * 0.36));
@@ -398,8 +402,11 @@ export function startWalk(root: HTMLElement, days: WalkDay[], opts: { planHref: 
   // so a new wheel notch mid-motion just re-targets it.
   // Only discrete mouse-wheel steps are smoothed; touch and touchpad stay 1:1 (DESIGN.md).
   let lastWheelStep = -1e9;
+  // A mouse wheel reports line/page deltas, or legacy wheelDelta in steps of 120. Anything
+  // ambiguous (touchpads) stays native 1:1 (RV-06).
   const onWheel = (e: WheelEvent) => {
-    if (e.deltaMode !== 0 || (Math.abs(e.deltaY) >= 50 && Number.isInteger(e.deltaY))) lastWheelStep = performance.now();
+    const legacy = (e as WheelEvent & { wheelDeltaY?: number }).wheelDeltaY;
+    if (e.deltaMode !== 0 || (typeof legacy === "number" && legacy !== 0 && legacy % 120 === 0)) lastWheelStep = performance.now();
   };
   const smoothNow = () => !reduce && performance.now() - lastWheelStep < 250;
   const RESPONSE = 0.2; // seconds, Apple-style "response"
@@ -411,7 +418,7 @@ export function startWalk(root: HTMLElement, days: WalkDay[], opts: { planHref: 
   let lastT = 0;
 
   function update(sy: number) {
-    const vh = innerHeight;
+    const vh = stageH;
     const mid = sy + vh * 0.5;
     let cur = curIdx < 0 ? 0 : curIdx;
     D.forEach((o) => {
@@ -498,12 +505,14 @@ export function startWalk(root: HTMLElement, days: WalkDay[], opts: { planHref: 
     progEl.style.transform = "scaleX(" + ((cur + tp) / total).toFixed(4) + ")";
     if (cur !== curIdx) {
       curIdx = cur;
-      nowEl.innerHTML = "<b>" + String(cur + 1).padStart(2, "0") + " / " + total + "</b><span>" + md(o.d.date) + "（" + wd(o.d.date) + "）　" + esc(o.d.title) + "</span>";
+      nowEl.innerHTML = "<b>" + String(cur + 1).padStart(2, "0") + " / " + total + "</b><span>" + md(o.d.date) + "（" + wd(o.d.date) + "）" + esc(o.d.segName) + "　" + esc(o.d.title) + "</span>";
+      // Chapter tint follows the current day (DESIGN.md: 300ms cross-fade, instant with reduced motion).
+      root.dataset.seg = o.d.seg;
       if (jump.value !== String(cur)) jump.value = String(cur);
       // Announce the day only when it changes, never per frame.
       liveEl.textContent = "第 " + (cur + 1) + " 天，" + md(o.d.date) + " " + o.d.title;
       dayPlan.href = opts.planHref + "?tab=days&day=" + o.d.date;
-      prevBtn.disabled = cur === 0 && sy - o.top < innerHeight * 0.3;
+      prevBtn.disabled = cur === 0 && sy - o.top < stageH * 0.3;
       nextBtn.disabled = cur === total - 1;
     }
   }
@@ -546,7 +555,12 @@ export function startWalk(root: HTMLElement, days: WalkDay[], opts: { planHref: 
     container.classList.add("jumping");
     jumpTimer = setTimeout(() => {
       jumpTimer = undefined;
+      // Root scroll-behavior is smooth site-wide; force an instant jump so no days scroll past (RV-05).
+      const html = document.documentElement;
+      const prev = html.style.scrollBehavior;
+      html.style.scrollBehavior = "auto";
       scrollTo({ top: y, behavior: "auto" });
+      html.style.scrollBehavior = prev;
       shown = target = y;
       vel = 0;
       update(y);
@@ -559,7 +573,8 @@ export function startWalk(root: HTMLElement, days: WalkDay[], opts: { planHref: 
   }
   // Step to the previous / next stop, crossing into neighbouring days.
   function goStop(dir: 1 | -1) {
-    const all = D.flatMap((o) => [o.top + 2, ...o.stopScroll]).sort((a, b) => a - b);
+    // Stations only; a day without stations is a stop of its own (RV-11).
+    const all = D.flatMap((o) => (o.stopScroll.length ? o.stopScroll : [o.top + 2])).sort((a, b) => a - b);
     const y = scrollY;
     const t = dir > 0 ? all.find((s) => s > y + 4) : [...all].reverse().find((s) => s < y - 4);
     if (t !== undefined) goTo(t, false);
@@ -570,7 +585,7 @@ export function startWalk(root: HTMLElement, days: WalkDay[], opts: { planHref: 
   const dayPlan = root.querySelector<HTMLAnchorElement>("#rw-dayplan")!;
   const onPrev = () => {
     const o = D[curIdx];
-    goDay(scrollY - o.top > innerHeight * 0.3 ? curIdx : curIdx - 1);
+    goDay(scrollY - o.top > stageH * 0.3 ? curIdx : curIdx - 1);
   };
   const onNext = () => goDay(curIdx + 1);
   const onJump = () => goDay(Number(jump.value));
@@ -621,6 +636,17 @@ export function startWalk(root: HTMLElement, days: WalkDay[], opts: { planHref: 
   // Proximity snap to landmarks only while the walk is mounted (not on /plan or /journey).
   document.documentElement.classList.add("rw-snap");
   addEventListener("resize", onResize);
+  const onMotion = () => {
+    reduce = motionQuery.matches;
+    layout();
+  };
+  motionQuery.addEventListener("change", onMotion);
+  // Mobile toolbars resize the 100svh stage without a window resize: remeasure then.
+  const firstStage = container.querySelector<HTMLElement>(".stage");
+  const ro = new ResizeObserver(() => {
+    if (firstStage && Math.abs(firstStage.clientHeight - stageH) > 1) onResize();
+  });
+  if (firstStage) ro.observe(firstStage);
   layout();
   // Open at a requested day: /#rw-day-YYYY-MM-DD.
   const hashDay = D.find((o) => location.hash === "#" + o.sec.id);
@@ -632,6 +658,9 @@ export function startWalk(root: HTMLElement, days: WalkDay[], opts: { planHref: 
     removeEventListener("wheel", onWheel);
     removeEventListener("wheel", cancelJump);
     removeEventListener("touchstart", cancelJump);
+    motionQuery.removeEventListener("change", onMotion);
+    ro.disconnect();
+    delete root.dataset.seg;
     prevBtn.removeEventListener("click", onPrev);
     nextBtn.removeEventListener("click", onNext);
     container.removeEventListener("click", onTap);

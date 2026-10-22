@@ -38,8 +38,10 @@
 /* ---------- days: tall section + sticky stage ---------- */
 .rw .day { position: relative; }
 .rw .stage { position: sticky; top: 0; height: 100vh; height: 100svh; overflow: hidden; background: transparent; }
-.rw .day.syd .stage { background: var(--sydney-day); }
-.rw .day.tas .stage { background: var(--tasmania-day); }
+/* Chapter tint follows the current day (set by walk.ts) and cross-fades in 300ms. */
+.rw { transition: background-color .3s ease; }
+.rw[data-seg="syd"] { background-color: var(--sydney-day); }
+.rw[data-seg="tas"] { background-color: var(--tasmania-day); }
 .rw .layer, .rw .track { position: absolute; left: 0; top: 0; height: 100%; will-change: transform; }
 .rw .layer svg, .rw .track svg.ink { position: absolute; left: 0; top: 0; overflow: visible; }
 .rw .far { opacity: .5; }
@@ -126,7 +128,7 @@
   .rw .bar select { max-width: 40vw; }
 }
 @media (prefers-reduced-motion: reduce) {
-  #rw-days { transition: none; }
+  .rw, #rw-days { transition: none; }
   .rw .bar button { transition: none; }
 }
 @media (prefers-reduced-transparency: reduce) {

@@ -357,7 +357,8 @@ dialog { border: 0; border-radius: 16px; background: var(--bg); box-shadow: 0 12
 @media (max-width: 720px) {
   .day-strip { top: calc(56px + env(safe-area-inset-top) + 48px); }
   .day-chip { min-width: 96px; }
-  .day-chip .t { font-size: .75rem; line-height: 1.3; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 96px; }
+  .day-chip { min-width: 112px; align-content: start; }
+  .day-chip .t { font-size: .75rem; line-height: 1.35; display: block; white-space: normal; max-width: 112px; }
 }
 @media (prefers-reduced-transparency: reduce) { .tabs { background: var(--bg); backdrop-filter: none; -webkit-backdrop-filter: none; } .tabs::after { display: none; } }
 @media (prefers-contrast: more) { :root { --ink: #181714; --ink-2: #3e3b34; --ink-muted: #3e3b34; --rule: #3e3b34; } }
@@ -365,3 +366,8 @@ dialog { border: 0; border-radius: 16px; background: var(--bg); box-shadow: 0 12
 .act .meta a, .src-list a, .pool-pkg a { display: inline-block; padding: 12px 0; margin: -12px 0; }
 .leaflet-bar a, .leaflet-touch .leaflet-bar a { width: 44px; height: 44px; line-height: 44px; }
 @media (max-width: 980px) { .day-map-wrap { order: 1; } }
+
+/* Form controls use the 3:1 rule color; date-strip warnings are readable text, not only a dot. */
+input, select, textarea, .field input, .field select, .field textarea { border-color: var(--rule) !important; }
+.warn-tag { display: inline-flex; align-items: center; gap: 3px; margin-right: 4px; font-size: .75rem; color: var(--vermilion); font-weight: 500; }
+.warn-tag .dot { position: static; background: var(--vermilion); margin-right: 0; }
