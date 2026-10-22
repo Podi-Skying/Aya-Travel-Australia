@@ -334,7 +334,7 @@ select, input, textarea { font-size: 1rem; }
 .alert.warn .ic, .alert.danger .ic { color: var(--vermilion); }
 
 /* Regions by ink tone and line style, not by color: Sydney solid, Tasmania dotted. */
-.timeline-mini button { border-radius: 2px; height: 28px; }
+.timeline-mini button { border-radius: 2px; height: 28px; padding: 0; min-width: 0; }
 .timeline-mini button.syd { background: var(--ink-2); }
 .timeline-mini button.tas { background: repeating-linear-gradient(90deg, var(--ink-muted) 0 3px, transparent 3px 6px), var(--paper-raised); box-shadow: inset 0 0 0 1px var(--ink-muted); }
 .timeline-mini button.open { opacity: .3; }
@@ -371,3 +371,5 @@ dialog { border: 0; border-radius: 16px; background: var(--bg); box-shadow: 0 12
 input, select, textarea, .field input, .field select, .field textarea { border-color: var(--rule) !important; }
 .warn-tag { display: inline-flex; align-items: center; gap: 3px; margin-right: 4px; font-size: .75rem; color: var(--vermilion); font-weight: 500; }
 .warn-tag .dot { position: static; background: var(--vermilion); margin-right: 0; }
+.timeline-mini { gap: 2px; }
+html, body { overflow-x: clip; }
