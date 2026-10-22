@@ -1,6 +1,6 @@
 # Australia Travel Planner
 
-Product requirements for a private test version based on the real Tasmania and Sydney trip in October–November 2026. This is a requirements workspace, **not** an architecture or technology decision.
+Requirements and the first version of a private travel planner for the real Sydney and Tasmania trip, 3–27 November 2026.
 
 ## Start here
 - [Product brief](docs/PRODUCT_BRIEF.md)
@@ -10,6 +10,10 @@ Product requirements for a private test version based on the real Tasmania and S
 - [User flows](docs/USER_FLOWS.md)
 - [Risks, decisions and roadmap](docs/PROJECT_CONTROL.md)
 - [Interview decision log](docs/DECISIONS.md)
+- [Architecture decision (ADR 0001)](docs/adr/0001-first-version-architecture.md)
+- [Deploying to Vercel](docs/DEPLOY.md)
+- Code: [`web/`](web/) (Next.js app); the original static prototype stays in [`site/`](site/)
+- Plan and review log: [PLAN.md](PLAN.md), [PLAN-REVIEW-LOG.md](PLAN-REVIEW-LOG.md)
 
 ## Requirement status
 - **Confirmed**: explicitly agreed in the interviews.
@@ -18,4 +22,4 @@ Product requirements for a private test version based on the real Tasmania and S
 - **Deferred**: intentionally outside the initial test scope.
 
 ## Guardrail
-Do not select the architecture, framework, database, hosting provider, or specific API until requirements and first-version scope are sufficiently clear.
+The first-version architecture is decided in ADR 0001. Changing the framework, database, hosting provider, or AI provider needs a new ADR. Live-data providers are still undecided.

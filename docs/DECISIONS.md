@@ -3,7 +3,7 @@
 This file records decisions and unresolved recommendations. Detailed behaviour belongs in the relevant requirements/rules documents.
 
 ## Confirmed through Stage 16
-- First test focuses on the Tasmania trip from 25 October to 26 November 2026, with Sydney from 3–6 November represented separately.
+- First test focuses on the real trip. ~~Tasmania 25 October–26 November 2026 with Sydney 3–6 November~~ (superseded 2026-10-22, see below).
 - Owner login; visitors can view shared links and submit interest without accounts.
 - AI proposes full itineraries and changes; owner confirms changes before application.
 - Preserve selected activities, explain conflicts, and suggest alternatives.
@@ -16,6 +16,11 @@ This file records decisions and unresolved recommendations. Detailed behaviour b
 - Split shared vehicle costs by participants in the relevant driving leg.
 - Immersive maps and animation are a high priority, subject to usability, accessibility, safety, and mobile performance.
 - Private testing with the owner, Aya, and friends comes before broader expansion.
+
+## Confirmed on 2026-10-22
+- Trip dates: Sydney 3–6 November 2026 first, then Tasmania 6–27 November 2026 (25 days in total).
+- The 25 October–2 November day plans are removed because the trip had not started; their attractions are kept, with full information, as an unscheduled attraction pool that the owner can add to days. Suggested dates are hints only.
+- First-version architecture (see [ADR 0001](adr/0001-first-version-architecture.md)): code on GitHub, hosting on Vercel, Next.js (React + TypeScript), Neon Postgres, owner login with GitHub through Auth.js (next-auth v4), Claude API for AI planning in phase B (server-side, owner-only, daily cap).
 
 ## Proposed, awaiting confirmation
 - Compare overnight accommodation with returning to base using travel time, fatigue, route, cost, transport access, and next-day plans.
@@ -30,5 +35,5 @@ This file records decisions and unresolved recommendations. Detailed behaviour b
 - Data-provider feasibility, first-version live-data boundary, and test thresholds.
 - Visitor data correction process and offline-copy deletion expectations.
 
-## Explicitly undecided
-System architecture, programming language/framework, database, hosting provider, and specific API/provider selection.
+## Decided (previously undecided)
+System architecture, framework, database, hosting provider, and AI provider were decided on 2026-10-22; see [ADR 0001](adr/0001-first-version-architecture.md). Live-data providers remain TBD.

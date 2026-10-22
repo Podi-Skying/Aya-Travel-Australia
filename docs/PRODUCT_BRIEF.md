@@ -11,8 +11,9 @@ Create a travel-planning website that combines itinerary, transport, budget, rel
 - Primary interface language: Traditional Chinese. Keep official place names and source links in English where appropriate.
 
 ## Initial trip and constraints
-- Tasmania: 25 October–26 November 2026.
-- Sydney segment: 3–6 November 2026, shown as a separate destination segment.
+- Sydney: 3–6 November 2026 (first segment).
+- Tasmania: 6–27 November 2026.
+- The earlier 25 October–2 November plans were removed (the trip had not started); those attractions are kept as an unscheduled pool (decision of 2026-10-22).
 - UTAS Hobart Apartments costs AUD $0 for the owner and Aya only while they stay there. Other nights require separate accommodation budgeting.
 - Zayden may drive Monday–Wednesday and JJ Saturday–Sunday, but neither availability nor a full-day commitment is confirmed. Do not rely on either driver until the exact date and time window are confirmed.
 - Use the transport mode that best fits each region and date: driving, ferry, public transport, or walking.

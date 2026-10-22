@@ -1,0 +1,10 @@
+{
+  "name": "Aya 的澳洲旅程",
+  "short_name": "Aya 旅程",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f6f3ec",
+  "theme_color": "#0f3d3a",
+  "lang": "zh-Hant",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}
