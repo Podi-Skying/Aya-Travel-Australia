@@ -17,6 +17,13 @@ describe("missingConfig", () => {
     expect(missingConfig("public")).toEqual([]);
   });
 
+  it("flags a DATABASE_URL that is not a Postgres connection string", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("VOTER_HASH_SALT", "s");
+    vi.stubEnv("DATABASE_URL", " https://ep-x.apirest.ap-southeast-2.aws.neon.tech/neondb/rest/v1");
+    expect(missingConfig("public")[0]).toMatch(/^DATABASE_URL（格式錯誤/);
+  });
+
   it("does not require settings outside production", () => {
     vi.stubEnv("NODE_ENV", "development");
     expect(missingConfig("owner")).toEqual([]);
