@@ -26,6 +26,6 @@ The static prototype in `site/` stored everything in one browser's `localStorage
 
 ## Consequences
 - Vercel Hobby forbids commercial use; a public or commercial launch needs Vercel Pro.
-- OpenStreetMap tiles are fine for private testing; a public launch needs a tile provider.
+- Map tiles: OpenStreetMap standard tiles. On 2026-10-23 they were blocked because the site sent `Referrer-Policy: no-referrer` and OSM's tile policy requires a Referer; fixed by sending the origin. OSM tiles suit light private use only; a public launch needs a commercial tile provider. (CARTO's basemaps now require an API key, so they were not used.) The site sends `Referrer-Policy: strict-origin-when-cross-origin`, so tile servers see only the origin, never a share-link path.
 - Every new field in the trip document must pass the privacy filter; the filter fails closed if a driver name or address remains.
 - Offline copies on visitors' devices cannot be recalled after deletion.

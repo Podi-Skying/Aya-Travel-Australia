@@ -21,7 +21,13 @@ function loadLeaflet(): Promise<L> {
 }
 
 function tiles(L: L) {
-  return L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18, attribution: "&copy; OpenStreetMap contributors" });
+  // OpenStreetMap standard tiles. Their usage policy requires a Referer header, which the
+  // site's Referrer-Policy (strict-origin-when-cross-origin) now sends as the origin only.
+  return L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    referrerPolicy: "strict-origin-when-cross-origin",
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  });
 }
 
 function segColor(seg: string) {

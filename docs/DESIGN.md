@@ -302,6 +302,12 @@
 - 保留瀏覽器縮放，不設定 `maximum-scale` 或 `user-scalable=no`。
 - 支援 `viewport-fit=cover` 並為固定 header、底部日期列與 dialog 加上安全區 inset。
 
+## 地圖
+
+- 底圖使用 OpenStreetMap 標準圖磚，以 CSS 濾鏡降低彩度、偏紙色；顯示 OpenStreetMap 姓名標示。網站送出 `strict-origin-when-cross-origin` Referer（OSM 使用政策要求），只含網域，不含分享連結路徑。
+- 地圖控制（縮放）放在地圖內，不得蓋過頂部導覽與分頁列；按鈕 44×44px。
+- 地圖無法載入時，保留「文字版路線」。
+
 ## 效能規則
 
 - 任何 scroll frame 都不讀取 `offsetTop`、`offsetHeight`、`getBoundingClientRect()` 或 `getTotalLength()`；幾何只在 layout／resize 時計算。
