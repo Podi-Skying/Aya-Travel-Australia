@@ -9,7 +9,7 @@ The static prototype in `site/` stored everything in one browser's `localStorage
 - **Code hosting:** GitHub, private repository `Podi-Skying/Aya-Travel-Australia`.
 - **Hosting:** Vercel (Hobby plan; private, non-commercial use), Root Directory `web`, deployed from GitHub.
 - **Framework:** Next.js 16 App Router with React 19 and TypeScript (strict). The prototype CSS is reused as the global stylesheet.
-- **Database:** Neon Postgres (Vercel Marketplace) through Drizzle ORM with committed SQL migrations. Local development and tests use PGlite, an in-process Postgres, so no database server is needed.
+- **Database:** Neon (Lakebase Postgres), project `quiet-mountain-96197074`, branch `production`, region aws-ap-southeast-2, through Drizzle ORM with committed SQL migrations. The app connects with node-postgres over the pooled URL and `attachDatabasePool` on Vercel Fluid compute (Neon's guidance for Vercel; changed from `@neondatabase/serverless` on 2026-10-22); migrations use the direct URL. Local development and tests use PGlite, an in-process Postgres, so no database server is needed.
 - **Data model:** each trip version is a full JSON snapshot validated by one Zod schema. Versions are append-only; restoring creates a new version. Writes lock the trip row and use optimistic concurrency (HTTP 409 on a stale base).
 - **Owner login:** GitHub OAuth with next-auth v4 (the stable Auth.js line), JWT sessions, no database adapter. Only GitHub ids in `OWNER_GITHUB_IDS` may sign in (Podi-Skying = 32431832). Account recovery is GitHub's recovery flow.
 - **Sharing:** random 32-byte tokens; only SHA-256 hashes are stored; one active link per trip. Visitors only ever receive a server-filtered document without addresses, driver names, or driver time windows.

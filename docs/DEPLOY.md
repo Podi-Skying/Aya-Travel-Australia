@@ -11,7 +11,7 @@ These steps need your own accounts. Nothing here was done for you automatically.
 ## 2. Vercel project
 1. Sign in to Vercel with GitHub and **Add New → Project**, then import `Podi-Skying/Aya-Travel-Australia`.
 2. Set **Root Directory** to `web`. Framework preset: Next.js.
-3. **Storage → Neon** (Marketplace): create a free database and connect it to the project. This sets `DATABASE_URL`.
+3. Database: the Neon project `quiet-mountain-96197074` (branch `production`, region aws-ap-southeast-2) is already linked in `web/.neon` and migrated and seeded (2026-10-22). In Vercel, add its connection strings as environment variables: `DATABASE_URL` (pooled, host contains `-pooler`) and `DATABASE_URL_UNPOOLED` (direct). Copy them from `web/.env.local` on this Mac or from the Neon console. Do not also create a second database through the Vercel Marketplace.
 4. Environment variables (Production):
    - `NEXTAUTH_SECRET`: output of `openssl rand -base64 32`
    - `NEXTAUTH_URL`: your production URL (GitHub sends sign-ins back to this address only, so sign-in works on production, not on preview deployments)
@@ -20,17 +20,16 @@ These steps need your own accounts. Nothing here was done for you automatically.
    - `VOTER_HASH_SALT`: output of `openssl rand -hex 16`
 5. Deploy.
 
-## 3. Create the tables and the trip (once)
-On your computer, in `web/`, with the Neon connection string from Vercel:
+## 3. Tables and the trip (already done once)
+`web/` is linked to Neon with the Neon CLI (`neon init`, `neon deploy`), which writes `DATABASE_URL`, `DATABASE_URL_UNPOOLED` and `NEON_BRANCH` into the git-ignored `web/.env.local`. Both scripts read that file:
 
 ```bash
 cd web
-npm ci
-DATABASE_URL="<neon connection string>" npm run db:migrate
-DATABASE_URL="<neon connection string>" OWNER_GITHUB_IDS=32431832 npm run db:seed
+npm run db:migrate   # uses DATABASE_URL_UNPOOLED (direct connection), as Neon advises for migrations
+npm run db:seed      # creates version 1 only if no trip exists
 ```
 
-`db:seed` creates version 1 (Sydney 11/3–11/6, Tasmania 11/6–11/27, plus the unscheduled attraction pool). It does nothing if a trip already exists.
+Run `db:migrate` again after any change in `drizzle/`. `db:seed` creates version 1 (Sydney 11/3–11/6, Tasmania 11/6–11/27, plus the unscheduled attraction pool) and does nothing if a trip already exists.
 
 ## 4. Check (on the production URL)
 1. Open the production site and sign in with GitHub as Podi-Skying. Another GitHub account gets a 403 page.
