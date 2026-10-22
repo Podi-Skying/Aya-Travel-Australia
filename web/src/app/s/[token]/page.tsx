@@ -1,11 +1,14 @@
 import { getPublicTrip } from "@/server/sharing";
 import { TripApp } from "@/components/TripApp";
-import { Notice } from "@/components/Notice";
+import { ConfigNotice, Notice } from "@/components/Notice";
+import { missingConfig } from "@/server/config";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Aya 的澳洲旅程（唯讀分享）", robots: { index: false, follow: false } };
 
 export default async function SharedTrip({ params }: { params: Promise<{ token: string }> }) {
+  const missing = missingConfig("public");
+  if (missing.length) return <ConfigNotice missing={missing} />;
   const { token } = await params;
   const t = await getPublicTrip(token);
   if (!t)

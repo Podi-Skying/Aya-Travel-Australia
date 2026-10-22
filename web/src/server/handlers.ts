@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { errorResponse, fail, HttpError, json, ownerRoute, readJson } from "./http";
+import { missingConfig } from "./config";
 import { applyOwnerOp, deleteTrip, getCurrentTrip, importDoc, listVersions, restoreVersion } from "./trips";
 import { createShareLink, deactivateShareLinks, getPublicTrip, interestCounts, myVotes, shareStatus, submitVote, withdrawVote } from "./sharing";
 import { alertStatus } from "@/domain/rules";
@@ -82,7 +83,14 @@ export const getInterest = ownerRoute(async (_req, owner) => {
 
 type Ctx = { params: Promise<{ token: string }> };
 
+function publicConfigError(): Response | null {
+  const missing = missingConfig("public");
+  return missing.length ? fail(503, "伺服器設定未完成", { missing }) : null;
+}
+
 export async function getPublic(_req: Request, ctx: Ctx) {
+  const cfg = publicConfigError();
+  if (cfg) return cfg;
   try {
     const { token } = await ctx.params;
     const t = await getPublicTrip(token);
@@ -96,6 +104,8 @@ export async function getPublic(_req: Request, ctx: Ctx) {
 const VOTE_BYTES = 2_000;
 
 export async function postVote(req: Request, ctx: Ctx) {
+  const cfg = publicConfigError();
+  if (cfg) return cfg;
   try {
     const { token } = await ctx.params;
     return json(await submitVote(token, await readJson(req, VOTE_BYTES)));
@@ -105,6 +115,8 @@ export async function postVote(req: Request, ctx: Ctx) {
 }
 
 export async function deleteVote(req: Request, ctx: Ctx) {
+  const cfg = publicConfigError();
+  if (cfg) return cfg;
   try {
     const { token } = await ctx.params;
     return json(await withdrawVote(token, await readJson(req, VOTE_BYTES)));
@@ -114,6 +126,8 @@ export async function deleteVote(req: Request, ctx: Ctx) {
 }
 
 export async function postMyVotes(req: Request, ctx: Ctx) {
+  const cfg = publicConfigError();
+  if (cfg) return cfg;
   try {
     const { token } = await ctx.params;
     return json({ votes: await myVotes(token, await readJson(req, VOTE_BYTES)) });

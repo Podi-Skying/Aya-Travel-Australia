@@ -14,6 +14,7 @@ type Tx = Parameters<Parameters<AppDb["transaction"]>[0]>[0];
 export const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
 
 function voterHash(voterKey: string) {
+  // Production requires VOTER_HASH_SALT (checked in config.ts); the fallback is for local development only.
   return sha256(`${process.env.VOTER_HASH_SALT ?? "dev-salt"}:${voterKey}`);
 }
 

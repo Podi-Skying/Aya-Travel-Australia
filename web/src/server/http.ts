@@ -1,4 +1,5 @@
 import { checkOwner, type Owner } from "./owner";
+import { missingConfig } from "./config";
 
 export const json = (data: unknown, status = 200, headers: Record<string, string> = {}) =>
   new Response(JSON.stringify(data), {
@@ -69,6 +70,8 @@ type OwnerHandler = (req: Request, owner: Owner) => Promise<Response>;
 /** Wraps an owner API handler: 401 without session, 403 for non-owner or foreign Origin on mutations. */
 export function ownerRoute(handler: OwnerHandler) {
   return async (req: Request): Promise<Response> => {
+    const missing = missingConfig("owner");
+    if (missing.length) return fail(503, "伺服器設定未完成", { missing });
     const c = await checkOwner();
     if (!c.ok) return c.reason === "unauthenticated" ? fail(401, "請先登入") : fail(403, "沒有權限");
     if (req.method !== "GET" && req.method !== "HEAD" && !sameOrigin(req)) return fail(403, "來源不符");
