@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Aya 的澳洲旅程</title>
+  <meta name="description" content="Aya 塔斯馬尼亞與雪梨旅遊規劃（私人測試原型）">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <a class="skip" href="#main">跳到主要內容</a>
+
+  <header class="hero" id="top">
+    <svg class="hero-waves" viewBox="0 0 1440 200" preserveAspectRatio="none" aria-hidden="true">
+      <path class="w1" d="M0,120 C240,170 480,70 720,110 C960,150 1200,80 1440,120 L1440,200 L0,200 Z"/>
+      <path class="w2" d="M0,150 C260,110 520,190 780,150 C1040,110 1240,170 1440,140 L1440,200 L0,200 Z"/>
+    </svg>
+    <div class="hero-inner">
+      <p class="eyebrow">私人測試版 · 行程草稿</p>
+      <h1 id="trip-title">Aya 的澳洲旅程</h1>
+      <p class="hero-sub" id="trip-sub"></p>
+      <div class="hero-meta" id="hero-meta"></div>
+    </div>
+  </header>
+
+  <div class="banner" id="share-banner" hidden></div>
+
+  <nav class="tabs" aria-label="主要分頁">
+    <div class="tabs-inner" role="tablist">
+      <button role="tab" data-tab="overview" aria-selected="true">總覽</button>
+      <button role="tab" data-tab="days">每日行程</button>
+      <button role="tab" data-tab="map">地圖</button>
+      <button role="tab" data-tab="budget">預算</button>
+      <button role="tab" data-tab="info">資訊與警示</button>
+      <button role="tab" data-tab="manage" data-owner>版本與分享</button>
+    </div>
+    <div class="mode-switch">
+      <button id="mode-btn" class="btn ghost small" type="button"></button>
+    </div>
+  </nav>
+
+  <main id="main">
+    <section class="panel" id="tab-overview" role="tabpanel"></section>
+    <section class="panel" id="tab-days" role="tabpanel" hidden>
+      <div class="days-layout">
+        <div class="day-strip" id="day-strip" aria-label="選擇日期"></div>
+        <div class="day-main">
+          <article class="day-detail" id="day-detail"></article>
+          <aside class="day-map-wrap">
+            <div class="map day-map" id="day-map" role="region" aria-label="當日路線地圖"></div>
+            <p class="map-note" id="day-map-note"></p>
+          </aside>
+        </div>
+      </div>
+    </section>
+    <section class="panel" id="tab-map" role="tabpanel" hidden>
+      <div class="map-head">
+        <h2>全程地圖</h2>
+        <div class="map-legend" id="map-legend"></div>
+      </div>
+      <div class="map trip-map" id="trip-map" role="region" aria-label="全程地圖"></div>
+      <p class="map-note" id="trip-map-note"></p>
+      <details class="map-alt">
+        <summary>文字版路線（不需地圖）</summary>
+        <ol id="map-text"></ol>
+      </details>
+    </section>
+    <section class="panel" id="tab-budget" role="tabpanel" hidden></section>
+    <section class="panel" id="tab-info" role="tabpanel" hidden></section>
+    <section class="panel" id="tab-manage" role="tabpanel" hidden></section>
+  </main>
+
+  <footer class="foot">
+    <p id="sync-line"></p>
+    <p>此網站為依需求文件製作的<strong>靜態原型</strong>（路線圖第 2 階段），不代表已選定系統架構。所有價格與時間皆為估計，AI 規劃、即時資料與登入尚未實作。</p>
+  </footer>
+
+  <dialog id="dlg">
+    <form method="dialog" id="dlg-form">
+      <h3 id="dlg-title"></h3>
+      <div id="dlg-body"></div>
+      <div class="dlg-actions">
+        <button value="cancel" class="btn ghost" type="submit" formnovalidate>取消</button>
+        <button value="ok" class="btn" id="dlg-ok" type="submit">確定</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
