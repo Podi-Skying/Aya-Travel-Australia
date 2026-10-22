@@ -8,6 +8,7 @@ export const dynamic = "force-dynamic";
 export default async function OwnerHome() {
   const p = await loadOwnerPage();
   if (p.kind === "config") return <ConfigNotice missing={p.missing} />;
+  if (p.kind === "public") return <TripApp mode="public" home initial={{ doc: p.trip.doc as never, versionNo: p.trip.versionNo, syncedAt: new Date().toISOString() }} />;
   if (p.kind === "signin") redirect("/api/auth/signin?callbackUrl=%2F");
   if (p.kind === "forbidden")
     return (

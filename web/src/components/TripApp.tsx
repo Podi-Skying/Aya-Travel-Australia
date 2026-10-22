@@ -42,6 +42,7 @@ type Ctx = {
   vote: (itemId: string, dayDate: string) => Promise<void>;
   unvote: (itemId: string, dayDate: string) => Promise<void>;
   counts: Counts | null;
+  canVote: boolean;
   versions: VersionMeta[];
   reloadVersions: () => Promise<void>;
   applyServerDoc: (doc: TripDoc, versionNo: number) => void;
@@ -87,9 +88,12 @@ function voterKey(): string {
   return memoryVoterKey;
 }
 
-export function TripApp(props: { mode: Mode; token?: string; initial: { doc: TripDoc; versionNo: number; syncedAt: string } }) {
+export function TripApp(props: { mode: Mode; token?: string; home?: boolean; initial: { doc: TripDoc; versionNo: number; syncedAt: string } }) {
   const { mode, token } = props;
-  const storeKey = keyFor(mode, token);
+  // Public home (PUBLIC_HOME=1): read-only like a share link, but without voting (votes belong to a share link).
+  const home = mode === "public" && !!props.home;
+  const canVote = mode === "public" && !!token;
+  const storeKey = home ? "trip:home" : keyFor(mode, token);
   const [doc, setDoc] = useState<TripDoc>(props.initial.doc);
   const [versionNo, setVersionNo] = useState(props.initial.versionNo);
   const [lastSyncAt, setLastSyncAt] = useState(props.initial.syncedAt);
@@ -107,7 +111,7 @@ export function TripApp(props: { mode: Mode; token?: string; initial: { doc: Tri
   const { ask, node: dialog } = useAsk();
   const { toast, node: toastNode } = useToast();
 
-  const tripUrl = mode === "owner" ? "/api/trip" : `/api/s/${token}`;
+  const tripUrl = mode === "owner" ? "/api/trip" : home ? "/api/public" : `/api/s/${token}`;
 
   const persist = useCallback(
     (d: TripDoc, v: number, syncedAt: string) =>
@@ -185,10 +189,10 @@ export function TripApp(props: { mode: Mode; token?: string; initial: { doc: Tri
   }, [mode]);
 
   const loadMyVotes = useCallback(async () => {
-    if (mode !== "public") return;
+    if (!canVote) return;
     const r = await api<{ votes: Vote[] }>(`/api/s/${token}/interest/mine`, { method: "POST", body: { voterKey: voterKey() } });
     if (r.ok) setMyVotes(r.data.votes);
-  }, [mode, token]);
+  }, [canVote, token]);
 
   useEffect(() => {
     registerServiceWorker([tripUrl]);
@@ -287,6 +291,7 @@ export function TripApp(props: { mode: Mode; token?: string; initial: { doc: Tri
     vote,
     unvote,
     counts,
+    canVote,
     versions,
     reloadVersions,
     applyServerDoc,
@@ -296,7 +301,7 @@ export function TripApp(props: { mode: Mode; token?: string; initial: { doc: Tri
   };
 
   const visibleTabs = TABS.filter((t) => mode === "owner" || !("owner" in t));
-  const journeyHref = mode === "owner" ? "/journey" : `/s/${token}/journey`;
+  const journeyHref = mode === "owner" || home ? "/journey" : `/s/${token}/journey`;
 
   return (
     <TripCtx.Provider value={ctx}>
@@ -304,7 +309,17 @@ export function TripApp(props: { mode: Mode; token?: string; initial: { doc: Tri
         跳到主要內容
       </a>
       <Hero doc={doc} mode={mode} journeyHref={journeyHref} />
-      {mode === "public" && <div className="banner">你正在檢視 Aya 的旅程（唯讀）。可以對活動按「我有興趣」！</div>}
+      {mode === "public" && (
+        <div className="banner">
+          {canVote ? "你正在檢視 Aya 的旅程（唯讀）。可以對活動按「我有興趣」！" : "你正在檢視 Aya 的旅程（唯讀公開版，住址與司機資訊已隱藏）。"}{" "}
+          {home && (
+            <>
+              {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- next-auth route, full navigation */}
+              <a href="/api/auth/signin?callbackUrl=%2F">擁有者登入</a>
+            </>
+          )}
+        </div>
+      )}
       {(!online || fromCache) && (
         <div className="offline-banner" role="status">
           離線副本，可能不是最新資料（最後同步：{fmtTs(lastSyncAt)}）

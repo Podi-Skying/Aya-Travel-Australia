@@ -208,6 +208,23 @@ describe("interest (AC7)", () => {
   });
 });
 
+describe("public home (PUBLIC_HOME)", () => {
+  it("is off by default and serves only the redacted document when on; owner APIs stay protected", async () => {
+    delete process.env.PUBLIC_HOME;
+    signedOut();
+    expect((await H.getPublicHome()).status).toBe(404);
+    process.env.PUBLIC_HOME = "1";
+    const r = await H.getPublicHome();
+    expect(r.status).toBe(200);
+    const text = await r.text();
+    expect(JSON.parse(text).doc.days).toHaveLength(25);
+    expect(text).not.toMatch(/Zayden|JJ|"address"|"driverConfirmation"/);
+    expect((await H.getTrip(req("GET", "/api/trip"))).status).toBe(401);
+    expect((await op(1, { op: "setPartySize", partySize: 3 })).status).toBe(401);
+    delete process.env.PUBLIC_HOME;
+  });
+});
+
 describe("request size (inspection R-05)", () => {
   it("stops reading an oversized body without Content-Length", async () => {
     const t = await newShare();

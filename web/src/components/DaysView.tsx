@@ -27,7 +27,7 @@ function Legs({ travel }: { travel: Item["travel"] }) {
 }
 
 export function DaysView({ active }: { active: boolean }) {
-  const { doc, mode, currentDay, setCurrentDay, runOp, ask, online, myVotes, vote, unvote, counts } = useTrip();
+  const { doc, mode, currentDay, setCurrentDay, runOp, ask, online, myVotes, vote, unvote, counts, canVote } = useTrip();
   const reduce = useReducedMotion();
   const stripRef = useRef<HTMLDivElement>(null);
   const [focusId, setFocusId] = useState<string | null>(null);
@@ -300,6 +300,7 @@ export function DaysView({ active }: { active: boolean }) {
                             🗺️ 地圖
                           </button>
                           {mode === "public" ? (
+                            canVote && (
                             <span className="interest">
                               <button className={`btn small ${voted ? "ghost" : ""}`} type="button" onClick={() => void vote(i.id, d.date)}>
                                 {voted ? `✓ 已表達興趣${voted.nickname ? "（" + voted.nickname + "）" : ""}` : "🙋 我有興趣"}
@@ -310,6 +311,7 @@ export function DaysView({ active }: { active: boolean }) {
                                 </button>
                               )}
                             </span>
+                            )
                           ) : (
                             <>
                               <label className="small">

@@ -5,6 +5,8 @@ export const metadata: Metadata = {
   title: "Aya 的澳洲旅程",
   description: "Aya 雪梨與塔斯馬尼亞旅遊規劃（私人測試版）",
   manifest: "/manifest.webmanifest",
+  // Private trip: keep every page out of search engines, including the optional public home.
+  robots: { index: false, follow: false },
 };
 
 export const viewport: Viewport = {

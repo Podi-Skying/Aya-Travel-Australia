@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { errorResponse, fail, HttpError, json, ownerRoute, readJson } from "./http";
 import { missingConfig } from "./config";
+import { getPublicHomeTrip, publicHomeEnabled } from "./public-home";
 import { applyOwnerOp, deleteTrip, getCurrentTrip, importDoc, listVersions, restoreVersion } from "./trips";
 import { createShareLink, deactivateShareLinks, getPublicTrip, interestCounts, myVotes, shareStatus, submitVote, withdrawVote } from "./sharing";
 import { alertStatus } from "@/domain/rules";
@@ -95,6 +96,20 @@ export async function getPublic(_req: Request, ctx: Ctx) {
     const { token } = await ctx.params;
     const t = await getPublicTrip(token);
     if (!t) return fail(404, "分享連結無效或已停用");
+    return json({ ...t, alerts: alertStatus(t.doc as never, { showWindow: false }), syncedAt: new Date().toISOString() });
+  } catch (e) {
+    return errorResponse(e);
+  }
+}
+
+/** Public home data (PUBLIC_HOME=1 only): same redacted document as share links. */
+export async function getPublicHome() {
+  if (!publicHomeEnabled()) return fail(404, "公開瀏覽未開啟");
+  const cfg = publicConfigError();
+  if (cfg) return cfg;
+  try {
+    const t = await getPublicHomeTrip();
+    if (!t) return fail(404, "找不到行程");
     return json({ ...t, alerts: alertStatus(t.doc as never, { showWindow: false }), syncedAt: new Date().toISOString() });
   } catch (e) {
     return errorResponse(e);
