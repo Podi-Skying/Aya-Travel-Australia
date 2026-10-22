@@ -1,3 +1,5 @@
+import { SiteHeader } from "./SiteHeader";
+
 export function ConfigNotice({ missing }: { missing: string[] }) {
   return (
     <Notice title="網站設定還沒完成">
@@ -16,11 +18,14 @@ export function ConfigNotice({ missing }: { missing: string[] }) {
 
 export function Notice({ title, children }: { title: string; children?: React.ReactNode }) {
   return (
+    <>
+    <SiteHeader account={null} />
     <main id="main">
       <div className="card center-card">
         <h2>{title}</h2>
         {children}
       </div>
     </main>
+    </>
   );
 }

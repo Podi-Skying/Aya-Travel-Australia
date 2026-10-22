@@ -1,14 +1,15 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { TripDoc } from "@/domain/schema";
 import type { Op } from "@/domain/ops";
 import { alertStatus } from "@/domain/rules";
 import { dayDiff, fmtMD, fmtTs } from "@/domain/format";
 import { api, registerServiceWorker } from "@/client/api";
 import { keyFor, loadSnapshot, saveSnapshot, mergeVersions, type VersionMeta } from "@/client/offline";
-import { signIn, signOut } from "next-auth/react";
-import { useAsk, useToast, useToday } from "./ui";
+import { SiteHeader } from "./SiteHeader";
+import { Icon } from "./Icon";
+import { useAsk, useToast, useHobartToday, useUrlState, writeUrl } from "./ui";
 import { Overview } from "./Overview";
 import { DaysView } from "./DaysView";
 import { TripMapTab } from "./MapViews";
@@ -101,11 +102,32 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
   const [alerts, setAlerts] = useState<Alerts>(() => alertStatus(props.initial.doc, { showWindow: props.mode === "owner" }));
   const [online, setOnline] = useState(true);
   const [fromCache, setFromCache] = useState(false);
-  const [tab, setTab] = useState<TabKey>("overview");
-  const today = useToday();
-  const [pickedDay, setCurrentDay] = useState<number | null>(null);
-  const todayIdx = today ? doc.days.findIndex((d) => d.date === today) : -1;
-  const currentDay = pickedDay ?? (todayIdx >= 0 ? todayIdx : 0);
+  // Tab and day live in the URL (?tab=days&day=YYYY-MM-DD) so walk ↔ plan links land in place.
+  // Without them: during the trip (Australia/Hobart dates) open today's day, otherwise the overview.
+  const today = useHobartToday();
+  const inTrip = !!today && today >= props.initial.doc.meta.start && today <= props.initial.doc.meta.end;
+  const [pickedTab, setPickedTab] = useState<TabKey | null>(null);
+  const [pickedDay, setPickedDay] = useState<number | null>(null);
+  const url = useUrlState();
+  const urlTab = TABS.some((t) => t.key === url.tab) ? (url.tab as TabKey) : null;
+  const urlDayIdx = url.day ? doc.days.findIndex((d) => d.date === url.day) : -1;
+  const tab: TabKey = pickedTab ?? urlTab ?? (urlDayIdx >= 0 || inTrip ? "days" : "overview");
+  const todayIdx = today ? doc.days.findIndex((d) => d.date >= today) : -1;
+  const currentDay = pickedDay ?? (urlDayIdx >= 0 ? urlDayIdx : inTrip && todayIdx >= 0 ? todayIdx : inTrip ? doc.days.length - 1 : 0);
+  const setTab = useCallback(
+    (t: TabKey) => {
+      setPickedTab(t);
+      writeUrl({ tab: t, day: t === "days" ? doc.days[currentDay]?.date : undefined });
+    },
+    [doc.days, currentDay],
+  );
+  const setCurrentDay = useCallback(
+    (i: number) => {
+      setPickedDay(i);
+      writeUrl({ tab: "days", day: doc.days[i]?.date });
+    },
+    [doc.days],
+  );
   const [myVotes, setMyVotes] = useState<Vote[]>([]);
   const [counts, setCounts] = useState<Counts | null>(null);
   const [versions, setVersions] = useState<VersionMeta[]>([]);
@@ -269,11 +291,13 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
 
   const gotoDay = useCallback(
     (i: number) => {
-      setCurrentDay(Math.max(0, Math.min(doc.days.length - 1, i)));
-      setTab("days");
+      const k = Math.max(0, Math.min(doc.days.length - 1, i));
+      setPickedDay(k);
+      setPickedTab("days");
+      writeUrl({ tab: "days", day: doc.days[k]?.date });
       if (typeof window !== "undefined") document.querySelector(".tabs")?.scrollIntoView({ block: "start" });
     },
-    [doc.days.length],
+    [doc.days],
   );
 
   const ctx: Ctx = {
@@ -302,14 +326,29 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
   };
 
   const visibleTabs = TABS.filter((t) => mode === "owner" || !("owner" in t));
-  const journeyHref = mode === "owner" || home ? "/journey" : `/s/${token}/journey`;
+  const base = mode === "public" && token ? `/s/${token}` : "";
+  const tabsRef = useRef<HTMLDivElement>(null);
+  // Keep the selected tab visible in the scrollable tab row (mobile).
+  useEffect(() => {
+    tabsRef.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [tab]);
+  const onTabKey = (e: React.KeyboardEvent) => {
+    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft" && e.key !== "Home" && e.key !== "End") return;
+    e.preventDefault();
+    const i = visibleTabs.findIndex((t) => t.key === tab);
+    const n = visibleTabs.length;
+    const j = e.key === "Home" ? 0 : e.key === "End" ? n - 1 : (i + (e.key === "ArrowRight" ? 1 : -1) + n) % n;
+    setTab(visibleTabs[j].key);
+    tabsRef.current?.querySelectorAll<HTMLElement>('[role="tab"]')[j]?.focus();
+  };
 
   return (
     <TripCtx.Provider value={ctx}>
       <a className="skip" href="#main">
         跳到主要內容
       </a>
-      <Hero doc={doc} mode={mode} journeyHref={journeyHref} account={mode === "owner" ? "signout" : home ? "signin" : null} />
+      <SiteHeader base={base} current="plan" account={mode === "owner" ? "signout" : home ? "signin" : null} />
+      <Hero doc={doc} mode={mode} walkHref={base || "/"} />
       {mode === "public" && (
         <div className="banner">
           {canVote ? "你正在檢視 Aya 的旅程（唯讀）。可以對活動按「我有興趣」！" : "你正在檢視 Aya 的旅程（唯讀公開版，住址與司機資訊已隱藏）。"}{" "}
@@ -324,36 +363,45 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
           </button>
         </div>
       )}
-      <nav className="tabs" aria-label="主要分頁">
-        <div className="tabs-inner" role="tablist">
+      <nav className="tabs" aria-label="行程分頁">
+        <div className="tabs-inner" role="tablist" ref={tabsRef} onKeyDown={onTabKey}>
           {visibleTabs.map((t) => (
-            <button key={t.key} role="tab" type="button" aria-selected={tab === t.key} onClick={() => setTab(t.key)}>
+            <button
+              key={t.key}
+              id={`tab-${t.key}`}
+              role="tab"
+              type="button"
+              aria-selected={tab === t.key}
+              aria-controls={`panel-${t.key}`}
+              tabIndex={tab === t.key ? 0 : -1}
+              onClick={() => setTab(t.key)}
+            >
               {t.label}
             </button>
           ))}
         </div>
       </nav>
       <main id="main">
-        <Panel show={tab === "overview"}>
+        <Panel id="overview" show={tab === "overview"}>
           <Overview />
         </Panel>
-        <Panel show={tab === "days"}>
+        <Panel id="days" show={tab === "days"}>
           <DaysView active={tab === "days"} />
         </Panel>
-        <Panel show={tab === "map"}>
+        <Panel id="map" show={tab === "map"}>
           <TripMapTab active={tab === "map"} />
         </Panel>
-        <Panel show={tab === "budget"}>
+        <Panel id="budget" show={tab === "budget"}>
           <Budget />
         </Panel>
-        <Panel show={tab === "pool"}>
+        <Panel id="pool" show={tab === "pool"}>
           <Pool />
         </Panel>
-        <Panel show={tab === "info"}>
+        <Panel id="info" show={tab === "info"}>
           <Info />
         </Panel>
         {mode === "owner" && (
-          <Panel show={tab === "manage"}>
+          <Panel id="manage" show={tab === "manage"}>
             <Manage />
           </Panel>
         )}
@@ -379,15 +427,15 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
   );
 }
 
-function Panel({ show, children }: { show: boolean; children: ReactNode }) {
+function Panel({ id, show, children }: { id: string; show: boolean; children: ReactNode }) {
   return (
-    <section className="panel" role="tabpanel" hidden={!show}>
+    <section className="panel" role="tabpanel" id={`panel-${id}`} aria-labelledby={`tab-${id}`} hidden={!show}>
       {children}
     </section>
   );
 }
 
-function Hero({ doc, mode, journeyHref, account }: { doc: TripDoc; mode: Mode; journeyHref: string; account: "signin" | "signout" | null }) {
+function Hero({ doc, mode, walkHref }: { doc: TripDoc; mode: Mode; walkHref: string }) {
   const segOrder = useMemo(() => {
     const out: string[] = [];
     doc.days.forEach((d) => {
@@ -395,42 +443,32 @@ function Hero({ doc, mode, journeyHref, account }: { doc: TripDoc; mode: Mode; j
     });
     return out;
   }, [doc.days]);
-  const t = useToday();
+  const t = useHobartToday();
   const s = doc.meta.start;
   const e = doc.meta.end;
   const when = !t ? "" : t < s ? `距離出發還有 ${dayDiff(t, s)} 天` : t <= e ? `旅程第 ${dayDiff(s, t) + 1} 天` : "旅程已結束";
   return (
     <header className="hero" id="top">
-      <svg className="hero-waves" viewBox="0 0 1440 200" preserveAspectRatio="none" aria-hidden="true">
-        <path className="w1" d="M0,120 C240,170 480,70 720,110 C960,150 1200,80 1440,120 L1440,200 L0,200 Z" />
-        <path className="w2" d="M0,150 C260,110 520,190 780,150 C1040,110 1240,170 1440,140 L1440,200 L0,200 Z" />
-      </svg>
-      {account && (
-        <button
-          type="button"
-          className="hero-account"
-          onClick={() => void (account === "signin" ? signIn("github", { callbackUrl: "/plan" }) : signOut({ callbackUrl: "/" }))}
-        >
-          {account === "signin" ? "登入" : "擁有者・登出"}
-        </button>
-      )}
       <div className="hero-inner">
-        <p className="eyebrow">{mode === "owner" ? "私人測試版 · 擁有者" : "私人測試版 · 訪客瀏覽"}</p>
+        <p className="eyebrow">{mode === "owner" ? "行程管理・擁有者" : "行程・唯讀瀏覽"}</p>
         <h1>{doc.meta.title}</h1>
         <p className="hero-sub">{doc.meta.subtitle}</p>
         <div className="hero-meta">
           <span className="chip-hero">
-            🗓️ {fmtMD(doc.meta.start)} – {fmtMD(doc.meta.end)}・{doc.days.length} 天
+            <Icon name="calendar" /> {fmtMD(doc.meta.start)} – {fmtMD(doc.meta.end)}・{doc.days.length} 天
           </span>
-          <span className="chip-hero">📍 {segOrder.map((k) => `${doc.segments[k]?.name ?? k}（${doc.segments[k]?.range ?? ""}）`).join(" → ")}</span>
-          {when && <span className="chip-hero">⏱️ {when}</span>}
+          <span className="chip-hero">
+            <Icon name="pin" /> {segOrder.map((k) => `${doc.segments[k]?.name ?? k}（${doc.segments[k]?.range ?? ""}）`).join(" → ")}
+          </span>
+          {when && (
+            <span className="chip-hero">
+              <Icon name="clock" /> {when}
+            </span>
+          )}
         </div>
         <p className="hero-links">
-          <a className="hero-cta" href={journeyHref}>
-            ✦ 3D 旅程首頁
-          </a>
-          <a className="hero-cta" href={journeyHref.replace(/\/journey$/, "") || "/"}>
-            🚶 南方散步（每日路線）
+          <a className="hero-cta" href={walkHref}>
+            <Icon name="route" /> 回到散步
           </a>
         </p>
       </div>

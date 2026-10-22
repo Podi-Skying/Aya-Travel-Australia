@@ -1,0 +1,22 @@
+/* Shared header (docs/DESIGN.md「材質與紙紋」「共用導覽」). Imported by the root layout. */
+.site-header { position: fixed; top: 0; left: 0; right: 0; z-index: 900; height: calc(56px + env(safe-area-inset-top)); padding: env(safe-area-inset-top) max(20px, env(safe-area-inset-right)) 0 max(20px, env(safe-area-inset-left)); display: flex; align-items: center; justify-content: space-between; gap: 12px; font-family: "PingFang TC", "Noto Sans TC", system-ui, -apple-system, sans-serif; font-weight: 400; letter-spacing: 0; }
+.site-header.paper { background: rgba(250, 247, 240, .88); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); color: #292823; }
+.site-header.dark { background: rgba(11, 20, 24, .88); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); color: #f4f1ea; }
+/* Scroll-edge fade instead of a hard divider. */
+.site-header::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 16px; pointer-events: none; }
+.site-header.paper::after { background: linear-gradient(rgba(250, 247, 240, .88), rgba(250, 247, 240, 0)); }
+.site-header.dark::after { background: linear-gradient(rgba(11, 20, 24, .88), rgba(11, 20, 24, 0)); }
+.site-logo { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; text-decoration: none; color: inherit; font-family: "Noto Serif TC", "Songti TC", serif; font-size: 1.0625rem; }
+.site-header nav { display: flex; align-items: center; gap: 4px; }
+.site-header nav a, .site-account { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 0 10px; border-radius: 12px; font: inherit; font-size: .9375rem; color: inherit; text-decoration: none; }
+.site-header nav a[aria-current="page"] { text-decoration: underline; text-decoration-color: #d2483a; text-decoration-thickness: 2px; text-underline-offset: 6px; }
+.site-account { appearance: none; background: none; border: 1px solid currentColor; border-radius: 999px; min-height: 44px; margin-left: 6px; cursor: pointer; padding: 0 14px; }
+.site-header a:active, .site-account:active { transform: scale(.94); }
+.site-header a, .site-account { transition: transform .1s ease-out; }
+@media (max-width: 380px) { .site-logo span { display: none; } }
+@media (prefers-reduced-transparency: reduce) {
+  .site-header.paper { background: #faf7f0; backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .site-header.dark { background: #0b1418; backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .site-header::after { display: none; }
+}
+@media (prefers-contrast: more) { .site-header.paper { color: #181714; } }

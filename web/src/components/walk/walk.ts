@@ -71,15 +71,16 @@ const RIDES: Record<string, string> = {
   car: '<g class="ride car"><path class="fillp" d="M6 66 Q6 56 16 56 L24 46 H48 L58 56 Q66 56 66 64 V68 H6 Z"/><path d="M27 48 V56 M44 48 V56"/><circle class="fillp wheel" cx="18" cy="70" r="6"/><circle class="fillp wheel" cx="54" cy="70" r="6"/><path class="scarf" d="M10 62 H16"/></g>',
   boat: '<g class="ride boat"><path class="fillp" d="M4 62 H66 L58 74 H12 Z"/><path class="fillp" d="M20 62 V50 H48 V62"/><path class="scarf" d="M34 50 V38 L46 44 L34 46"/><path class="wave" d="M0 80 Q8 76 16 80 T32 80 T48 80 T64 80 T80 80"/></g>',
   plane: '<g class="ride plane"><path class="fillp" d="M8 52 L56 42 Q68 40 69 44 Q70 48 58 51 L12 62 Z"/><path d="M34 48 L26 30 H32 L46 46"/><path d="M36 56 L30 70 H36 L46 54"/><path class="scarf" d="M12 54 L6 44 H12 L18 52"/></g>',
+  train: '<g class="ride train"><rect class="fillp" x="4" y="42" width="62" height="26" rx="9"/><path d="M4 54 H66 M14 47 H24 M30 47 H40 M46 47 H56"/><circle class="fillp wheel" cx="18" cy="71" r="4"/><circle class="fillp wheel" cx="52" cy="71" r="4"/><path class="scarf" d="M0 76 H70"/></g>',
   bus: '<g class="ride bus"><rect class="fillp" x="6" y="44" width="58" height="26" rx="5"/><path d="M12 50 H22 V58 H12 Z M28 50 H38 V58 H28 Z M44 50 H54 V58 H44 Z"/><circle class="fillp wheel" cx="18" cy="72" r="5"/><circle class="fillp wheel" cx="52" cy="72" r="5"/><path class="scarf" d="M6 64 H64"/></g>'
 };
-const WALKER = '<svg viewBox="0 0 70 80">' + PERSON + RIDES.car + RIDES.boat + RIDES.plane + RIDES.bus + "</svg>";
+const WALKER = '<svg viewBox="0 0 70 80">' + PERSON + RIDES.car + RIDES.boat + RIDES.plane + RIDES.train + RIDES.bus + "</svg>";
 
 export function artFor(it: { name: string; en?: string }): string {
   const s = (it.name + " " + (it.en || "")).toLowerCase();
   const rules: [RegExp, string][] = [
     [/opera|歌劇院/, "opera"], [/bridge|大橋|橋/, "bridge"], [/lighthouse|燈塔/, "lighthouse"], [/airport|flight|航班|機場|飛抵/, "plane"],
-    [/falls|瀑布/, "waterfall"], [/cave|洞/, "cave"], [/ferry|渡輪|船/, "boat"], [/market|市集/, "market"], [/museum|mona|tmag|博物館|美術館/, "museum"],
+    [/falls?\b|瀑布/, "waterfall"], [/cave|洞/, "cave"], [/ferry|渡輪|船/, "boat"], [/market|市集/, "market"], [/museum|mona|tmag|博物館|美術館/, "museum"],
     [/wildlife|devil|wombat|袋|保護區|動物/, "animal"], [/cheese|oyster|午餐|晚餐|brunch|早午餐|咖啡|bakery|麵包/, "food"],
     [/airwalk|walk|步道|樹|forest|garden|植物園|gorge|峽谷/, "forest"], [/beach|bay|灣|海|coast|cliff|懸崖|lake|湖/, "beach"],
     [/mount|kunanyi|cradle|山|echo|三姊妹/, "mountain"],
@@ -88,9 +89,9 @@ export function artFor(it: { name: string; en?: string }): string {
   return "town";
 }
 
-type Ride = "person" | "car" | "boat" | "plane" | "bus";
+type Ride = "person" | "car" | "boat" | "plane" | "train" | "bus";
 function rideFor(mode: string | undefined): Ride {
-  return mode === "drive" ? "car" : mode === "ferry" ? "boat" : mode === "flight" ? "plane" : mode === "bus" || mode === "train" ? "bus" : "person";
+  return mode === "drive" ? "car" : mode === "ferry" ? "boat" : mode === "flight" ? "plane" : mode === "train" ? "train" : mode === "bus" ? "bus" : "person";
 }
 
 /* ---------- distant lines: Sydney skyline, Tasmania ridges ---------- */
@@ -149,7 +150,7 @@ function clouds(w: number, h: number, seed: number) {
   return out;
 }
 
-type Spot = { el: HTMLElement; wash: HTMLElement; strokes: (SVGGeometryElement & { _l: number })[] };
+type Spot = { el: HTMLElement; meta: HTMLElement; wash: HTMLElement; strokes: (SVGGeometryElement & { _l: number })[] };
 type DayState = {
   d: WalkDay;
   i: number;
@@ -172,9 +173,16 @@ type DayState = {
   legL: Element;
   legR: Element;
   arm: Element;
+  // Cached geometry (read once per layout, never during scroll) and last-written values,
+  // so a scroll frame only touches the DOM where something actually changed.
+  top: number;
+  h: number;
+  anchorX: number;
+  stopScroll: number[];
+  last: { reveal: number[]; seen: number[]; dot: boolean[]; wash: number[]; ride: string; say: string; fade: number };
 };
 
-export function startWalk(root: HTMLElement, days: WalkDay[]): () => void {
+export function startWalk(root: HTMLElement, days: WalkDay[], opts: { planHref: string }): () => void {
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const container = root.querySelector<HTMLElement>("#rw-days")!;
   const jump = root.querySelector<HTMLSelectElement>("#rw-jump")!;
@@ -188,19 +196,18 @@ export function startWalk(root: HTMLElement, days: WalkDay[]): () => void {
   const D: DayState[] = days.map((d, di) => {
     const sec = document.createElement("section");
     sec.className = "day " + d.seg;
-    sec.id = di === 0 ? "rw-top" : "rw-d" + d.date;
+    sec.id = "rw-day-" + d.date;
     sec.setAttribute("aria-label", "第 " + (di + 1) + " 天 " + md(d.date) + " " + d.title);
     const no = String(di + 1).padStart(2, "0");
     const driver = d.needsDriver ? (d.driverOk ? "・朋友開車（已確認）" : "・需朋友開車（未確認）") : "";
     const segs = [...new Set(days.map((x) => x.segName))];
     const title =
       di === 0
-        ? '<div class="title hero"><h1><span>跟著 Aya，</span><br><span>走過南方的<em>每一天</em>。</span></h1><div class="lead">' +
+        ? '<div class="title hero"><h1>跟著 Aya，<br>走過南方的<em>每一天</em>。</h1><div class="lead">' +
           md(days[0].date) + " – " + md(days[total - 1].date) + "，" + esc(segs.join("，接著")) +
           "。往下捲動，小人會沿著當天路線走過每個景點，走完就換到下一天。</div>" +
-          '<div class="cue"><svg viewBox="0 0 18 40"><path d="M9 2 V34 M3 28 L9 36 L15 28" fill="none" stroke="#d2483a" stroke-width="1.4" stroke-linecap="round"/></svg>往下捲動，開始散步</div></div>'
-        : '<div class="title"><div class="no">' + no + "<small>DAY</small></div><h2>" + esc(d.title) + "</h2><p>" + md(d.date) + "（" + wd(d.date) + "）・" +
-          (d.seg === "syd" ? "SYDNEY " : d.seg === "tas" ? "TASMANIA " : "") + esc(d.segName) + driver + "</p></div>";
+          '<div class="cue"><svg viewBox="0 0 18 40" aria-hidden="true"><path d="M9 2 V34 M3 28 L9 36 L15 28" fill="none" stroke="#b83a2e" stroke-width="1.4" stroke-linecap="round"/></svg>往下捲動，開始散步</div></div>'
+        : '<div class="title"><div class="no">' + no + "<small>DAY</small></div><h2>" + esc(d.title) + "</h2><p>" + md(d.date) + "（" + wd(d.date) + "）・" + esc(d.segName) + driver + "</p></div>";
     sec.innerHTML = '<div class="stage"><div class="layer far"></div><div class="track"></div>' + title + "</div>";
     container.appendChild(sec);
     const opt = document.createElement("option");
@@ -212,22 +219,26 @@ export function startWalk(root: HTMLElement, days: WalkDay[]): () => void {
 
   function layout() {
     const vw = innerWidth;
-    const vh = innerHeight;
+    // Stage size, not innerHeight: the stage is 100svh and mobile toolbars change innerHeight.
+    const vh = container.querySelector<HTMLElement>(".stage")?.clientHeight || innerHeight;
     const small = vw < 680;
+    const anchorX = vw * (small ? 0.34 : 0.4); // walker's fixed screen position (DESIGN.md)
     const gap = small ? Math.max(260, vw * 0.78) : Math.max(340, Math.min(480, vw * 0.36));
     const startX = small ? vw * 0.78 : vw * 0.62; // leave room for the title before the first stop
     D.forEach((o) => {
       const items = o.d.items;
       const n = items.length;
       const lastX = startX + gap * Math.max(0, n - 1);
-      const W = n ? lastX + vw * 0.55 : vw;
+      // Reserve room after the last stop so the camera keeps the walker on its anchor.
+      const W = n ? lastX + (vw - anchorX) + 24 : vw;
       o.W = W;
       o.vw = vw;
       o.vh = vh;
-      o.sec.style.height = (n ? lastX - vw * 0.42 + vh * 1.7 : vh * 1.5) + "px";
+      o.sec.style.height = (n ? lastX - anchorX + vh * 1.7 : vh * 1.5) + "px";
       o.track.style.width = W + "px";
       const seed = Number(o.d.date.replace(/-/g, "")) % 9973;
-      const gy = vh * 0.66;
+      // Foot line: clear of the 64px date bar plus 24px (DESIGN.md yFoot).
+      const gy = Math.min(vh * 0.72, vh - 64 - 24);
 
       const fw = W * 0.5 + vw;
       o.far.style.width = fw + "px";
@@ -249,11 +260,13 @@ export function startWalk(root: HTMLElement, days: WalkDay[]): () => void {
       }
       o.track.innerHTML =
         '<svg class="ink" width="' + W + '" height="' + vh + '" viewBox="0 0 ' + W + " " + vh + '">' +
+        // Only the static ink sits under the roughness filter; the animated red line is outside it,
+        // otherwise every scroll frame re-runs the filter over the whole (very wide) track.
         '<g class="sketch" fill="none" stroke-linecap="round">' +
         '<path d="' + dStr + '" stroke="#2b2a27" stroke-width="1.4"/>' +
         '<path d="' + dStr + '" stroke="#2b2a27" stroke-width=".6" transform="translate(0 3)" opacity=".5"/>' +
-        '<path class="walked" d="' + dStr + '" stroke="#d2483a" stroke-width="2.6"/>' +
         "</g>" +
+        '<path class="walked" d="' + dStr + '" fill="none" stroke="#d2483a" stroke-width="2.6" stroke-linecap="round"/>' +
         items.map((_, k) => '<circle cx="' + pts[k + 1][0] + '" cy="' + pts[k + 1][1] + '" r="4.5" fill="#faf7f0" stroke="#2b2a27" stroke-width="1.4" class="dot"/>').join("") +
         "</svg>";
       o.path = o.track.querySelector<SVGPathElement>(".walked")!;
@@ -273,7 +286,8 @@ export function startWalk(root: HTMLElement, days: WalkDay[]): () => void {
         return lo;
       };
       o.stopLen = items.map((_, k) => lenAtX(pts[k + 1][0]));
-      o.L0 = n ? Math.min(lenAtX(small ? vw * 0.22 : vw * 0.3), o.stopLen[0]) : 0; // walker starts on screen
+      o.L0 = n ? Math.min(lenAtX(anchorX), o.stopLen[0]) : 0; // walker starts on its anchor
+      o.anchorX = anchorX;
 
       o.spots = items.map((it, k) => {
         const kind = artFor(it);
@@ -288,10 +302,15 @@ export function startWalk(root: HTMLElement, days: WalkDay[]): () => void {
         o.track.appendChild(wash);
         const el = document.createElement("div");
         el.className = "spot" + (up ? "" : " below");
+        el.dataset.stop = String(k);
+        // Landmarks are keyboard-operable: Enter/Space walks there (DESIGN.md 站點互動).
+        el.tabIndex = 0;
+        el.setAttribute("role", "button");
+        el.setAttribute("aria-label", "走到 " + it.time + " " + it.name);
         el.innerHTML =
           '<svg class="art sketch" viewBox="0 0 150 110" aria-hidden="true">' + ART[kind] + "</svg>" +
           '<div class="meta"><div class="time">' + esc(it.time) + "　·　" + mins(it.dur) + "</div><h3>" + esc(it.name) + '</h3><div class="en">' + esc(it.en || "") + "</div>" +
-          (it.pri === "must" ? '<span class="must">必 去</span>' : "") + "</div>";
+          (it.pri === "must" ? '<span class="must">必去</span>' : "") + "</div>";
         el.style.left = x + "px";
         if (up) {
           el.style.top = "auto";
@@ -308,7 +327,7 @@ export function startWalk(root: HTMLElement, days: WalkDay[]): () => void {
           s.style.strokeDashoffset = reduce ? "0" : String(l);
           s._l = l;
         });
-        return { el, wash, strokes };
+        return { el, meta: el.querySelector<HTMLElement>(".meta")!, wash, strokes };
       });
       items.forEach((it, k) => {
         const t = it.travel || {};
@@ -339,40 +358,84 @@ export function startWalk(root: HTMLElement, days: WalkDay[]): () => void {
         car: wk.querySelector<SVGGElement>(".car")!,
         boat: wk.querySelector<SVGGElement>(".boat")!,
         plane: wk.querySelector<SVGGElement>(".plane")!,
+        train: wk.querySelector<SVGGElement>(".train")!,
         bus: wk.querySelector<SVGGElement>(".bus")!,
       };
       o.legL = wk.querySelector(".legL")!;
       o.legR = wk.querySelector(".legR")!;
       o.arm = wk.querySelector(".arm")!;
+      o.last = { reveal: items.map(() => -1), seen: items.map(() => -1), dot: items.map(() => false), wash: items.map(() => -1), ride: "", say: "", fade: -1 };
     });
-    update();
+    // Read geometry once, after every section has its height. Scroll frames use these numbers.
+    D.forEach((o) => {
+      o.top = o.sec.offsetTop;
+      o.h = o.sec.offsetHeight;
+      const run = Math.max(1, o.h - vh);
+      const n = o.d.items.length;
+      const Lmax = n ? o.stopLen[n - 1] : 0;
+      // Scroll position at which the walker stands exactly on stop k (inverse of update()).
+      o.stopScroll = o.stopLen.map((len) => {
+        const q = Lmax > o.L0 ? (len - o.L0) / (Lmax - o.L0) : 0;
+        return o.top + (0.06 + 0.88 * Math.max(0, q)) * run;
+      });
+      o.sec.querySelectorAll(".snap").forEach((a) => a.remove());
+      o.stopScroll.forEach((y) => {
+        const a = document.createElement("i");
+        a.className = "snap";
+        a.style.top = y - o.top + "px";
+        o.sec.appendChild(a);
+      });
+    });
+    shown = target = scrollY;
+    vel = 0;
+    update(shown);
   }
 
-  let curIdx = 0;
-  function update() {
+  let curIdx = -1;
+  // Smoothed scroll position. On a mouse wheel the page jumps 100px per notch; a critically
+  // damped spring (no overshoot) turns those steps into continuous walking. Touch scrolling is
+  // already continuous, so it stays 1:1. The spring always starts from the value on screen,
+  // so a new wheel notch mid-motion just re-targets it.
+  // Only discrete mouse-wheel steps are smoothed; touch and touchpad stay 1:1 (DESIGN.md).
+  let lastWheelStep = -1e9;
+  const onWheel = (e: WheelEvent) => {
+    if (e.deltaMode !== 0 || (Math.abs(e.deltaY) >= 50 && Number.isInteger(e.deltaY))) lastWheelStep = performance.now();
+  };
+  const smoothNow = () => !reduce && performance.now() - lastWheelStep < 250;
+  const RESPONSE = 0.2; // seconds, Apple-style "response"
+  const omega = (2 * Math.PI) / RESPONSE;
+  let shown = scrollY;
+  let target = scrollY;
+  let vel = 0;
+  let raf = 0;
+  let lastT = 0;
+
+  function update(sy: number) {
     const vh = innerHeight;
-    const mid = scrollY + vh * 0.5;
+    const mid = sy + vh * 0.5;
+    let cur = curIdx < 0 ? 0 : curIdx;
     D.forEach((o) => {
       if (!o.path) return;
-      const top = o.sec.offsetTop;
-      const h = o.sec.offsetHeight;
-      if (mid >= top && mid < top + h) curIdx = o.i;
-      const raw = (scrollY - top) / Math.max(1, h - vh);
-      if (raw < -1.2 || raw > 2.2) return;
+      if (mid >= o.top && mid < o.top + o.h) cur = o.i;
+      const raw = (sy - o.top) / Math.max(1, o.h - vh);
+      if (raw < -1 || raw > 2) return; // off screen: skip entirely
       const p = Math.min(1, Math.max(0, raw));
       const n = o.d.items.length;
       const q = Math.min(1, Math.max(0, (p - 0.06) / 0.88));
       const Lmax = n ? o.stopLen[n - 1] : 0;
       const L = n ? o.L0 + (Lmax - o.L0) * q : 0;
       const pt = n ? o.path.getPointAtLength(L) : { x: o.vw * 0.3, y: o.vh * 0.66 };
-      const cam = Math.min(Math.max(0, o.W - o.vw), Math.max(0, pt.x - o.vw * 0.42));
+      const cam = Math.min(Math.max(0, o.W - o.vw), Math.max(0, pt.x - o.anchorX));
       o.track.style.transform = "translate3d(" + (-cam).toFixed(1) + "px,0,0)";
-      o.far.style.transform = "translate3d(" + (-cam * 0.5).toFixed(1) + "px,0,0)";
+      // Reduced motion: no parallax, the far layer moves with the content.
+      o.far.style.transform = "translate3d(" + (-cam * (reduce ? 1 : 0.5)).toFixed(1) + "px,0,0)";
       if (n) o.path.style.strokeDashoffset = (o.len - L).toFixed(1);
-      // The day title fades out once walking starts.
-      const fade = Math.min(1, Math.max(0, 1 - (p - 0.02) / 0.12));
-      o.title.style.opacity = fade.toFixed(3);
-      o.title.style.transform = "translate3d(" + (-(1 - fade) * 40).toFixed(1) + "px,0,0)";
+      const fade = Math.round(Math.min(1, Math.max(0, 1 - (p - 0.02) / 0.12)) * 100) / 100;
+      if (fade !== o.last.fade) {
+        o.last.fade = fade;
+        o.title.style.opacity = String(fade);
+        if (!reduce) o.title.style.transform = "translate3d(" + (-(1 - fade) * 40).toFixed(1) + "px,0,0)";
+      }
 
       let near = -1;
       let idx = 0;
@@ -380,23 +443,40 @@ export function startWalk(root: HTMLElement, days: WalkDay[]): () => void {
       for (let k = 0; k < n; k++) {
         const dist = L - o.stopLen[k];
         if (Math.abs(dist) < 36) near = k;
-        const reveal = reduce ? 1 : Math.min(1, Math.max(0, (dist + o.vw * 0.78) / (o.vw * 0.26)));
+        const reveal = reduce ? 1 : Math.round(Math.min(1, Math.max(0, (dist + o.vw * 0.78) / (o.vw * 0.26))) * 100) / 100;
         const s = o.spots[k];
-        s.strokes.forEach((st) => {
-          st.style.strokeDashoffset = (st._l * (1 - reveal)).toFixed(1);
-        });
-        s.wash.classList.toggle("on", reveal > 0.6);
-        s.el.classList.toggle("seen", reduce || dist > -o.vw * 0.25);
-        o.dots[k].setAttribute("fill", dist > -6 ? "#d2483a" : "#faf7f0");
+        if (reveal !== o.last.reveal[k]) {
+          o.last.reveal[k] = reveal;
+          s.strokes.forEach((st) => {
+            st.style.strokeDashoffset = (st._l * (1 - reveal)).toFixed(1);
+          });
+        }
+        // Wash and caption follow scroll position directly (no fixed-duration transitions).
+        const wash = Math.round(Math.min(1, Math.max(0, (reveal - 0.6) / 0.4)) * 100) / 100;
+        if (wash !== o.last.wash[k]) {
+          o.last.wash[k] = wash;
+          s.wash.style.opacity = String(wash * 0.75);
+          s.wash.style.transform = "translate(-50%, -50%) scale(" + (0.6 + 0.4 * wash).toFixed(3) + ")";
+        }
+        const seen = reduce ? 1 : Math.round(Math.min(1, Math.max(0, (dist + o.vw * 0.35) / (o.vw * 0.1))) * 100) / 100;
+        if (seen !== o.last.seen[k]) {
+          o.last.seen[k] = seen;
+          s.meta.style.opacity = String(0.25 + 0.75 * seen);
+        }
+        const dot = dist > -6;
+        if (dot !== o.last.dot[k]) o.dots[k].setAttribute("fill", (o.last.dot[k] = dot) ? "#d2483a" : "#faf7f0");
       }
       const next = o.d.items[Math.min(idx, n - 1)];
       let ride: Ride = !n || near >= 0 || q === 0 ? "person" : rideFor(next?.mode);
       if (n && idx === 0) ride = "person";
-      (Object.keys(o.rides) as Ride[]).forEach((key) => {
-        o.rides[key].style.display = key === ride ? "" : "none";
-      });
+      if (ride !== o.last.ride) {
+        o.last.ride = ride;
+        (Object.keys(o.rides) as Ride[]).forEach((key) => {
+          o.rides[key].style.display = key === ride ? "" : "none";
+        });
+      }
       let lift = 0;
-      if (ride === "plane") {
+      if (ride === "plane" && !reduce) {
         const a = o.stopLen[idx - 1] || 0;
         const b = o.stopLen[idx] || Lmax;
         lift = -Math.sin(Math.PI * Math.min(1, Math.max(0, (L - a) / Math.max(1, b - a)))) * o.vh * 0.18;
@@ -406,67 +486,156 @@ export function startWalk(root: HTMLElement, days: WalkDay[]): () => void {
       o.legL.setAttribute("d", "M35 54 L" + (35 + ph * 7).toFixed(1) + " 76");
       o.legR.setAttribute("d", "M35 54 L" + (35 - ph * 7).toFixed(1) + " 76");
       o.arm.setAttribute("d", "M43 36 L" + (46 - ph * 4).toFixed(1) + " 48");
-      if (near >= 0) {
-        o.say.textContent = o.d.items[near].name;
-        o.say.classList.add("show");
-      } else if (n && q >= 0.999) {
-        o.say.textContent = "今天走完了";
-        o.say.classList.add("show");
-      } else o.say.classList.remove("show");
+      const say = near >= 0 ? o.d.items[near].name : n && q >= 0.999 ? "今天走完了" : "";
+      if (say !== o.last.say) {
+        o.last.say = say;
+        if (say) o.say.textContent = say;
+        o.say.classList.toggle("show", !!say);
+      }
     });
-    const o = D[curIdx];
-    const tp = Math.min(1, Math.max(0, (scrollY - o.sec.offsetTop) / Math.max(1, o.sec.offsetHeight - vh)));
-    nowEl.innerHTML = "<b>" + String(curIdx + 1).padStart(2, "0") + " / " + total + "</b><span>" + md(o.d.date) + "（" + wd(o.d.date) + "）　" + esc(o.d.title) + "</span>";
-    progEl.style.width = (((curIdx + tp) / total) * 100).toFixed(2) + "%";
-    if (jump.value !== String(curIdx)) jump.value = String(curIdx);
+    const o = D[cur];
+    const tp = Math.min(1, Math.max(0, (sy - o.top) / Math.max(1, o.h - vh)));
+    progEl.style.transform = "scaleX(" + ((cur + tp) / total).toFixed(4) + ")";
+    if (cur !== curIdx) {
+      curIdx = cur;
+      nowEl.innerHTML = "<b>" + String(cur + 1).padStart(2, "0") + " / " + total + "</b><span>" + md(o.d.date) + "（" + wd(o.d.date) + "）　" + esc(o.d.title) + "</span>";
+      if (jump.value !== String(cur)) jump.value = String(cur);
+      // Announce the day only when it changes, never per frame.
+      liveEl.textContent = "第 " + (cur + 1) + " 天，" + md(o.d.date) + " " + o.d.title;
+      dayPlan.href = opts.planHref + "?tab=days&day=" + o.d.date;
+      prevBtn.disabled = cur === 0 && sy - o.top < innerHeight * 0.3;
+      nextBtn.disabled = cur === total - 1;
+    }
   }
 
+  function step(t: number) {
+    const dt = Math.min(0.05, lastT ? (t - lastT) / 1000 : 1 / 60);
+    lastT = t;
+    // Critically damped spring: x'' = -ω²(x - target) - 2ωx'
+    const a = -omega * omega * (shown - target) - 2 * omega * vel;
+    vel += a * dt;
+    shown += vel * dt;
+    if (Math.abs(shown - target) < 0.5 && Math.abs(vel) < 5) {
+      shown = target;
+      vel = 0;
+      raf = 0;
+      lastT = 0;
+      update(shown);
+      return;
+    }
+    update(shown);
+    raf = requestAnimationFrame(step);
+  }
+
+  // Jumping to a far day would smooth-scroll through every day in between (and walk every
+  // walker on the way). Neighbouring days scroll; anything further cross-fades in place.
+  let jumpTimer: ReturnType<typeof setTimeout> | undefined;
+  function cancelJump() {
+    if (jumpTimer) {
+      clearTimeout(jumpTimer);
+      jumpTimer = undefined;
+      container.classList.remove("jumping");
+    }
+  }
+  function goTo(y: number, far: boolean) {
+    cancelJump();
+    if (reduce || !far) {
+      scrollTo({ top: y, behavior: reduce ? "auto" : "smooth" });
+      return;
+    }
+    container.classList.add("jumping");
+    jumpTimer = setTimeout(() => {
+      jumpTimer = undefined;
+      scrollTo({ top: y, behavior: "auto" });
+      shown = target = y;
+      vel = 0;
+      update(y);
+      requestAnimationFrame(() => container.classList.remove("jumping"));
+    }, 140);
+  }
   function goDay(i: number) {
     i = Math.max(0, Math.min(total - 1, i));
-    scrollTo({ top: D[i].sec.offsetTop + 2, behavior: reduce ? "auto" : "smooth" });
+    goTo(D[i].top + 2, Math.abs(i - curIdx) > 1);
   }
-  const prev = root.querySelector<HTMLButtonElement>("#rw-prev")!;
-  const next = root.querySelector<HTMLButtonElement>("#rw-next")!;
+  // Step to the previous / next stop, crossing into neighbouring days.
+  function goStop(dir: 1 | -1) {
+    const all = D.flatMap((o) => [o.top + 2, ...o.stopScroll]).sort((a, b) => a - b);
+    const y = scrollY;
+    const t = dir > 0 ? all.find((s) => s > y + 4) : [...all].reverse().find((s) => s < y - 4);
+    if (t !== undefined) goTo(t, false);
+  }
+  const prevBtn = root.querySelector<HTMLButtonElement>("#rw-prev")!;
+  const nextBtn = root.querySelector<HTMLButtonElement>("#rw-next")!;
+  const liveEl = root.querySelector<HTMLElement>("#rw-live")!;
+  const dayPlan = root.querySelector<HTMLAnchorElement>("#rw-dayplan")!;
   const onPrev = () => {
     const o = D[curIdx];
-    goDay(scrollY - o.sec.offsetTop > innerHeight * 0.3 ? curIdx : curIdx - 1);
+    goDay(scrollY - o.top > innerHeight * 0.3 ? curIdx : curIdx - 1);
   };
   const onNext = () => goDay(curIdx + 1);
   const onJump = () => goDay(Number(jump.value));
   const onKey = (e: KeyboardEvent) => {
-    if ((e.target as HTMLElement).tagName === "SELECT") return;
+    const tag = (e.target as HTMLElement).tagName;
+    if (tag === "SELECT" || tag === "INPUT" || tag === "TEXTAREA") return;
     if (e.key === "]") goDay(curIdx + 1);
     if (e.key === "[") goDay(curIdx - 1);
-  };
-  let ticking = false;
-  const onScroll = () => {
-    if (!ticking) {
-      ticking = true;
-      requestAnimationFrame(() => {
-        ticking = false;
-        update();
-      });
+    if (e.key === "ArrowRight") { e.preventDefault(); goStop(1); }
+    if (e.key === "ArrowLeft") { e.preventDefault(); goStop(-1); }
+    const spot = (e.target as HTMLElement).closest?.<HTMLElement>(".spot");
+    if (spot && (e.key === "Enter" || e.key === " ")) {
+      e.preventDefault();
+      spot.click();
     }
+  };
+  // Tap a landmark to walk to it.
+  const onTap = (e: MouseEvent) => {
+    const el = (e.target as HTMLElement).closest<HTMLElement>(".spot");
+    const sec = el?.closest<HTMLElement>(".day");
+    if (!el || !sec) return;
+    const o = D.find((x) => x.sec === sec);
+    if (o) goTo(o.stopScroll[Number(el.dataset.stop)], false);
+  };
+  const onScroll = () => {
+    target = scrollY;
+    if (!smoothNow() && !raf) {
+      shown = target;
+      update(shown);
+      return;
+    }
+    if (!raf) raf = requestAnimationFrame(step);
   };
   let rt: ReturnType<typeof setTimeout> | undefined;
   const onResize = () => {
     clearTimeout(rt);
     rt = setTimeout(layout, 150);
   };
-  prev.addEventListener("click", onPrev);
-  next.addEventListener("click", onNext);
+  prevBtn.addEventListener("click", onPrev);
+  nextBtn.addEventListener("click", onNext);
+  container.addEventListener("click", onTap);
   jump.addEventListener("change", onJump);
   addEventListener("keydown", onKey);
   addEventListener("scroll", onScroll, { passive: true });
+  addEventListener("wheel", onWheel, { passive: true });
+  addEventListener("wheel", cancelJump, { passive: true });
+  addEventListener("touchstart", cancelJump, { passive: true });
+  // Proximity snap to landmarks only while the walk is mounted (not on /plan or /journey).
+  document.documentElement.classList.add("rw-snap");
   addEventListener("resize", onResize);
   layout();
-  let alive = true;
-  if (document.fonts?.ready) void document.fonts.ready.then(() => alive && layout());
+  // Open at a requested day: /#rw-day-YYYY-MM-DD.
+  const hashDay = D.find((o) => location.hash === "#" + o.sec.id);
+  if (hashDay) scrollTo({ top: hashDay.top + 2, behavior: "auto" });
 
   return () => {
-    alive = false;
-    prev.removeEventListener("click", onPrev);
-    next.removeEventListener("click", onNext);
+    cancelJump();
+    document.documentElement.classList.remove("rw-snap");
+    removeEventListener("wheel", onWheel);
+    removeEventListener("wheel", cancelJump);
+    removeEventListener("touchstart", cancelJump);
+    prevBtn.removeEventListener("click", onPrev);
+    nextBtn.removeEventListener("click", onNext);
+    container.removeEventListener("click", onTap);
+    cancelAnimationFrame(raf);
     jump.removeEventListener("change", onJump);
     removeEventListener("keydown", onKey);
     removeEventListener("scroll", onScroll);

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useTrip } from "./TripApp";
+import { Icon } from "./Icon";
 import { Badge } from "./ui";
 import { api } from "@/client/api";
 import { fmtDay, fmtTs } from "@/domain/format";
@@ -259,10 +260,10 @@ function BackupCard() {
       <h3>備份與匯入</h3>
       <p>
         <a className="btn ghost small" href="/api/trip/export" download>
-          ⬇︎ 下載目前行程（JSON）
+          <Icon name="download" size={16} /> 下載目前行程（JSON）
         </a>{" "}
         <label className="btn ghost small">
-          ⬆︎ 匯入 JSON
+          <Icon name="upload" size={16} /> 匯入 JSON
           <input
             type="file"
             accept="application/json,.json"
@@ -276,7 +277,7 @@ function BackupCard() {
           />
         </label>{" "}
         <button className="btn ghost small" type="button" onClick={() => window.print()}>
-          🖨️ 列印／存成 PDF
+          <Icon name="print" size={16} /> 列印／存成 PDF
         </button>
       </p>
       <p className="small muted">匯入的資料會先檢查格式與規則（例如活動 id 不可重複、司機時段格式），不符合就不會儲存。</p>

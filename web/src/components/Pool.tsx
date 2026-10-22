@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useTrip } from "./TripApp";
+import { Icon } from "./Icon";
 import { Badge, MODE, PRI } from "./ui";
 import { packageEstimate } from "@/domain/budget";
 import { fmtDay, money } from "@/domain/format";
@@ -81,7 +82,7 @@ function PackageCard({ pkg }: { pkg: Package }) {
       {pkg.alt && <p className="small muted">沒有司機時：{pkg.alt}</p>}
       {pkg.suggestion && (
         <p className="small">
-          💡 建議：{pkg.suggestion.date ? `${fmtDay(pkg.suggestion.date)}・` : ""}
+          <Icon name="note" size={16} /> 建議：{pkg.suggestion.date ? `${fmtDay(pkg.suggestion.date)}・` : ""}
           {pkg.suggestion.reason}
         </p>
       )}

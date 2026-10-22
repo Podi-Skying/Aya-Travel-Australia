@@ -3,6 +3,7 @@
 import "@/app/journey.css";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, registerServiceWorker } from "@/client/api";
+import { SiteHeader } from "@/components/SiteHeader";
 import { fmtTs } from "@/domain/format";
 import type { TripDoc } from "@/domain/schema";
 import { heroLead, journeyChapters, journeyStats } from "@/domain/journey";
@@ -44,7 +45,19 @@ const COPY: Record<string, { eyebrow: string; title: string; text: string; mood:
   },
 };
 
-export function JourneyView({ doc: initialDoc, backHref, dataUrl, syncedAt }: { doc: TripDoc; backHref: string; dataUrl: string; syncedAt: string }) {
+export function JourneyView({
+  doc: initialDoc,
+  backHref,
+  dataUrl,
+  syncedAt,
+  account = null,
+}: {
+  doc: TripDoc;
+  backHref: string;
+  dataUrl: string;
+  syncedAt: string;
+  account?: "signin" | "signout" | null;
+}) {
   const root = useRef<HTMLDivElement>(null);
   const [doc, setDoc] = useState(initialDoc);
   const [sync, setSync] = useState({ at: syncedAt, offline: false });
@@ -123,23 +136,7 @@ export function JourneyView({ doc: initialDoc, backHref, dataUrl, syncedAt }: { 
           離線副本，可能不是最新資料（最後同步：{fmtTs(sync.at)}）
         </div>
       )}
-      <header className="nav">
-        <a className="brand" href="#top">
-          南方之旅 <b>·</b> Aya
-        </a>
-        <nav aria-label="章節">
-          <ul>
-            {sectionIds.slice(1).map((id) => (
-              <li key={id}>
-                <a href={`#${id}`}>{label(id)}</a>
-              </li>
-            ))}
-          </ul>
-        </nav>
-        <a className="cta" href={backHref}>
-          打開行程 →
-        </a>
-      </header>
+      <SiteHeader base={backHref.replace(/\/plan$/, "")} current="journey" account={account} variant="dark" />
 
       <nav className="rail" aria-label="章節進度">
         {sectionIds.map((id) => (

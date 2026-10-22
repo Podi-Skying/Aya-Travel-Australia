@@ -12,9 +12,9 @@ export default async function Home() {
   const p = await loadOwnerPage();
   if (p.kind === "config") return <ConfigNotice missing={p.missing} />;
   if (p.kind === "public")
-    return <WalkView doc={p.trip.doc as never} dataUrl="/api/public" syncedAt={new Date().toISOString()} planHref="/plan" journeyHref="/journey" account="signin" />;
+    return <WalkView doc={p.trip.doc as never} dataUrl="/api/public" syncedAt={new Date().toISOString()} account="signin" />;
   if (p.kind === "signin") redirect("/api/auth/signin?callbackUrl=%2Fplan");
   if (p.kind === "forbidden") return <Notice title="沒有權限（403）" />;
   if (p.kind === "none") return <Notice title="尚未建立行程" />;
-  return <WalkView doc={toPublicDoc(p.trip.doc) as never} dataUrl="/api/trip" syncedAt={new Date().toISOString()} planHref="/plan" journeyHref="/journey" account="owner" />;
+  return <WalkView doc={toPublicDoc(p.trip.doc) as never} dataUrl="/api/trip" syncedAt={new Date().toISOString()} account="owner" />;
 }

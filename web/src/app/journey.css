@@ -97,3 +97,9 @@
 .jr .eyebrow { opacity: 1; }
 .jr .jr-offline { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; background: rgba(60, 45, 10, .92); color: #f0c060; padding: 10px 16px; text-align: center; font-size: 14px; }
 .jr .section-note { color: var(--ink-2); font-size: 14px; }
+
+/* DESIGN.md v2: shared dark header replaces the old .nav; 180ms entrance fade. */
+.jr { animation: jr-enter .18s ease-out; }
+@keyframes jr-enter { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .jr { animation: none; } }
+.jr .ch.hero { padding-top: calc(56px + env(safe-area-inset-top) + 34px); }

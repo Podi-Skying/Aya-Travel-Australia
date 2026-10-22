@@ -1,6 +1,7 @@
 "use client";
 
 import { useTrip } from "./TripApp";
+import { Icon } from "./Icon";
 import { Badge, PRI, STATUS, VERIFY } from "./ui";
 import { fmtDay, fmtTs } from "@/domain/format";
 
@@ -16,7 +17,9 @@ export function Info() {
   return (
     <>
       <div className="alert warn">
-        <span className="ic">⚠️</span>
+        <span className="ic">
+          <Icon name="warn" label="提醒" />
+        </span>
         <p>
           <strong>目前沒有即時資料連線。</strong>
           以下為官方來源連結，出發前與每天出門前請手動查看道路、國家公園與天氣警示。網站不會把舊資料當成最新資訊。

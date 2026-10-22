@@ -2,7 +2,7 @@
 
 import "@/app/walk.css";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { signIn, signOut } from "next-auth/react";
+import { SiteHeader } from "@/components/SiteHeader";
 import type { TripDoc } from "@/domain/schema";
 import { walkDays } from "@/domain/walk";
 import { api, registerServiceWorker } from "@/client/api";
@@ -16,17 +16,17 @@ export function WalkView({
   doc: initialDoc,
   dataUrl,
   syncedAt,
-  planHref,
-  journeyHref,
+  base = "",
   account,
 }: {
   doc: TripDoc;
   dataUrl: string;
   syncedAt: string;
-  planHref: string;
-  journeyHref: string;
+  /** "" for the site, "/s/{token}" for a share link. */
+  base?: string;
   account: "signin" | "owner" | null;
 }) {
+  const planHref = `${base}/plan`;
   const root = useRef<HTMLDivElement>(null);
   const [doc, setDoc] = useState(initialDoc);
   const [sync, setSync] = useState({ at: syncedAt, offline: false });
@@ -38,7 +38,8 @@ export function WalkView({
     void api<{ doc: TripDoc; syncedAt: string }>(dataUrl).then((r) => {
       if (!alive) return;
       if (r.ok && !r.cached) {
-        setDoc(r.data.doc);
+        // Rebuilding the walk is visible; skip it when nothing changed.
+        setDoc((cur) => (JSON.stringify(cur) === JSON.stringify(r.data.doc) ? cur : r.data.doc));
         setSync({ at: r.data.syncedAt, offline: false });
       } else if (r.ok) setSync({ at: r.data.syncedAt, offline: true });
       else if (r.offline) setSync((s) => ({ ...s, offline: true }));
@@ -52,12 +53,13 @@ export function WalkView({
     let stop: (() => void) | undefined;
     let cancelled = false;
     void import("./walk").then((m) => {
-      if (!cancelled && root.current) stop = m.startWalk(root.current, days);
+      if (!cancelled && root.current) stop = m.startWalk(root.current, days, { planHref });
     });
     return () => {
       cancelled = true;
       stop?.();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [days]);
 
   return (
@@ -76,34 +78,7 @@ export function WalkView({
         </div>
       )}
 
-      <header className="top">
-        <a className="logo" href="#rw-top" aria-label="回到開頭">
-          <svg viewBox="0 0 26 26" aria-hidden="true">
-            <circle cx="13" cy="13" r="11" fill="none" stroke="#2b2a27" strokeWidth="1.3" />
-            <path d="M6 17 Q10 9 13 13 T20 9" fill="none" stroke="#d2483a" strokeWidth="1.6" strokeLinecap="round" />
-          </svg>
-          南方散步
-        </a>
-        <div className="right">
-          <nav className="links" aria-label="網站">
-            <a href={planHref} className="keep">
-              行程
-            </a>
-            <a href={`${planHref}#budget`}>預算</a>
-            <a href={journeyHref}>3D 旅程</a>
-          </nav>
-          {account === "signin" && (
-            <button type="button" className="account" onClick={() => void signIn("github", { callbackUrl: "/plan" })}>
-              登入
-            </button>
-          )}
-          {account === "owner" && (
-            <button type="button" className="account" onClick={() => void signOut({ callbackUrl: "/" })}>
-              登出
-            </button>
-          )}
-        </div>
-      </header>
+      <SiteHeader base={base} current="walk" account={account === "owner" ? "signout" : account} />
 
       <main id="rw-days" />
 
@@ -117,12 +92,14 @@ export function WalkView({
           </p>
           <div className="go">
             <a href={planHref}>{account === "owner" ? "打開行程管理" : "看完整行程"}</a>
-            <a href="#rw-top">從頭再走一次</a>
+            <a href={`#rw-day-${days[0]?.date ?? ""}`}>從頭再走一次</a>
           </div>
         </div>
       </section>
 
-      <div className="bar" aria-live="polite">
+      <span id="rw-live" className="sr" aria-live="polite" />
+
+      <div className="bar">
         <button type="button" id="rw-prev" aria-label="前一天">
           ‹
         </button>
@@ -134,6 +111,9 @@ export function WalkView({
           <span className="sr">跳到某一天</span>
           <select id="rw-jump" />
         </label>
+        <a className="dayplan" id="rw-dayplan" href={planHref}>
+          當日行程
+        </a>
         <button type="button" id="rw-next" aria-label="後一天">
           ›
         </button>

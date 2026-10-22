@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useTrip } from "./TripApp";
+import { Icon, MODE_ICON } from "./Icon";
 import { Badge, LEG, MODE, PRI, STATUS, VERIFY, useReducedMotion } from "./ui";
 import { DayMap } from "./MapViews";
 import { effectiveDay, isTentative } from "@/domain/effective-day";
@@ -18,7 +19,7 @@ function Legs({ travel }: { travel: Item["travel"] }) {
     <li className="leg">
       {parts.map(([k, v]) => (
         <span key={k}>
-          {LEG[k] ?? k} {mins(v)}
+          <Icon name={MODE_ICON[k] ?? "route"} size={16} /> {LEG[k] ?? k} {mins(v)}
         </span>
       ))}
       <span>・約 {mins(total)}（估計）</span>
@@ -213,14 +214,16 @@ export function DaysView({ active }: { active: boolean }) {
           </div>
           {st.name && d.stay !== "none" && (
             <p className="small muted">
-              🏠 {st.name}
+              <Icon name="home" size={16} /> {st.name}
               {owner && st.address ? `・地址：${st.address}` : "・確切地址已隱藏"}
               {st.note ? `・${st.note}` : ""}
             </p>
           )}
           {cs.map((c, k) => (
             <div key={k} className={`alert ${c.lv}`}>
-              <span className="ic">{c.lv === "warn" ? "⚠️" : c.lv === "ok" ? "✅" : c.lv === "danger" ? "⛔" : "ℹ️"}</span>
+              <span className="ic">
+                <Icon name={c.lv === "warn" ? "warn" : c.lv === "ok" ? "ok" : c.lv === "danger" ? "stop" : "info"} label={c.lv === "warn" ? "提醒" : c.lv === "ok" ? "確認" : c.lv === "danger" ? "危險" : "資訊"} />
+              </span>
               <div>
                 <p>{c.t}</p>
                 {c.alt && (
@@ -273,7 +276,9 @@ export function DaysView({ active }: { active: boolean }) {
                         <h4>{i.name}</h4>
                         <div className="en">{i.en}</div>
                         <div className="meta">
-                          <span>{MODE[i.mode]}</span>
+                          <span>
+                            <Icon name={MODE_ICON[i.mode] ?? "route"} size={16} /> {MODE[i.mode]}
+                          </span>
                           {i.src && (
                             <span>
                               來源：
@@ -289,21 +294,25 @@ export function DaysView({ active }: { active: boolean }) {
                             </span>
                           )}
                         </div>
-                        {i.note && <div className="note">💡 {i.note}</div>}
+                        {i.note && (
+                          <div className="note">
+                            <Icon name="note" size={16} /> {i.note}
+                          </div>
+                        )}
                         {i.packageContext && (
                           <div className="note small">
-                            🧭 來自「{i.packageContext.title ?? i.packageContext.key}」：{i.packageContext.driveHrs ? `整趟約開車 ${i.packageContext.driveHrs} 小時；` : ""}共乘費用未套用。
+                            <Icon name="compass" size={16} /> 來自「{i.packageContext.title ?? i.packageContext.key}」：{i.packageContext.driveHrs ? `整趟約開車 ${i.packageContext.driveHrs} 小時；` : ""}共乘費用未套用。
                           </div>
                         )}
                         <div className="tools">
                           <button className="btn ghost small" type="button" onClick={() => setFocusId(i.id)}>
-                            🗺️ 地圖
+                            <Icon name="map" size={16} /> 地圖
                           </button>
                           {mode === "public" ? (
                             canVote && (
                             <span className="interest">
                               <button className={`btn small ${voted ? "ghost" : ""}`} type="button" onClick={() => void vote(i.id, d.date)}>
-                                {voted ? `✓ 已表達興趣${voted.nickname ? "（" + voted.nickname + "）" : ""}` : "🙋 我有興趣"}
+                                {voted ? `✓ 已表達興趣${voted.nickname ? "（" + voted.nickname + "）" : ""}` : "我有興趣"}
                               </button>
                               {voted && (
                                 <button className="btn ghost small" type="button" onClick={() => void unvote(i.id, d.date)}>
@@ -341,7 +350,7 @@ export function DaysView({ active }: { active: boolean }) {
                               )}
                               {cnt > 0 && (
                                 <span className="count-pill" title="訪客興趣（合計）">
-                                  🙋 {cnt}
+                                  <Icon name="hand" size={14} label="訪客興趣" /> {cnt}
                                 </span>
                               )}
                             </>

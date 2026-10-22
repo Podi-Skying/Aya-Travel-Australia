@@ -5,8 +5,8 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type Re
 /* Shared UI pieces and labels ported from site/js/app.js. */
 
 export const PRI = { must: { t: "必去", c: "b-must" }, pref: { t: "優先", c: "b-pref" }, repl: { t: "可替換", c: "b-repl" } } as const;
-export const MODE: Record<string, string> = { walk: "🚶 步行", bus: "🚌 大眾運輸", drive: "🚗 開車", ferry: "⛴️ 渡輪", train: "🚆 火車", flight: "✈️ 飛機" };
-export const LEG: Record<string, string> = { drive: "🚗 開車", walk: "🚶 步行", wait: "⏳ 等候", ferry: "⛴️ 渡輪", transit: "🚌 乘車", flight: "✈️ 飛行" };
+export const MODE: Record<string, string> = { walk: "步行", bus: "大眾運輸", drive: "開車", ferry: "渡輪", train: "火車", flight: "飛機" };
+export const LEG: Record<string, string> = { drive: "開車", walk: "步行", wait: "等候", ferry: "渡輪", transit: "乘車", flight: "飛行" };
 export const STATUS = { estimate: { t: "估計", c: "b-warn" }, quote: { t: "報價", c: "b-info" }, confirmed: { t: "已確認", c: "b-ok" }, unknown: { t: "未知", c: "b-danger" } } as const;
 export const VERIFY = { verified: { t: "已驗證", c: "b-ok" }, partial: { t: "部分驗證", c: "b-info" }, unverified: { t: "未驗證", c: "b-line" } } as const;
 export const CATS: Record<string, { t: string; color: string }> = {
@@ -35,6 +35,50 @@ export function useReducedMotion(): boolean {
 }
 
 const noSubscribe = () => () => {};
+
+/** Today's date in Hobart, where the trip happens (DESIGN.md: /plan default day). Null on the server. */
+export function useHobartToday(): string | null {
+  return useSyncExternalStore(
+    noSubscribe,
+    () => new Intl.DateTimeFormat("en-CA", { timeZone: "Australia/Hobart", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()),
+    () => null,
+  );
+}
+
+/* ---------- ?tab=…&day=… URL state for /plan ---------- */
+const URL_EVENT = "aya-url";
+let urlCache = { key: "", value: { tab: null as string | null, day: null as string | null } };
+function readUrl() {
+  const key = location.search;
+  if (key !== urlCache.key) {
+    const q = new URLSearchParams(key);
+    urlCache = { key, value: { tab: q.get("tab"), day: q.get("day") } };
+  }
+  return urlCache.value;
+}
+const SERVER_URL = { tab: null, day: null };
+export function useUrlState(): { tab: string | null; day: string | null } {
+  return useSyncExternalStore(
+    (cb) => {
+      addEventListener("popstate", cb);
+      addEventListener(URL_EVENT, cb);
+      return () => {
+        removeEventListener("popstate", cb);
+        removeEventListener(URL_EVENT, cb);
+      };
+    },
+    readUrl,
+    () => SERVER_URL,
+  );
+}
+export function writeUrl(next: { tab: string; day?: string }) {
+  const q = new URLSearchParams(location.search);
+  q.set("tab", next.tab);
+  if (next.day) q.set("day", next.day);
+  else q.delete("day");
+  history.replaceState(history.state, "", `${location.pathname}?${q.toString()}${location.hash}`);
+  dispatchEvent(new Event(URL_EVENT));
+}
 /** Today's date in the viewer's time zone; null during server rendering. */
 export function useToday(): string | null {
   return useSyncExternalStore(noSubscribe, () => {

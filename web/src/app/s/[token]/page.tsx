@@ -19,6 +19,6 @@ export default async function SharedWalk({ params }: { params: Promise<{ token: 
       </Notice>
     );
   return (
-    <WalkView doc={t.doc as never} dataUrl={`/api/s/${token}`} syncedAt={new Date().toISOString()} planHref={`/s/${token}/plan`} journeyHref={`/s/${token}/journey`} account={null} />
+    <WalkView doc={t.doc as never} dataUrl={`/api/s/${token}`} syncedAt={new Date().toISOString()} base={`/s/${token}`} account={null} />
   );
 }

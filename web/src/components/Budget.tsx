@@ -1,6 +1,7 @@
 "use client";
 
 import { useTrip } from "./TripApp";
+import { Icon } from "./Icon";
 import { Badge, CATS, STATUS } from "./ui";
 import { basis, budgetLines, byCategory, sum } from "@/domain/budget";
 import { fmtDay, money } from "@/domain/format";
@@ -39,7 +40,9 @@ export function Budget() {
         </div>
         {N > 2 && (
           <div className="alert info">
-            <span className="ic">ℹ️</span>
+            <span className="ic">
+              <Icon name="info" label="資訊" />
+            </span>
             <p>UTAS Hobart Apartments 的 AUD $0 只適用擁有者與 Aya；其他同行者的住宿尚未列入，需另外估算。</p>
           </div>
         )}
