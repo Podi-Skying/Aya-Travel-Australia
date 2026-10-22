@@ -1,7 +1,9 @@
 "use client";
 
 import "@/app/journey.css";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { api, registerServiceWorker } from "@/client/api";
+import { fmtTs } from "@/domain/format";
 import type { TripDoc } from "@/domain/schema";
 import { heroLead, journeyChapters, journeyStats } from "@/domain/journey";
 import type { MoodKey } from "./scene";
@@ -42,8 +44,27 @@ const COPY: Record<string, { eyebrow: string; title: string; text: string; mood:
   },
 };
 
-export function JourneyView({ doc, backHref }: { doc: TripDoc; backHref: string }) {
+export function JourneyView({ doc: initialDoc, backHref, dataUrl, syncedAt }: { doc: TripDoc; backHref: string; dataUrl: string; syncedAt: string }) {
   const root = useRef<HTMLDivElement>(null);
+  const [doc, setDoc] = useState(initialDoc);
+  const [sync, setSync] = useState({ at: syncedAt, offline: false });
+
+  // Same freshness rule as the itinerary: say so when this is an offline copy.
+  useEffect(() => {
+    registerServiceWorker([dataUrl]);
+    let alive = true;
+    void api<{ doc: TripDoc; syncedAt: string }>(dataUrl).then((r) => {
+      if (!alive) return;
+      if (r.ok && !r.cached) {
+        setDoc(r.data.doc);
+        setSync({ at: r.data.syncedAt, offline: false });
+      } else if (r.ok) setSync({ at: r.data.syncedAt, offline: true });
+      else if (r.offline) setSync((s) => ({ ...s, offline: true }));
+    });
+    return () => {
+      alive = false;
+    };
+  }, [dataUrl]);
   const chapters = useMemo(() => journeyChapters(doc), [doc]);
   const stats = useMemo(() => journeyStats(doc), [doc]);
   const lead = useMemo(() => heroLead(doc), [doc]);
@@ -52,9 +73,20 @@ export function JourneyView({ doc, backHref }: { doc: TripDoc; backHref: string 
   useEffect(() => {
     let stop: (() => void) | undefined;
     let cancelled = false;
-    void import("./scene").then((m) => {
-      if (!cancelled && root.current) stop = m.startJourney(root.current, moods);
-    });
+    import("./scene")
+      .then((m) => {
+        if (!cancelled && root.current) stop = m.startJourney(root.current, moods);
+      })
+      .catch(() => {
+        // Three.js chunk failed (offline or blocked): static background, content stays readable.
+        const el = root.current;
+        if (!el) return;
+        el.classList.add("no-webgl");
+        el.querySelector("#loader")?.classList.add("done");
+        const canvas = el.querySelector<HTMLElement>("#world");
+        if (canvas) canvas.style.display = "none";
+        el.querySelectorAll(".card").forEach((c) => c.classList.add("in"));
+      });
     return () => {
       cancelled = true;
       stop?.();
@@ -86,6 +118,11 @@ export function JourneyView({ doc, backHref }: { doc: TripDoc; backHref: string 
       <div className="fg" id="fg-fern" aria-hidden="true" />
       <div className="fg" id="fg-grass" aria-hidden="true" />
 
+      {sync.offline && (
+        <div className="jr-offline" role="status">
+          離線副本，可能不是最新資料（最後同步：{fmtTs(sync.at)}）
+        </div>
+      )}
       <header className="nav">
         <a className="brand" href="#top">
           南方之旅 <b>·</b> Aya
@@ -188,6 +225,10 @@ export function JourneyView({ doc, backHref }: { doc: TripDoc; backHref: string 
           </div>
         </section>
       </main>
+      <footer className="foot">
+        最後同步：{fmtTs(sync.at)}
+        {sync.offline ? "（離線副本，可能不是最新資料）" : ""}。行程內容為草稿，價格與時間皆為估計。
+      </footer>
     </div>
   );
 }

@@ -14,7 +14,14 @@ export const COST_STATUS = ["estimate", "quote", "confirmed", "unknown"] as cons
 export const VERIFY = ["verified", "partial", "unverified"] as const;
 export const LEG_KEYS = ["drive", "walk", "wait", "ferry", "transit", "flight"] as const;
 
-const dateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "日期格式需為 YYYY-MM-DD");
+export function isRealDate(s: string): boolean {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (!m) return false;
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  return d.getUTCFullYear() === Number(m[1]) && d.getUTCMonth() === Number(m[2]) - 1 && d.getUTCDate() === Number(m[3]);
+}
+export const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+const dateStr = z.string().refine(isRealDate, "日期需為存在的日期（YYYY-MM-DD）");
 const shortText = (max: number) => z.string().max(max);
 
 export const costSchema = z.object({
@@ -42,7 +49,7 @@ export const packageContextSchema = z.object({
 
 export const itemSchema = z.object({
   id: z.string().min(1).max(32).regex(/^[A-Za-z0-9_-]+$/, "活動 id 只能使用英數字、- 與 _"),
-  time: z.string().regex(/^\d{2}:\d{2}$/),
+  time: z.string().regex(TIME_RE, "時間需為 00:00–23:59"),
   dur: z.number().int().min(0).max(24 * 60),
   name: z.string().min(1).max(120),
   en: shortText(160).optional(),

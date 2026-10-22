@@ -17,7 +17,10 @@ self.addEventListener("activate", (event) => {
     caches
       .keys()
       .then((keys) => Promise.all(keys.filter((k) => k.startsWith("aya-") && k !== CACHE).map((k) => caches.delete(k))))
-      .then(() => self.clients.claim()),
+      .then(() => self.clients.claim())
+      // Open pages re-send their asset lists: anything they loaded went to the old cache.
+      .then(() => self.clients.matchAll({ type: "window" }))
+      .then((cs) => cs.forEach((c) => c.postMessage({ type: "rewarm" }))),
   );
 });
 
@@ -49,6 +52,35 @@ async function cacheFirst(req) {
   if (cacheable(res)) cache.put(req, res.clone());
   return res;
 }
+
+// Pages tell the worker which assets they loaded (some may have loaded before this
+// worker took control, e.g. right after a deploy), so the page works offline next time.
+self.addEventListener("message", (event) => {
+  const urls = event.data && event.data.type === "warm" && Array.isArray(event.data.urls) ? event.data.urls : [];
+  const same = urls.filter((u) => {
+    try {
+      const url = new URL(u, self.location.origin);
+      return url.origin === self.location.origin && !url.pathname.startsWith("/api/auth");
+    } catch {
+      return false;
+    }
+  });
+  event.waitUntil(
+    caches.open(CACHE).then((cache) =>
+      Promise.all(
+        same.map(async (u) => {
+          if (await cache.match(u)) return;
+          try {
+            const res = await fetch(u, { credentials: "same-origin" });
+            if (cacheable(res)) await cache.put(u, res);
+          } catch {
+            /* offline: try again on the next visit */
+          }
+        }),
+      ),
+    ),
+  );
+});
 
 self.addEventListener("fetch", (event) => {
   const req = event.request;

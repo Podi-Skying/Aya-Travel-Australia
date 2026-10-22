@@ -34,8 +34,29 @@ export function sameOrigin(req: Request): boolean {
 export async function readJson(req: Request, maxBytes: number): Promise<unknown> {
   const len = Number(req.headers.get("content-length") ?? "0");
   if (len > maxBytes) throw new HttpError(413, "內容太大");
-  const text = await req.text();
-  if (new TextEncoder().encode(text).length > maxBytes) throw new HttpError(413, "內容太大");
+  // Read incrementally and stop as soon as the limit is passed (Content-Length may be absent or wrong).
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  if (req.body) {
+    const reader = req.body.getReader();
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > maxBytes) {
+        await reader.cancel().catch(() => {});
+        throw new HttpError(413, "內容太大");
+      }
+      chunks.push(value);
+    }
+  }
+  const buf = new Uint8Array(size);
+  let off = 0;
+  for (const c of chunks) {
+    buf.set(c, off);
+    off += c.byteLength;
+  }
+  const text = new TextDecoder().decode(buf);
   try {
     return JSON.parse(text);
   } catch {

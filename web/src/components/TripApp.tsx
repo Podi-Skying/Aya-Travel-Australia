@@ -22,6 +22,7 @@ import { Manage } from "./Manage";
  */
 
 export type Mode = "owner" | "public";
+export type Alerts = ReturnType<typeof alertStatus>;
 export type Vote = { itemId: string; dayDate: string; nickname: string | null };
 export type Counts = { current: { itemId: string; dayDate: string; name: string; count: number }[]; moved: { itemId: string; dayDate: string; name: string; count: number }[] };
 
@@ -44,6 +45,9 @@ type Ctx = {
   versions: VersionMeta[];
   reloadVersions: () => Promise<void>;
   applyServerDoc: (doc: TripDoc, versionNo: number) => void;
+  alerts: Alerts;
+  lastSyncAt: string;
+  offlineCopy: boolean;
 };
 
 const TripCtx = createContext<Ctx | null>(null);
@@ -84,6 +88,7 @@ export function TripApp(props: { mode: Mode; token?: string; initial: { doc: Tri
   const [doc, setDoc] = useState<TripDoc>(props.initial.doc);
   const [versionNo, setVersionNo] = useState(props.initial.versionNo);
   const [lastSyncAt, setLastSyncAt] = useState(props.initial.syncedAt);
+  const [alerts, setAlerts] = useState<Alerts>(() => alertStatus(props.initial.doc, { showWindow: props.mode === "owner" }));
   const [online, setOnline] = useState(true);
   const [fromCache, setFromCache] = useState(false);
   const [tab, setTab] = useState<TabKey>("overview");
@@ -108,6 +113,7 @@ export function TripApp(props: { mode: Mode; token?: string; initial: { doc: Tri
   const applyServerDoc = useCallback(
     (d: TripDoc, v: number) => {
       const now = new Date().toISOString();
+      setAlerts(alertStatus(d, { showWindow: mode === "owner" }));
       setDoc(d);
       setVersionNo(v);
       setLastSyncAt(now);
@@ -115,12 +121,13 @@ export function TripApp(props: { mode: Mode; token?: string; initial: { doc: Tri
       setOnline(true);
       void persist(d, v, now);
     },
-    [persist],
+    [persist, mode],
   );
 
   const refresh = useCallback(async () => {
-    const r = await api<{ doc: TripDoc; versionNo: number; syncedAt: string }>(tripUrl);
+    const r = await api<{ doc: TripDoc; versionNo: number; syncedAt: string; alerts: Alerts }>(tripUrl);
     if (r.ok && !r.cached) {
+      setAlerts(r.data.alerts);
       setDoc(r.data.doc);
       setVersionNo(r.data.versionNo);
       setLastSyncAt(r.data.syncedAt);
@@ -133,8 +140,9 @@ export function TripApp(props: { mode: Mode; token?: string; initial: { doc: Tri
       // The service worker answered from its cache: the server is unreachable.
       setOnline(false);
       setFromCache(true);
-      const snap = await loadSnapshot<TripDoc, unknown>(storeKey);
-      const best = snap && snap.lastSyncAt > r.data.syncedAt ? { doc: snap.doc, versionNo: snap.versionNo, syncedAt: snap.lastSyncAt } : r.data;
+      const snap = await loadSnapshot<TripDoc, Alerts>(storeKey);
+      const best = snap && snap.lastSyncAt > r.data.syncedAt ? { doc: snap.doc, versionNo: snap.versionNo, syncedAt: snap.lastSyncAt, alerts: snap.alerts } : r.data;
+      setAlerts(best.alerts);
       setDoc(best.doc);
       setVersionNo(best.versionNo);
       setLastSyncAt(best.syncedAt);
@@ -143,8 +151,9 @@ export function TripApp(props: { mode: Mode; token?: string; initial: { doc: Tri
     }
     if (!r.ok && r.offline) {
       setOnline(false);
-      const snap = await loadSnapshot<TripDoc, unknown>(storeKey);
+      const snap = await loadSnapshot<TripDoc, Alerts>(storeKey);
       if (snap && snap.lastSyncAt > props.initial.syncedAt) {
+        setAlerts(snap.alerts);
         setDoc(snap.doc);
         setVersionNo(snap.versionNo);
         setLastSyncAt(snap.lastSyncAt);
@@ -177,7 +186,7 @@ export function TripApp(props: { mode: Mode; token?: string; initial: { doc: Tri
   }, [mode, token]);
 
   useEffect(() => {
-    registerServiceWorker();
+    registerServiceWorker([tripUrl]);
     // Initial render came from the server (or from a cached page when offline): re-check.
     void (async () => {
       const ok = await refresh();
@@ -276,6 +285,9 @@ export function TripApp(props: { mode: Mode; token?: string; initial: { doc: Tri
     versions,
     reloadVersions,
     applyServerDoc,
+    alerts,
+    lastSyncAt,
+    offlineCopy: !online || fromCache,
   };
 
   const visibleTabs = TABS.filter((t) => mode === "owner" || !("owner" in t));

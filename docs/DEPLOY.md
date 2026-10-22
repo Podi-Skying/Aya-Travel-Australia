@@ -12,9 +12,9 @@ These steps need your own accounts. Nothing here was done for you automatically.
 1. Sign in to Vercel with GitHub and **Add New → Project**, then import `Podi-Skying/Aya-Travel-Australia`.
 2. Set **Root Directory** to `web`. Framework preset: Next.js.
 3. **Storage → Neon** (Marketplace): create a free database and connect it to the project. This sets `DATABASE_URL`.
-4. Environment variables (Production and Preview):
+4. Environment variables (Production):
    - `NEXTAUTH_SECRET`: output of `openssl rand -base64 32`
-   - `NEXTAUTH_URL`: your production URL
+   - `NEXTAUTH_URL`: your production URL (GitHub sends sign-ins back to this address only, so sign-in works on production, not on preview deployments)
    - `GITHUB_ID`, `GITHUB_SECRET`: from step 1
    - `OWNER_GITHUB_IDS`: `32431832`
    - `VOTER_HASH_SALT`: output of `openssl rand -hex 16`
@@ -32,8 +32,8 @@ DATABASE_URL="<neon connection string>" OWNER_GITHUB_IDS=32431832 npm run db:see
 
 `db:seed` creates version 1 (Sydney 11/3–11/6, Tasmania 11/6–11/27, plus the unscheduled attraction pool). It does nothing if a trip already exists.
 
-## 4. Check
-1. Open the site and sign in with GitHub as Podi-Skying. Another GitHub account gets a 403 page.
+## 4. Check (on the production URL)
+1. Open the production site and sign in with GitHub as Podi-Skying. Another GitHub account gets a 403 page.
 2. 版本與分享 → 建立分享連結. The link is shown once; open it in a private window to check what visitors see.
 3. On your phone, open the site once while online. Then turn on airplane mode and reload: the itinerary and the last sync time remain visible, with an offline notice.
 

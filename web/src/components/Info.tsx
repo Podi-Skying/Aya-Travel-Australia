@@ -2,9 +2,11 @@
 
 import { useTrip } from "./TripApp";
 import { Badge, PRI, STATUS, VERIFY } from "./ui";
+import { fmtDay, fmtTs } from "@/domain/format";
 
 export function Info() {
-  const { doc, mode } = useTrip();
+  const { doc, mode, alerts, lastSyncAt, offlineCopy, gotoDay } = useTrip();
+  const warnDays = alerts.map((a, i) => ({ ...a, i, warns: a.checks.filter((c) => c.lv === "warn" || c.lv === "danger") })).filter((a) => a.warns.length);
   const legend = (o: Record<string, { t: string; c: string }>) =>
     Object.values(o).map((v) => (
       <span key={v.t}>
@@ -33,8 +35,34 @@ export function Info() {
               </li>
             ))}
           </ul>
-          <p className="muted small">最後已知警示狀態：未連線（未查詢）。每日的規劃提醒在「每日行程」中，離線時顯示上次同步的結果。</p>
+          <p className="muted small">外部即時警示：未連線（第一版沒有自動查詢），請用上面的官方連結確認。</p>
         </div>
+      </div>
+      <div className="card section">
+        <h3>最後已知的規劃提醒</h3>
+        <p className="muted small">
+          依 {fmtTs(lastSyncAt)} 同步的行程計算{offlineCopy ? "（離線副本，可能不是最新資料）" : ""}。{warnDays.length ? `共 ${warnDays.length} 天有提醒。` : "目前沒有提醒。"}
+        </p>
+        {warnDays.length > 0 && (
+          <ul className="todo-list">
+            {warnDays.map((a) => (
+              <li key={a.date}>
+                <a
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    gotoDay(a.i);
+                  }}
+                >
+                  {fmtDay(a.date)}
+                </a>
+                ：{a.warns.map((c) => c.t).join(" ")}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <div className="grid cols-2 section">
         <div className="card">
           <h3>標籤說明</h3>
           <p>

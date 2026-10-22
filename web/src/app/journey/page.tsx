@@ -11,5 +11,5 @@ export default async function OwnerJourney() {
   if (p.kind === "signin") redirect("/api/auth/signin?callbackUrl=%2Fjourney");
   if (p.kind === "forbidden") return <Notice title="沒有權限（403）" />;
   if (p.kind === "none") return <Notice title="尚未建立行程" />;
-  return <JourneyView doc={p.trip.doc} backHref="/" />;
+  return <JourneyView doc={p.trip.doc} backHref="/" dataUrl="/api/trip" syncedAt={new Date().toISOString()} />;
 }

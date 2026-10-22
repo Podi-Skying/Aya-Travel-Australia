@@ -241,13 +241,13 @@ Expected: all exit 0; `npm test` reports the AC3–AC9 test files passing.
 
 Legacy parity method (AC3): `tests/legacy-parity.test.ts` reads `site/js/data.js` and `site/js/app.js` from the repo, extracts the code between the markers `/* ---------- rules` and `/* ---------- header ----------` (which contains `checks`, `feasibility`, `isTentative`, `lineAmount`, `basis`, `budgetLines`, `dayTotal`), evaluates it in a `node:vm` context with `DATA = TRIP_DATA`, `S = { days, partySize }`, `SHARE = false`, and stub `esc`/`driverLabel`/`stayOf` copied from `app.js` helpers, then compares outputs with the TypeScript port on the same inputs. If the markers move, the test fails loudly rather than skipping.
 
-Manual checks (host, local `npm run dev` with PGlite and a test owner session, and on the Vercel preview after the owner completes `docs/DEPLOY.md`):
+Manual checks (host, local production build with PGlite for visitor views; owner views on the production deployment after the owner completes `docs/DEPLOY.md`, because the GitHub OAuth callback is bound to one URL — changed during inspection fix round 1, finding R-06):
 1. 375 px and desktop: walk through AC11 views.
 2. Offline: load owner page and a share page, then set the browser offline and reload: itinerary visible, footer last-sync time, offline banner.
 3. Map blocked (block tile domain): text route list still usable.
 4. Visitor link in a private window: no address, no driver names, interest submit/edit/withdraw works; owner sees counts.
 
-Local dev auth for manual checks: a development-only credentials bypass is **not** added. Instead, integration tests call route handlers with a mocked `getServerSession`; manual owner checks happen on the Vercel preview with real GitHub login after setup. Local manual checks cover the visitor view and read-only owner rendering with a seeded DB.
+Local dev auth for manual checks: a development-only credentials bypass is **not** added. Instead, integration tests call route handlers with a mocked `getServerSession`; manual owner checks happen on the production deployment with real GitHub login after setup. Local manual checks cover the visitor view and read-only owner rendering with a seeded DB.
 
 ## 8. Toolchain
 

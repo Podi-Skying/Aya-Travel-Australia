@@ -26,9 +26,24 @@ export async function api<T>(path: string, init: { method?: string; body?: unkno
   return { ok: false, status: res.status, error: typeof d.error === "string" ? d.error : `錯誤 ${res.status}`, data: d };
 }
 
-export function registerServiceWorker() {
+/** Registers the service worker and asks it to cache this page, its assets and its data URLs. */
+export function registerServiceWorker(dataUrls: string[] = []) {
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
   if (process.env.NODE_ENV !== "production") return;
   const v = process.env.NEXT_PUBLIC_BUILD_ID ?? "dev";
-  navigator.serviceWorker.register(`/sw.js?v=${encodeURIComponent(v)}`).catch(() => {});
+  const warm = (sw: ServiceWorker | null | undefined) => {
+    const assets = performance
+      .getEntriesByType("resource")
+      .map((e) => e.name)
+      .filter((u) => u.startsWith(location.origin + "/_next/static/"));
+    sw?.postMessage({ type: "warm", urls: [location.pathname, ...dataUrls, ...assets] });
+  };
+  navigator.serviceWorker.addEventListener("message", (e) => {
+    if (e.data?.type === "rewarm") warm(navigator.serviceWorker.controller);
+  });
+  navigator.serviceWorker
+    .register(`/sw.js?v=${encodeURIComponent(v)}`)
+    .then(() => navigator.serviceWorker.ready)
+    .then((reg) => warm(reg.active))
+    .catch(() => {});
 }

@@ -70,3 +70,24 @@ describe("privacy filter (AC6)", () => {
     expect(() => assertPublicSafe({ address: "" }, doc)).toThrow(PrivacyGuardError);
   });
 });
+
+describe("dates and times (inspection R-01)", () => {
+  it("rejects impossible calendar dates and clock times", () => {
+    const a = seedDoc();
+    a.days[0].date = "2026-02-31";
+    expect(parseTripDoc(a).ok).toBe(false);
+    const b = seedDoc();
+    b.days[0].items[0].time = "99:99";
+    expect(parseTripDoc(b).ok).toBe(false);
+    const c = seedDoc();
+    c.days[0].items[0].time = "24:00";
+    expect(parseTripDoc(c).ok).toBe(false);
+  });
+
+  it("rejects an impossible time in an item edit", () => {
+    const doc = seedDoc();
+    const it = doc.days[0].items[0];
+    expect(applyOp(doc, { op: "editItem", date: doc.days[0].date, itemId: it.id, fields: { time: "25:10" } })).toMatchObject({ ok: false, status: 400 });
+    expect(applyOp(doc, { op: "editItem", date: doc.days[0].date, itemId: it.id, fields: { time: "23:59" } }).ok).toBe(true);
+  });
+});

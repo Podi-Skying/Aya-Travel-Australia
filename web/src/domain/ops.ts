@@ -1,4 +1,4 @@
-import { MODES, PRIORITIES, COST_STATUS, COST_UNITS, COST_CATS, validWindow } from "./schema";
+import { MODES, PRIORITIES, COST_STATUS, COST_UNITS, COST_CATS, TIME_RE, validWindow } from "./schema";
 import type { Cost, Day, Item, Package, TripDoc } from "./schema";
 import { effectiveDay } from "./effective-day";
 import { fmtDay } from "./format";
@@ -52,7 +52,7 @@ function sortItems(day: Day) {
 
 function applyFields(it: Item, f: ItemFields): string | null {
   if (f.time !== undefined) {
-    if (!/^\d{2}:\d{2}$/.test(f.time)) return "時間格式需為 HH:MM";
+    if (!TIME_RE.test(f.time)) return "時間需為 00:00–23:59";
     it.time = f.time;
   }
   if (f.dur !== undefined) {

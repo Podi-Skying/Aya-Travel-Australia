@@ -118,3 +118,23 @@ Both findings accepted and applied:
 - Review rounds used: 9 (5 budgeted + 4 extra). The final plan (with the round-9 dispositions) has NOT received an APPROVED verdict.
 - Host decision: proceed to build under the owner's original plan-and-implement authorization, recording this plan version as unreviewed for the round-9 changes, as proposed to the owner (option A). Final code inspection by a fresh Codex session remains mandatory and will cover the round-9 changes in code.
 - Plan SHA256 at build start: ce9f6e7fdb10a7ad43e3559a5b8c531cf2efd061468bd40f4173e4d5eddadbaa
+
+## Build (Claude, this session)
+- Base commit for inspection: 4f02e72. Build commit: e95117d.
+- Host proof run: npm ci, npm run lint, npm run typecheck, npm test (74 tests), npm run build — all exit 0; npm audit --omit=dev: 0 vulnerabilities.
+- Manual checks (local production build, PGlite seed, visitor share link): overview, day detail, map, pool, info, 375 px width (no horizontal scroll), interest submit and withdraw, journey page, offline reload with server stopped. Owner pages were not checked manually (GitHub login needed; to do on production after docs/DEPLOY.md).
+- Found and fixed during manual checks: offline banner did not appear when the service worker answered from its cache (SW now marks cached fallbacks with x-aya-offline).
+
+## Inspection 1 — fresh Codex session
+- Result: /private/tmp/claude-501/-Users-tanghuakui-Downloads-claude-Aya------/658c8c6d-5439-4fec-9bcf-1d7cb7e5eb37/scratchpad/cx/inspect-1/claudex-626mlnza/result.json; effective_model gpt-6-luna.
+- Verdict: REVISE. R-01 (medium) impossible dates/times accepted; R-02 (medium) alert status from API/offline not shown; R-03 (medium) journey loader stays if Three.js chunk fails; R-04 (medium) journey pages lack last-sync/offline notice; R-05 (low) request body read fully before size check; R-06 (low) NEXTAUTH_URL vs preview deployments.
+
+### Fix round 1 (Claude) — dispositions
+- R-01 accepted: real calendar-date check and 00:00–23:59 times in schema and item edits; tests added.
+- R-02 accepted: client keeps the server alert status, restores it from the offline snapshot, and the information tab lists the last-known planning alerts with the sync time.
+- R-03 accepted: scene import failure dismisses the loader, hides the canvas and shows all chapter cards.
+- R-04 accepted: journey pages fetch the trip data, show the last-sync footer and an offline notice when served from cache.
+- R-05 accepted: bounded incremental body reading; test streams an oversized body without Content-Length and checks reading stops early.
+- R-06 accepted: DEPLOY.md and PLAN.md section 7 now do authenticated manual checks on production (OAuth callback is bound to one URL); recorded as a plan change.
+- Additional fix found while verifying R-04 offline: after a new deploy, assets loaded before the new service worker took control were not cached, so the next offline visit had no JavaScript. Pages now send their loaded assets and data URLs to the worker ("warm"), and a newly activated worker asks open pages to re-send them. Verified: deploy → one online visit → server stopped → page and tabs work offline with the notice.
+- Proof after fixes: lint, typecheck, 77 tests, build — all exit 0.

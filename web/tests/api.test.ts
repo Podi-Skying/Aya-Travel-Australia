@@ -205,6 +205,24 @@ describe("interest (AC7)", () => {
   });
 });
 
+describe("request size (inspection R-05)", () => {
+  it("stops reading an oversized body without Content-Length", async () => {
+    const t = await newShare();
+    let pulled = 0;
+    const big = new ReadableStream<Uint8Array>({
+      pull(ctrl) {
+        pulled++;
+        if (pulled > 1000) return ctrl.close();
+        ctrl.enqueue(new Uint8Array(1024).fill(32));
+      },
+    });
+    const r = new Request("http://localhost:3000/api/s/x/interest", { method: "POST", body: big, duplex: "half" } as RequestInit);
+    const res = await H.postVote(r, ctx(t));
+    expect(res.status).toBe(413);
+    expect(pulled).toBeLessThan(10);
+  });
+});
+
 describe("delete (AC9)", () => {
   it("removes the trip and all associated rows; the public link is 404", async () => {
     const t = await newShare();
