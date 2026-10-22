@@ -18,7 +18,7 @@ export function Pool() {
       <div className="card">
         <h2>待安排景點</h2>
         <p className="muted">
-          這些是原本 10 月下旬規劃、旅程還沒開始所以先移出行程的景點，資訊都保留著。建議日期只是參考，
+          這些是原本 10 月下旬規劃、旅程還沒開始所以先移出行程的景點，以及從 Google 地圖收藏匯入的雪梨與塔州景點。建議日期只是參考，
           {mode === "owner" ? "要由你決定排進哪一天。" : "擁有者還沒排入行程。"}整組排入會一起套用共乘費用、開車時間與司機需求；單獨排入一個景點不套用共乘費用。
         </p>
       </div>
@@ -41,6 +41,8 @@ function PackageCard({ pkg }: { pkg: Package }) {
   const [date, setDate] = useState(pkg.suggestion?.date && eligible.some((d) => d.date === pkg.suggestion!.date) ? pkg.suggestion.date : (eligible[0]?.date ?? ""));
   const editable = mode === "owner" && online;
   const est = packageEstimate(pkg, doc.partySize);
+  // Places imported from saved lists carry no cost at all; say so instead of showing $0.
+  const priced = pkg.costs.length > 0 || pkg.items.some((i) => i.cost);
   return (
     <div className="card pool-pkg">
       <h3>{pkg.title}</h3>
@@ -76,9 +78,13 @@ function PackageCard({ pkg }: { pkg: Package }) {
           </li>
         ))}
       </ul>
-      <p className="small">
-        估計花費（{doc.partySize} 人，含共乘）：<strong>{money(est)}</strong> <Badge t="估計" c="b-warn" />
-      </p>
+      {priced ? (
+        <p className="small">
+          估計花費（{doc.partySize} 人，含共乘）：<strong>{money(est)}</strong> <Badge t="估計" c="b-warn" />
+        </p>
+      ) : (
+        <p className="small muted">費用與開放時間尚未查證。</p>
+      )}
       {pkg.alt && <p className="small muted">沒有司機時：{pkg.alt}</p>}
       {pkg.suggestion && (
         <p className="small">
