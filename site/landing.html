@@ -1,0 +1,613 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>南方之旅｜Aya 的塔斯馬尼亞</title>
+  <meta name="description" content="Aya 的塔斯馬尼亞與雪梨旅程：捲動進入即時 3D 的山海世界。">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500&family=Noto+Serif+TC:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --accent: #e0231c;
+      --ink: #f4f1ea;
+      --ink-2: rgba(244, 241, 234, .72);
+      --glass: rgba(10, 18, 22, .42);
+      --line: rgba(244, 241, 234, .18);
+      --serif: "Noto Serif TC", "Songti TC", serif;
+      --sans: "Noto Sans TC", system-ui, -apple-system, "PingFang TC", sans-serif;
+      --h-size: 46px;
+      color-scheme: dark;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; background: #0b1418; color: var(--ink); font-family: var(--sans); font-weight: 300; font-size: 17px; line-height: 1.75; }
+    body.no-webgl { background: linear-gradient(180deg, #1b2c3a 0%, #2c4a4a 40%, #6d5a4a 75%, #0b1418 100%) fixed; }
+    a { color: inherit; }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+
+    /* 3D 世界與前景圖層 */
+    #world { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; z-index: 0; }
+    .fg { position: fixed; pointer-events: none; z-index: 2; will-change: transform; }
+    .fg svg { display: block; width: 100%; height: 100%; }
+    #fg-gum { top: -4vh; left: -6vw; width: min(52vw, 560px); height: min(52vw, 560px); }
+    #fg-fern { right: -8vw; bottom: -10vh; width: min(58vw, 620px); height: min(58vw, 620px); }
+    #fg-grass { left: 0; right: 0; bottom: -2vh; height: 26vh; }
+    #fg-columns { left: -4vw; bottom: -6vh; width: min(34vw, 360px); height: min(60vh, 520px); }
+    .vignette { position: fixed; inset: 0; z-index: 1; pointer-events: none; background: radial-gradient(ellipse at 50% 45%, transparent 45%, rgba(4, 8, 10, .55) 100%); }
+
+    /* 載入畫面 */
+    #loader { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: #070d10; transition: opacity 1.1s ease, visibility 1.1s; }
+    #loader.done { opacity: 0; visibility: hidden; }
+    .ld { text-align: center; }
+    .ld .glyph { font-family: var(--serif); font-size: clamp(40px, 8vw, 84px); letter-spacing: .08em; font-weight: 400; }
+    .ld .line { margin-top: 10px; color: var(--ink-2); font-size: 14px; letter-spacing: .12em; }
+    .ld .pct { font-variant-numeric: tabular-nums; color: var(--accent); }
+    .ld .bar { width: 200px; height: 1px; background: var(--line); margin: 18px auto 0; overflow: hidden; }
+    .ld .bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s ease; }
+
+    /* 導覽 */
+    .nav { position: fixed; top: 0; left: 0; right: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: max(16px, env(safe-area-inset-top)) 28px 16px; mix-blend-mode: normal; }
+    .nav::before { content: ""; position: absolute; inset: 0 0 -30px; background: linear-gradient(rgba(5, 10, 12, .6), transparent); z-index: -1; pointer-events: none; }
+    .brand { font-family: var(--serif); font-size: 18px; letter-spacing: .06em; text-decoration: none; }
+    .brand b { color: var(--accent); font-weight: 600; }
+    .nav ul { display: flex; gap: 22px; list-style: none; margin: 0; padding: 0; font-size: 14px; letter-spacing: .06em; }
+    .nav ul a { text-decoration: none; opacity: .7; transition: opacity .3s; }
+    .nav ul a:hover, .nav ul a.on { opacity: 1; }
+    .nav ul a.on::before { content: ""; display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); margin-right: 7px; vertical-align: middle; }
+    .cta { border: 1px solid var(--line); padding: 7px 16px; border-radius: 999px; text-decoration: none; font-size: 14px; background: var(--glass); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); white-space: nowrap; }
+    .cta:hover { border-color: var(--accent); }
+
+    /* 章節進度 */
+    .rail { position: fixed; right: 22px; top: 50%; transform: translateY(-50%); z-index: 20; display: grid; gap: 14px; }
+    .rail a { display: block; width: 8px; height: 8px; border-radius: 50%; border: 1px solid var(--ink-2); }
+    .rail a.on { background: var(--accent); border-color: var(--accent); transform: scale(1.3); }
+
+    /* 章節 */
+    main { position: relative; z-index: 10; }
+    .ch { min-height: 150vh; padding: 0 clamp(16px, 6vw, 96px); display: flex; align-items: center; }
+    .ch.hero { min-height: 120vh; padding-top: 90px; padding-bottom: 60px; align-items: center; justify-content: center; text-align: center; }
+    .ch.right { justify-content: flex-end; }
+    #afterlight { min-height: 100vh; }
+    .card { max-width: 520px; padding: 30px 32px; border-radius: 18px; background: var(--glass); border: 1px solid var(--line); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); opacity: 0; transform: translateY(40px); transition: opacity 1s ease, transform 1.2s cubic-bezier(.2, .7, .2, 1); position: sticky; top: 22vh; }
+    .card.in { opacity: 1; transform: none; }
+    .hero .card { background: none; border: 0; backdrop-filter: none; -webkit-backdrop-filter: none; max-width: 900px; position: static; }
+    .eyebrow { font-size: 13px; letter-spacing: .22em; color: var(--ink-2); text-transform: uppercase; margin: 0 0 14px; }
+    .eyebrow em { font-style: normal; color: var(--accent); margin-right: 10px; }
+    .h-hero { font-family: var(--serif); font-weight: 400; font-size: clamp(34px, 6.4vw, 76px); line-height: 1.18; letter-spacing: -0.012em; margin: 0; text-shadow: 0 2px 30px rgba(0, 0, 0, .35); }
+    .h-sec { font-family: var(--serif); font-weight: 400; font-size: clamp(28px, 3.4vw, var(--h-size)); line-height: 1.25; letter-spacing: -0.012em; margin: 0 0 14px; }
+    .lead { color: var(--ink-2); margin: 18px auto 0; max-width: 560px; }
+    .scroll-cue { margin-top: 48px; font-size: 13px; letter-spacing: .2em; color: var(--ink-2); }
+    .scroll-cue i { display: block; width: 1px; height: 54px; margin: 12px auto 0; background: linear-gradient(var(--accent), transparent); animation: cue 2.2s ease-in-out infinite; transform-origin: top; }
+    @keyframes cue { 0% { transform: scaleY(0); } 50% { transform: scaleY(1); } 100% { transform: scaleY(1); opacity: 0; } }
+    .stops { list-style: none; padding: 0; margin: 18px 0 0; border-top: 1px solid var(--line); }
+    .stops li { display: flex; justify-content: space-between; gap: 14px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 15px; }
+    .stops span:last-child { color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 22px; }
+    .stats div { border-top: 1px solid var(--line); padding-top: 10px; }
+    .stats b { display: block; font-family: var(--serif); font-weight: 400; font-size: 30px; line-height: 1.1; }
+    .stats small { color: var(--ink-2); font-size: 12px; }
+    .btn { display: inline-block; margin-top: 24px; padding: 11px 22px; border-radius: 999px; background: var(--accent); color: #fff; text-decoration: none; font-weight: 400; letter-spacing: .04em; }
+    .btn:hover { filter: brightness(1.1); }
+    .note { font-size: 12px; color: var(--ink-2); margin-top: 14px; }
+    .foot { position: relative; z-index: 10; padding: 40px clamp(16px, 6vw, 96px) 60px; color: var(--ink-2); font-size: 13px; background: linear-gradient(transparent, #070d10 40%); }
+
+    @media (max-width: 760px) {
+      .nav { padding: max(12px, env(safe-area-inset-top)) 16px 12px; }
+      .nav ul { display: none; }
+      .rail { right: 10px; }
+      .ch, .ch.right { justify-content: center; padding: 0 16px; }
+      .card { padding: 22px 20px; top: 16vh; }
+      .stats { grid-template-columns: repeat(2, 1fr); }
+      #fg-columns { display: none; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .card { transition: none; opacity: 1; transform: none; }
+      .scroll-cue i { animation: none; }
+      #loader { transition: none; }
+    }
+  </style>
+</head>
+<body>
+  <div id="loader" role="status" aria-live="polite">
+    <div class="ld">
+      <div class="glyph">南方之旅</div>
+      <div class="line">正在升起塔斯馬尼亞的山海　<span class="pct" id="pct">0%</span></div>
+      <div class="bar"><i id="bar"></i></div>
+    </div>
+  </div>
+
+  <canvas id="world" aria-hidden="true"></canvas>
+  <div class="vignette" aria-hidden="true"></div>
+  <div class="fg" id="fg-gum" aria-hidden="true"></div>
+  <div class="fg" id="fg-columns" aria-hidden="true"></div>
+  <div class="fg" id="fg-fern" aria-hidden="true"></div>
+  <div class="fg" id="fg-grass" aria-hidden="true"></div>
+
+  <header class="nav">
+    <a class="brand" href="#top">南方之旅 <b>·</b> Aya</a>
+    <nav aria-label="章節">
+      <ul>
+        <li><a href="#hobart">荷巴特</a></li>
+        <li><a href="#coast">東海岸</a></li>
+        <li><a href="#wild">荒野</a></li>
+        <li><a href="#sydney">雪梨</a></li>
+        <li><a href="#afterlight">南極光</a></li>
+      </ul>
+    </nav>
+    <a class="cta" href="index.html">打開行程 →</a>
+  </header>
+
+  <nav class="rail" aria-label="章節進度">
+    <a href="#top" aria-label="序章"></a><a href="#hobart" aria-label="荷巴特"></a><a href="#coast" aria-label="東海岸"></a><a href="#wild" aria-label="荒野"></a><a href="#sydney" aria-label="雪梨"></a><a href="#afterlight" aria-label="南極光"></a>
+  </nav>
+
+  <main>
+    <section class="ch hero" id="top" data-ch="0">
+      <div class="card">
+        <p class="eyebrow"><em>00</em>Tasmania · Sydney · 2026</p>
+        <h1 class="h-hero">世界的南端，<br>是旅程的開始。</h1>
+        <p class="lead" id="hero-lead">三十三天，從荷巴特的港灣走到搖籃山的湖畔，中途繞去雪梨看一眼港灣大橋。</p>
+        <div class="scroll-cue">往下捲動，進入旅程<i></i></div>
+      </div>
+    </section>
+
+    <section class="ch" id="hobart" data-ch="1">
+      <div class="card">
+        <p class="eyebrow"><em>01</em>Hobart · kunanyi</p>
+        <h2 class="h-sec">港灣與山</h2>
+        <p>UTAS 公寓是這趟旅程的家。早上去 Salamanca 逛市集，下午開上 kunanyi 威靈頓山，看整座城市和 Derwent 河口在腳下展開。</p>
+        <ul class="stops" data-stops="hobart"></ul>
+      </div>
+    </section>
+
+    <section class="ch right" id="coast" data-ch="2">
+      <div class="card">
+        <p class="eyebrow"><em>02</em>East Coast</p>
+        <h2 class="h-sec">酒杯灣與火焰灣</h2>
+        <p>沿著東海岸往北，花崗岩染著橘色地衣，海水藍得不像真的。Wineglass Bay 的觀景台值得走上去。</p>
+        <ul class="stops" data-stops="coast"></ul>
+      </div>
+    </section>
+
+    <section class="ch" id="wild" data-ch="3">
+      <div class="card">
+        <p class="eyebrow"><em>03</em>Wilderness</p>
+        <h2 class="h-sec">搖籃山的霧</h2>
+        <p>樹蕨、雨林和冰河切出的湖。鴿子湖環湖步道走一圈約三小時，天氣說變就變，記得帶外套。</p>
+        <ul class="stops" data-stops="wild"></ul>
+      </div>
+    </section>
+
+    <section class="ch right" id="sydney" data-ch="4">
+      <div class="card">
+        <p class="eyebrow"><em>04</em>Interlude · Sydney</p>
+        <h2 class="h-sec">四天的城市插曲</h2>
+        <p>十一月初飛去雪梨：歌劇院的夜景、曼利渡輪、邦迪到庫吉的海岸步道，再搭火車上藍山看三姊妹岩。</p>
+        <ul class="stops" data-stops="sydney"></ul>
+      </div>
+    </section>
+
+    <section class="ch hero" id="afterlight" data-ch="5">
+      <div class="card">
+        <p class="eyebrow"><em>05</em>Afterlight</p>
+        <h2 class="h-hero">運氣好的夜晚，<br>天空會亮起南極光。</h2>
+        <div class="stats" id="stats"></div>
+        <a class="btn" href="index.html">打開完整行程</a>
+        <p class="note">行程內容為草稿，價格與時間皆為估計；南極光無法保證出現。<br>3D 場景為即時運算的程序化地形，非實際地圖比例。</p>
+      </div>
+    </section>
+  </main>
+
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="js/data.js"></script>
+  <script>
+  (function () {
+    "use strict";
+    var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var mobile = window.matchMedia("(max-width: 760px)").matches;
+    var $ = function (s) { return document.querySelector(s); };
+
+    /* ---------- 載入進度 ---------- */
+    var shown = 0, target = 0;
+    function setProgress(p) { target = Math.max(target, p); }
+    (function tick() {
+      shown += (target - shown) * (reduce ? 1 : 0.12);
+      if (target - shown < 0.5) shown = target;
+      $("#pct").textContent = Math.round(shown) + "%";
+      $("#bar").style.width = shown + "%";
+      if (shown >= 100) { setTimeout(function () { $("#loader").classList.add("done"); }, reduce ? 0 : 250); return; }
+      requestAnimationFrame(tick);
+    })();
+    setProgress(15);
+    // 慢速裝置上 requestAnimationFrame 可能很稀疏：保底在載入完成後 1.5 秒關閉載入畫面
+    addEventListener("load", function () { setTimeout(function () { setProgress(100); shown = 100; $("#loader").classList.add("done"); }, 1500); });
+
+    /* ---------- 從行程資料帶入內容 ---------- */
+    var T = window.TRIP_DATA;
+    function md(s) { var p = s.split("-"); return Number(p[1]) + "/" + Number(p[2]); }
+    var groups = {
+      hobart: ["kunanyi / 威靈頓山山頂", "Salamanca Market 週六市集", "MONA 新舊藝術博物館", "亞瑟港歷史遺址（含港灣遊船）", "Bruny Island 起司與生蠔午餐"],
+      coast: ["Wineglass Bay 酒杯灣觀景台步道", "Bay of Fires 火焰灣（Binalong Bay）", "Cataract Gorge 卡塔拉克特峽谷", "Painted Cliffs 彩繪懸崖"],
+      wild: ["Russell Falls 羅素瀑布", "Dove Lake 鴿子湖環湖步道", "Devils@Cradle 袋獾保育中心", "Tahune 樹頂步道"],
+      sydney: ["雪梨歌劇院與港灣大橋夜景", "搭渡輪到 Manly 曼利海灘", "Bondi → Coogee 海岸步道", "Echo Point 三姊妹岩"]
+    };
+    if (T) {
+      var byName = {};
+      T.days.forEach(function (d) { d.items.forEach(function (i) { byName[i.name] = d.date; }); });
+      Object.keys(groups).forEach(function (k) {
+        var ul = document.querySelector('[data-stops="' + k + '"]');
+        ul.innerHTML = groups[k].filter(function (n) { return byName[n]; }).map(function (n) {
+          return "<li><span>" + n + "</span><span>" + md(byName[n]) + "</span></li>";
+        }).join("");
+      });
+      var all = [].concat.apply([], T.days.map(function (d) { return d.items; }));
+      var must = all.filter(function (i) { return i.pri === "must" && i.major; }).length;
+      var stats = [[T.days.length, "天"], [2, "個目的地"], [must, "個必去"], [all.filter(function (i) { return i.major; }).length, "個景點"]];
+      $("#stats").innerHTML = stats.map(function (s) { return "<div><b>" + s[0] + "</b><small>" + s[1] + "</small></div>"; }).join("");
+    }
+
+    /* ---------- 前景剪影（程序化 SVG） ---------- */
+    function rnd(seed) { return function () { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }; }
+    function svg(vb, body) { return '<svg viewBox="' + vb + '" preserveAspectRatio="xMidYMax slice" xmlns="http://www.w3.org/2000/svg">' + body + "</svg>"; }
+    var SIL = "#060c0e";
+    // 尤加利枝：從左上角伸出的枝條，掛著細長下垂的葉子
+    (function () {
+      var r = rnd(7), out = "";
+      function branch(x, y, ang, len, w, depth) {
+        var x2 = x + Math.cos(ang) * len, y2 = y + Math.sin(ang) * len;
+        out += '<path d="M' + x + " " + y + " Q" + ((x + x2) / 2 + 10) + " " + ((y + y2) / 2 - 8) + " " + x2 + " " + y2 + '" stroke="' + SIL + '" stroke-width="' + w + '" fill="none" stroke-linecap="round"/>';
+        var n = Math.floor(len / 22);
+        for (var i = 1; i <= n; i++) {
+          var t = i / n, px = x + (x2 - x) * t, py = y + (y2 - y) * t;
+          var la = Math.PI / 2 + (r() - .5) * 0.9, ll = 34 + r() * 26;
+          var lx = px + Math.cos(la) * ll, ly = py + Math.sin(la) * ll;
+          var nx = -Math.sin(la) * 6, ny = Math.cos(la) * 6;
+          out += '<path d="M' + px + " " + py + " Q" + ((px + lx) / 2 + nx) + " " + ((py + ly) / 2 + ny) + " " + lx + " " + ly + " Q" + ((px + lx) / 2 - nx) + " " + ((py + ly) / 2 - ny) + " " + px + " " + py + 'Z" fill="' + SIL + '"/>';
+        }
+        if (depth > 0) {
+          branch(x2, y2, ang + 0.35 + r() * 0.2, len * 0.7, w * 0.65, depth - 1);
+          branch(x + (x2 - x) * .55, y + (y2 - y) * .55, ang - 0.15 + r() * 0.2, len * 0.6, w * 0.6, depth - 1);
+        }
+      }
+      branch(-10, 40, 0.28, 260, 9, 3);
+      $("#fg-gum").innerHTML = '<svg viewBox="0 0 560 560" xmlns="http://www.w3.org/2000/svg">' + out + "</svg>";
+    })();
+    // 樹蕨：從右下角展開的羽狀葉
+    (function () {
+      var r = rnd(21), out = "";
+      for (var f = 0; f < 7; f++) {
+        var ang = -Math.PI * (0.55 + f * 0.085) + (r() - .5) * .1, len = 300 + r() * 160;
+        var bx = 560, by = 600, cur = 0.0016 * (r() > .5 ? 1 : -1);
+        var pts = [];
+        for (var i = 0; i <= 40; i++) {
+          var t = i / 40, a = ang + cur * t * len;
+          pts.push([bx + Math.cos(a) * len * t, by + Math.sin(a) * len * t + t * t * 60, a]);
+        }
+        out += '<path d="M' + pts.map(function (p) { return p[0].toFixed(1) + " " + p[1].toFixed(1); }).join(" L") + '" stroke="' + SIL + '" stroke-width="4" fill="none"/>';
+        for (var j = 2; j < 40; j++) {
+          var p = pts[j], s = (1 - j / 40) * 46 + 6;
+          [1, -1].forEach(function (side) {
+            var la = p[2] + side * 1.2, ex = p[0] + Math.cos(la) * s, ey = p[1] + Math.sin(la) * s + 6;
+            out += '<path d="M' + p[0].toFixed(1) + " " + p[1].toFixed(1) + " Q" + ((p[0] + ex) / 2).toFixed(1) + " " + ((p[1] + ey) / 2 - 5).toFixed(1) + " " + ex.toFixed(1) + " " + ey.toFixed(1) + '" stroke="' + SIL + '" stroke-width="' + (3.2 - j / 20).toFixed(2) + '" fill="none" stroke-linecap="round"/>';
+          });
+        }
+      }
+      $("#fg-fern").innerHTML = '<svg viewBox="0 0 620 620" xmlns="http://www.w3.org/2000/svg">' + out + "</svg>";
+    })();
+    // 草叢：底部一整排細草
+    (function () {
+      var r = rnd(3), out = "";
+      for (var i = 0; i < (mobile ? 140 : 320); i++) {
+        var x = r() * 1440, h = 40 + r() * 150, lean = (r() - .5) * 70, w = 2 + r() * 4;
+        out += '<path d="M' + (x - w) + " 260 Q" + (x + lean * .4) + " " + (260 - h * .6) + " " + (x + lean) + " " + (260 - h) + " Q" + (x + lean * .4 + w) + " " + (260 - h * .6) + " " + (x + w) + ' 260Z" fill="' + SIL + '"/>';
+      }
+      $("#fg-grass").innerHTML = svg("0 0 1440 260", out);
+    })();
+    // 玄武岩柱（塔州海岸常見的輝綠岩柱）
+    (function () {
+      var r = rnd(11), out = "", x = 0;
+      for (var i = 0; i < 9; i++) {
+        var w = 30 + r() * 18, h = 200 + r() * 300;
+        out += '<path d="M' + x + " 520 L" + x + " " + (520 - h) + " L" + (x + w * .5) + " " + (520 - h - 10) + " L" + (x + w) + " " + (520 - h + 4) + " L" + (x + w) + ' 520Z" fill="' + SIL + '" stroke="#0d1a1d" stroke-width="2"/>';
+        x += w + 1;
+      }
+      $("#fg-columns").innerHTML = svg("0 0 360 520", out);
+    })();
+    setProgress(35);
+
+    /* ---------- 章節狀態 ---------- */
+    var sections = Array.prototype.slice.call(document.querySelectorAll(".ch"));
+    var navLinks = Array.prototype.slice.call(document.querySelectorAll(".nav ul a"));
+    var railLinks = Array.prototype.slice.call(document.querySelectorAll(".rail a"));
+    var io = new IntersectionObserver(function (es) {
+      es.forEach(function (e) {
+        // 離開畫面的章節卡片淡出，避免黏在導覽列下方
+        e.target.querySelector(".card").classList.toggle("in", e.intersectionRatio >= 0.25);
+        if (e.intersectionRatio >= 0.25) {
+          var id = e.target.id;
+          navLinks.forEach(function (a) { a.classList.toggle("on", a.getAttribute("href") === "#" + id); });
+          railLinks.forEach(function (a) { a.classList.toggle("on", a.getAttribute("href") === "#" + id); });
+        }
+      });
+    }, { threshold: [0, 0.25] });
+    sections.forEach(function (s) { io.observe(s); });
+
+    // 以章節為單位計算進度：每章置中時剛好落在整數位置，讓光線與鏡頭跟章節對齊
+    function progress() {
+      var n = sections.length, maxS = document.documentElement.scrollHeight - innerHeight, y = scrollY;
+      var anchors = sections.map(function (sec, k) {
+        if (k === 0) return 0;
+        var a = sec.offsetTop + sec.offsetHeight / 2 - innerHeight / 2;
+        return k === n - 1 ? Math.min(a, maxS) : a;
+      });
+      if (y <= 0) return 0;
+      for (var k = 1; k < n; k++) {
+        if (y < anchors[k]) return (k - 1 + (y - anchors[k - 1]) / Math.max(1, anchors[k] - anchors[k - 1])) / (n - 1);
+      }
+      return 1;
+    }
+
+    /* ---------- 前景視差：不同速度、隨章節淡入淡出 ---------- */
+    var fg = {
+      gum: { el: $("#fg-gum"), speed: -0.35, show: [0, 1, 0.2, 0.9, 0, 0.3] },
+      fern: { el: $("#fg-fern"), speed: -0.6, show: [0.9, 0.3, 0, 1, 0, 0.6] },
+      grass: { el: $("#fg-grass"), speed: -0.15, show: [1, 0.6, 0.4, 1, 0.2, 1] },
+      columns: { el: $("#fg-columns"), speed: -0.45, show: [0, 0, 1, 0.3, 0, 0] }
+    };
+    function sampleArr(arr, p) {
+      var f = p * (arr.length - 1), i = Math.floor(f), t = f - i;
+      if (i >= arr.length - 1) return arr[arr.length - 1];
+      t = t * t * (3 - 2 * t);
+      return arr[i] + (arr[i + 1] - arr[i]) * t;
+    }
+    function updateLayers(p) {
+      var vh = innerHeight;
+      Object.keys(fg).forEach(function (k) {
+        var L = fg[k], local = (p * 5) % 1;
+        var y = reduce ? 0 : (local - 0.5) * L.speed * vh * 0.5;
+        var o = sampleArr(L.show, p);
+        L.el.style.transform = "translate3d(0," + y.toFixed(1) + "px,0) scale(" + (1 + (1 - o) * 0.15).toFixed(3) + ")";
+        L.el.style.opacity = o.toFixed(3);
+      });
+    }
+
+    /* ---------- Three.js 世界 ---------- */
+    if (!window.THREE || !(function () { try { var c = document.createElement("canvas"); return !!(c.getContext("webgl") || c.getContext("experimental-webgl")); } catch (e) { return false; } })()) {
+      document.body.classList.add("no-webgl");
+      $("#world").remove();
+      addEventListener("scroll", function () { updateLayers(progress()); }, { passive: true });
+      updateLayers(0);
+      setProgress(100);
+      return;
+    }
+
+    var canvas = $("#world");
+    var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: !mobile, powerPreference: "high-performance" });
+    renderer.setPixelRatio(Math.min(devicePixelRatio || 1, mobile ? 1.3 : 1.75));
+    renderer.setSize(innerWidth, innerHeight, false);
+    var scene = new THREE.Scene();
+    var camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.5, 1400);
+    scene.fog = new THREE.FogExp2(0x22313a, 0.0055);
+
+    // 各章節的光線氣氛：天頂、地平線、霧、太陽、極光強度
+    var MOODS = [
+      { top: 0x0d1b2e, hor: 0xd9826a, fog: 0x5a5560, sun: 0xffb38a, sunI: 0.9, amb: 0.35, aur: 0.0, fogD: 0.0060 },  // 序章：黃昏的港灣
+      { top: 0x3f6f9a, hor: 0xe8d9c2, fog: 0xa9b8c0, sun: 0xfff1d8, sunI: 1.3, amb: 0.55, aur: 0.0, fogD: 0.0042 },  // 荷巴特：清晨
+      { top: 0x2a78b8, hor: 0xbfe3ee, fog: 0x9fd0dc, sun: 0xffffff, sunI: 1.5, amb: 0.6, aur: 0.0, fogD: 0.0035 },  // 東海岸：正午
+      { top: 0x4c5b5f, hor: 0x9aa59e, fog: 0x8d9893, sun: 0xdfe7df, sunI: 0.7, amb: 0.5, aur: 0.0, fogD: 0.0095 },  // 荒野：霧
+      { top: 0x2b2350, hor: 0xff8a4c, fog: 0x8a5a5a, sun: 0xff9a5c, sunI: 1.1, amb: 0.4, aur: 0.0, fogD: 0.0050 },  // 雪梨：夕陽
+      { top: 0x02060c, hor: 0x0c2a2a, fog: 0x08141a, sun: 0x8fb8ff, sunI: 0.35, amb: 0.22, aur: 1.0, fogD: 0.0045 }  // 南極光：夜
+    ];
+    var cA = new THREE.Color(), cB = new THREE.Color();
+    function moodAt(p) {
+      var f = p * (MOODS.length - 1), i = Math.min(MOODS.length - 2, Math.floor(f)), t = f - i;
+      t = t * t * (3 - 2 * t);
+      var a = MOODS[i], b = MOODS[i + 1], m = {};
+      ["top", "hor", "fog", "sun"].forEach(function (k) { m[k] = cA.setHex(a[k]).clone().lerp(cB.setHex(b[k]), t); });
+      ["sunI", "amb", "aur", "fogD"].forEach(function (k) { m[k] = a[k] + (b[k] - a[k]) * t; });
+      return m;
+    }
+
+    // 天空：漸層＋星星＋南極光帷幕
+    var skyU = { uTop: { value: new THREE.Color() }, uHor: { value: new THREE.Color() }, uTime: { value: 0 }, uAur: { value: 0 }, uStars: { value: 0 } };
+    var sky = new THREE.Mesh(new THREE.SphereGeometry(900, 32, 16), new THREE.ShaderMaterial({
+      side: THREE.BackSide, depthWrite: false, fog: false, uniforms: skyU,
+      vertexShader: "varying vec3 vDir; void main(){ vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }",
+      fragmentShader: [
+        "uniform vec3 uTop; uniform vec3 uHor; uniform float uTime; uniform float uAur; uniform float uStars; varying vec3 vDir;",
+        "float h(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }",
+        "float n(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(h(i),h(i+vec2(1,0)),f.x), mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x), f.y); }",
+        "void main(){",
+        "  float y = clamp(vDir.y, -0.2, 1.0);",
+        "  vec3 col = mix(uHor, uTop, pow(smoothstep(-0.05, 0.75, y), 0.7));",
+        "  vec2 sp = vec2(atan(vDir.z, vDir.x), asin(clamp(vDir.y, -1.0, 1.0))) * 160.0;",
+        "  vec2 cell = floor(sp); vec2 off = vec2(h(cell + 7.0), h(cell + 3.0)) - 0.5;",
+        "  float d = length(fract(sp) - 0.5 - off * 0.6);",
+        "  float st = step(0.965, h(cell)) * smoothstep(0.09, 0.0, d) * smoothstep(0.05, 0.4, y) * uStars;",
+        "  col += st * (0.7 + 0.3 * sin(uTime * 2.0 + h(cell) * 40.0));",
+        "  float ang = atan(vDir.z, vDir.x);",
+        "  float curtain = n(vec2(ang * 3.0 + uTime * 0.05, uTime * 0.08)) * 0.7 + n(vec2(ang * 9.0 - uTime * 0.12, 3.0)) * 0.3;",
+        "  float band = smoothstep(0.08, 0.25, y) * (1.0 - smoothstep(0.35, 0.75, y + curtain * 0.25));",
+        "  float rays = pow(n(vec2(ang * 40.0, uTime * 0.2)), 2.0);",
+        "  vec3 aur = mix(vec3(0.1, 0.95, 0.55), vec3(0.75, 0.25, 0.9), smoothstep(0.2, 0.6, y + curtain * 0.2));",
+        "  col += aur * band * (0.35 + rays * 0.9) * curtain * uAur * 1.6;",
+        "  gl_FragColor = vec4(col, 1.0);",
+        "}"
+      ].join("\n")
+    }));
+    scene.add(sky);
+    setProgress(50);
+
+    // 地形：程序化的山脊、海岸與山谷
+    function hash(x, y) { var s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); }
+    function vnoise(x, y) {
+      var xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
+      var u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+      var a = hash(xi, yi), b = hash(xi + 1, yi), c = hash(xi, yi + 1), d = hash(xi + 1, yi + 1);
+      return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+    }
+    function fbm(x, y) { var s = 0, a = 0.5, f = 1; for (var i = 0; i < 5; i++) { s += a * vnoise(x * f, y * f); f *= 2.03; a *= 0.5; } return s; }
+    function heightAt(x, z) {
+      var base = fbm(x * 0.006 + 3.1, z * 0.006 - 1.7);
+      var ridge = 1 - Math.abs(fbm(x * 0.004 + 9, z * 0.004 + 2) * 2 - 1);
+      var hgt = Math.pow(base, 1.6) * 90 + Math.pow(ridge, 3) * 70;
+      var coast = (x + 40) / 160;                       // 東側漸漸沉入海中
+      hgt *= THREE.MathUtils.clamp(1 - coast, 0, 1);
+      var valley = Math.exp(-Math.pow((x + 10 + Math.sin(z * 0.01) * 30) / 45, 2)); // 沿著鏡頭路徑的谷地
+      hgt *= 1 - valley * 0.75;
+      return hgt - 6;
+    }
+    var SEG = mobile ? 140 : 220, SIZE = 900;
+    var tg = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG);
+    tg.rotateX(-Math.PI / 2);
+    var pos = tg.attributes.position, cols = new Float32Array(pos.count * 3);
+    var cSand = new THREE.Color(0xc9b48a), cGrass = new THREE.Color(0x3f5a32), cForest = new THREE.Color(0x22361f), cRock = new THREE.Color(0x6b6a63), cSnow = new THREE.Color(0xdfe3e2), tmp = new THREE.Color();
+    for (var i = 0; i < pos.count; i++) {
+      var x = pos.getX(i), z = pos.getZ(i), y = heightAt(x, z);
+      pos.setY(i, y);
+      if (y < 1.5) tmp.copy(cSand);
+      else if (y < 14) tmp.copy(cGrass).lerp(cForest, (y - 1.5) / 12.5);
+      else if (y < 55) tmp.copy(cForest).lerp(cRock, (y - 14) / 41);
+      else tmp.copy(cRock).lerp(cSnow, Math.min(1, (y - 55) / 25));
+      tmp.offsetHSL(0, 0, (hash(x, z) - 0.5) * 0.04);
+      cols[i * 3] = tmp.r; cols[i * 3 + 1] = tmp.g; cols[i * 3 + 2] = tmp.b;
+    }
+    tg.setAttribute("color", new THREE.BufferAttribute(cols, 3));
+    tg.computeVertexNormals();
+    var terrain = new THREE.Mesh(tg, new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.95, metalness: 0 }));
+    scene.add(terrain);
+    setProgress(70);
+
+    // 海：頂點波浪＋菲涅耳反光的著色器
+    var seaU = THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { uTime: { value: 0 }, uDeep: { value: new THREE.Color(0x0b3a4a) }, uShallow: { value: new THREE.Color(0x2fa3a8) }, uSky: { value: new THREE.Color() }, uSun: { value: new THREE.Color() } }]);
+    var sea = new THREE.Mesh(new THREE.PlaneGeometry(SIZE * 1.6, SIZE * 1.6, mobile ? 80 : 160, mobile ? 80 : 160).rotateX(-Math.PI / 2), new THREE.ShaderMaterial({
+      uniforms: seaU, fog: true, transparent: true,
+      vertexShader: [
+        "uniform float uTime; varying vec3 vW; varying float vH;",
+        "#include <fog_pars_vertex>",
+        "void main(){",
+        "  vec3 p = position;",
+        "  float w = sin(p.x * 0.05 + uTime * 0.9) * 0.6 + sin(p.z * 0.07 - uTime * 1.1) * 0.45 + sin((p.x + p.z) * 0.11 + uTime * 1.7) * 0.2;",
+        "  p.y += w; vH = w;",
+        "  vec4 wp = modelMatrix * vec4(p, 1.0); vW = wp.xyz;",
+        "  vec4 mvPosition = viewMatrix * wp; gl_Position = projectionMatrix * mvPosition;",
+        "  #include <fog_vertex>",
+        "}"
+      ].join("\n"),
+      fragmentShader: [
+        "uniform vec3 uDeep; uniform vec3 uShallow; uniform vec3 uSky; uniform vec3 uSun; varying vec3 vW; varying float vH;",
+        "#include <fog_pars_fragment>",
+        "void main(){",
+        "  vec3 v = normalize(cameraPosition - vW);",
+        "  float fres = pow(1.0 - max(v.y, 0.0), 3.0);",
+        "  vec3 col = mix(uDeep, uShallow, smoothstep(-0.8, 1.0, vH) * 0.6);",
+        "  col = mix(col, uSky, fres * 0.7);",
+        "  col += uSun * smoothstep(0.7, 1.2, vH) * 0.25;",
+        "  gl_FragColor = vec4(col, 0.94);",
+        "  #include <fog_fragment>",
+        "}"
+      ].join("\n")
+    }));
+    sea.position.y = 0;
+    scene.add(sea);
+
+    // 光線
+    var hemi = new THREE.HemisphereLight(0xffffff, 0x223322, 0.5);
+    var sun = new THREE.DirectionalLight(0xffffff, 1);
+    sun.position.set(-200, 160, -120);
+    scene.add(hemi, sun);
+
+    // 漂浮的光點（螢火、海霧中的微光）
+    var PN = mobile ? 350 : 900, pg = new THREE.BufferGeometry(), pp = new Float32Array(PN * 3), pseed = new Float32Array(PN);
+    for (var k = 0; k < PN; k++) {
+      var px = (Math.random() - 0.5) * 500, pz = (Math.random() - 0.5) * 700;
+      pp[k * 3] = px; pp[k * 3 + 1] = Math.max(heightAt(px, pz), 0) + 2 + Math.random() * 25; pp[k * 3 + 2] = pz; pseed[k] = Math.random() * 100;
+    }
+    pg.setAttribute("position", new THREE.BufferAttribute(pp, 3));
+    pg.setAttribute("seed", new THREE.BufferAttribute(pseed, 1));
+    var ptU = { uTime: { value: 0 }, uColor: { value: new THREE.Color(0xffe6b0) }, uPx: { value: renderer.getPixelRatio() }, uAlpha: { value: 0.6 } };
+    var motes = new THREE.Points(pg, new THREE.ShaderMaterial({
+      uniforms: ptU, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+      vertexShader: "uniform float uTime; uniform float uPx; attribute float seed; varying float vA; void main(){ vec3 p = position; p.y += sin(uTime*0.6 + seed)*1.5; p.x += cos(uTime*0.4 + seed*1.3)*1.2; vec4 mv = modelViewMatrix * vec4(p,1.0); gl_Position = projectionMatrix * mv; gl_PointSize = uPx * (30.0 / -mv.z) * (0.6 + 0.4*sin(uTime*1.5+seed)); vA = clamp(1.0 - (-mv.z)/260.0, 0.0, 1.0); }",
+      fragmentShader: "uniform vec3 uColor; uniform float uAlpha; varying float vA; void main(){ float d = length(gl_PointCoord - 0.5); float a = smoothstep(0.5, 0.0, d); gl_FragColor = vec4(uColor, a * vA * uAlpha); }"
+    }));
+    scene.add(motes);
+    setProgress(85);
+
+    // 鏡頭路徑：沿著谷地從港灣飛向海岸、穿越山區，最後拉高看夜空
+    var camPath = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(120, 22, 330),
+      new THREE.Vector3(40, 30, 220),
+      new THREE.Vector3(-20, 46, 120),
+      new THREE.Vector3(60, 26, 20),
+      new THREE.Vector3(-30, 60, -80),
+      new THREE.Vector3(-10, 34, -170),
+      new THREE.Vector3(30, 80, -260),
+      new THREE.Vector3(10, 140, -320)
+    ], false, "catmullrom", 0.4);
+    var lookPath = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(0, 8, 180),
+      new THREE.Vector3(-30, 25, 90),
+      new THREE.Vector3(120, 4, 40),
+      new THREE.Vector3(-40, 40, -60),
+      new THREE.Vector3(-40, 50, -200),
+      new THREE.Vector3(200, 20, -200),
+      new THREE.Vector3(0, 160, -600),
+      new THREE.Vector3(0, 260, -700)
+    ], false, "catmullrom", 0.4);
+
+    var smooth = progress(), mouseX = 0, mouseY = 0, tx = 0, ty = 0;
+    var camPos = new THREE.Vector3(), lookAt = new THREE.Vector3();
+    addEventListener("pointermove", function (e) { tx = (e.clientX / innerWidth - 0.5); ty = (e.clientY / innerHeight - 0.5); }, { passive: true });
+
+    function frame(t) {
+      var time = (t || 0) / 1000;
+      var p = progress();
+      smooth += (p - smooth) * (reduce ? 1 : 0.06);
+      mouseX += (tx - mouseX) * 0.05; mouseY += (ty - mouseY) * 0.05;
+
+      camPath.getPointAt(smooth, camPos);
+      lookPath.getPointAt(Math.min(1, smooth + 0.02), lookAt);
+      if (!reduce) { camPos.x += mouseX * 6 + Math.sin(time * 0.3) * 0.8; camPos.y += -mouseY * 3 + Math.sin(time * 0.5) * 0.4; }
+      var ground = Math.max(heightAt(camPos.x, camPos.z), 0);
+      if (camPos.y < ground + 8) camPos.y = ground + 8;
+      camera.position.copy(camPos);
+      camera.lookAt(lookAt);
+
+      var m = moodAt(smooth);
+      skyU.uTop.value.copy(m.top); skyU.uHor.value.copy(m.hor);
+      skyU.uAur.value = m.aur; skyU.uStars.value = Math.max(m.aur, 1 - m.sunI);
+      skyU.uTime.value = reduce ? 10 : time;
+      scene.fog.color.copy(m.fog); scene.fog.density = m.fogD;
+      seaU.fogColor.value.copy(m.fog); seaU.fogDensity.value = m.fogD;
+      seaU.uSky.value.copy(m.hor); seaU.uSun.value.copy(m.sun); seaU.uTime.value = reduce ? 0 : time;
+      sun.color.copy(m.sun); sun.intensity = m.sunI;
+      hemi.intensity = m.amb; hemi.color.copy(m.top).lerp(m.hor, 0.5);
+      ptU.uTime.value = reduce ? 0 : time;
+      ptU.uColor.value.copy(m.aur > 0.3 ? cA.setHex(0x9fffd0) : m.sun);
+      ptU.uAlpha.value = 0.25 + (1 - m.sunI / 1.5) * 0.6;
+      sky.position.copy(camera.position);
+
+      updateLayers(smooth);
+      renderer.render(scene, camera);
+      if (!reduce) requestAnimationFrame(frame);
+    }
+
+    function resize() {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight, false);
+      if (reduce) frame(0);
+    }
+    addEventListener("resize", resize);
+    if (reduce) addEventListener("scroll", function () { frame(0); }, { passive: true });
+
+    renderer.compile(scene, camera);
+    frame(0);
+    setProgress(100);
+  })();
+  </script>
+</body>
+</html>

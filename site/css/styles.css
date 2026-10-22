@@ -65,6 +65,8 @@ h3 { font-size: 1.1rem; }
 .hero-sub { font-size: 1.1rem; opacity: .92; margin: 6px 0 18px; }
 .hero-meta { display: flex; flex-wrap: wrap; gap: 10px; }
 .chip-hero { background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.25); border-radius: 999px; padding: 6px 14px; font-size: .9rem; backdrop-filter: blur(4px); }
+.hero-link { margin: 16px 0 0; }
+.hero-link a { color: #fff; opacity: .9; text-underline-offset: 4px; }
 .hero-waves { position: absolute; bottom: -1px; left: 0; width: 200%; height: 90px; }
 .hero-waves path.w1 { fill: rgba(255,255,255,.12); animation: drift 18s linear infinite; }
 .hero-waves path.w2 { fill: var(--bg); animation: drift 26s linear infinite reverse; }
