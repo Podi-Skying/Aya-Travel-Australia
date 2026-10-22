@@ -1,30 +1,20 @@
 import { redirect } from "next/navigation";
 import { loadOwnerPage } from "@/server/pages";
-import { TripApp } from "@/components/TripApp";
+import { WalkView } from "@/components/walk/WalkView";
 import { ConfigNotice, Notice } from "@/components/Notice";
+import { toPublicDoc } from "@/domain/privacy";
 
 export const dynamic = "force-dynamic";
+export const metadata = { title: "南方散步｜Aya 的雪梨與塔斯馬尼亞" };
 
-export default async function OwnerHome() {
+/* Home: the hand-drawn route walk. Everyone sees the redacted document; the planner lives at /plan. */
+export default async function Home() {
   const p = await loadOwnerPage();
   if (p.kind === "config") return <ConfigNotice missing={p.missing} />;
-  if (p.kind === "public") return <TripApp mode="public" home initial={{ doc: p.trip.doc as never, versionNo: p.trip.versionNo, syncedAt: new Date().toISOString() }} />;
-  if (p.kind === "signin") redirect("/api/auth/signin?callbackUrl=%2F");
-  if (p.kind === "forbidden")
-    return (
-      <Notice title="沒有權限（403）">
-        <p className="muted">這個帳號不是行程擁有者。訪客請使用擁有者提供的分享連結。</p>
-        <p>
-          {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- next-auth route, full navigation */}
-          <a href="/api/auth/signout">登出</a>
-        </p>
-      </Notice>
-    );
-  if (p.kind === "none")
-    return (
-      <Notice title="尚未建立行程">
-        <p className="muted">資料庫裡還沒有行程。請依 docs/DEPLOY.md 執行一次 npm run db:seed。</p>
-      </Notice>
-    );
-  return <TripApp mode="owner" initial={{ doc: p.trip.doc, versionNo: p.trip.versionNo, syncedAt: new Date().toISOString() }} />;
+  if (p.kind === "public")
+    return <WalkView doc={p.trip.doc as never} dataUrl="/api/public" syncedAt={new Date().toISOString()} planHref="/plan" journeyHref="/journey" account="signin" />;
+  if (p.kind === "signin") redirect("/api/auth/signin?callbackUrl=%2Fplan");
+  if (p.kind === "forbidden") return <Notice title="沒有權限（403）" />;
+  if (p.kind === "none") return <Notice title="尚未建立行程" />;
+  return <WalkView doc={toPublicDoc(p.trip.doc) as never} dataUrl="/api/trip" syncedAt={new Date().toISOString()} planHref="/plan" journeyHref="/journey" account="owner" />;
 }

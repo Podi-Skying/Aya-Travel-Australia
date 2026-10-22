@@ -409,7 +409,7 @@ function Hero({ doc, mode, journeyHref, account }: { doc: TripDoc; mode: Mode; j
         <button
           type="button"
           className="hero-account"
-          onClick={() => void (account === "signin" ? signIn("github", { callbackUrl: "/" }) : signOut({ callbackUrl: "/" }))}
+          onClick={() => void (account === "signin" ? signIn("github", { callbackUrl: "/plan" }) : signOut({ callbackUrl: "/" }))}
         >
           {account === "signin" ? "登入" : "擁有者・登出"}
         </button>
@@ -429,8 +429,8 @@ function Hero({ doc, mode, journeyHref, account }: { doc: TripDoc; mode: Mode; j
           <a className="hero-cta" href={journeyHref}>
             ✦ 3D 旅程首頁
           </a>
-          <a className="hero-cta" href={journeyHref.replace(/journey$/, "walk")}>
-            🚶 每日路線散步
+          <a className="hero-cta" href={journeyHref.replace(/\/journey$/, "") || "/"}>
+            🚶 南方散步（每日路線）
           </a>
         </p>
       </div>

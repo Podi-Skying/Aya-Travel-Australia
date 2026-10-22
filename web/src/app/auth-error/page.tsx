@@ -36,7 +36,7 @@ export default async function AuthError({ searchParams }: { searchParams: Promis
       <p className="muted small">錯誤代碼：{error ?? "unknown"}</p>
       <p>
         {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- next-auth route, full navigation */}
-        <a href="/api/auth/signin">重新登入</a>
+        <a href="/api/auth/signin?callbackUrl=%2Fplan">重新登入</a>
       </p>
     </Notice>
   );

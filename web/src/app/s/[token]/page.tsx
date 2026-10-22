@@ -1,12 +1,13 @@
 import { getPublicTrip } from "@/server/sharing";
-import { TripApp } from "@/components/TripApp";
+import { WalkView } from "@/components/walk/WalkView";
 import { ConfigNotice, Notice } from "@/components/Notice";
 import { missingConfig } from "@/server/config";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Aya 的澳洲旅程（唯讀分享）", robots: { index: false, follow: false } };
+export const metadata = { title: "南方散步（分享）", robots: { index: false, follow: false } };
 
-export default async function SharedTrip({ params }: { params: Promise<{ token: string }> }) {
+/* Share links open with the walk; the read-only planner with interest voting is at /s/[token]/plan. */
+export default async function SharedWalk({ params }: { params: Promise<{ token: string }> }) {
   const missing = missingConfig("public");
   if (missing.length) return <ConfigNotice missing={missing} />;
   const { token } = await params;
@@ -17,5 +18,7 @@ export default async function SharedTrip({ params }: { params: Promise<{ token: 
         <p className="muted">請向行程擁有者索取新的連結。</p>
       </Notice>
     );
-  return <TripApp mode="public" token={token} initial={{ doc: t.doc as never, versionNo: t.versionNo, syncedAt: new Date().toISOString() }} />;
+  return (
+    <WalkView doc={t.doc as never} dataUrl={`/api/s/${token}`} syncedAt={new Date().toISOString()} planHref={`/s/${token}/plan`} journeyHref={`/s/${token}/journey`} account={null} />
+  );
 }

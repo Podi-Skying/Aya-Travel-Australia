@@ -32,9 +32,12 @@ npm run db:seed      # creates version 1 only if no trip exists
 Run `db:migrate` again after any change in `drizzle/`. `db:seed` creates version 1 (Sydney 11/3–11/6, Tasmania 11/6–11/27, plus the unscheduled attraction pool) and does nothing if a trip already exists.
 
 ## 4. Check (on the production URL)
-1. Open the production site and sign in with GitHub as Podi-Skying. Another GitHub account gets a 403 page.
+1. Open the production site, press 登入 (top-right) and sign in with GitHub as Podi-Skying; you land on `/plan`. Another GitHub account gets a 403 page.
 2. 版本與分享 → 建立分享連結. The link is shown once; open it in a private window to check what visitors see.
 3. On your phone, open the site once while online. Then turn on airplane mode and reload: the itinerary and the last sync time remain visible, with an offline notice.
+
+## Pages
+- `/`: the hand-drawn route walk (home, guest view). `/plan`: the planner (owner editing after sign-in, read-only for guests). `/journey`: the 3D page. Share links: `/s/<token>` opens the walk, `/s/<token>/plan` is the read-only planner with interest voting. `/walk` redirects to `/`.
 
 ## Public home page (default on)
 Anyone can read the current trip at the site root without signing in. Visitors get the same redacted view as share links (no addresses, driver names, or driver time windows) and cannot vote; the owner signs in with the 「登入」 button in the top-right corner. All pages send `noindex`. Set `PUBLIC_HOME=0` (Production) and redeploy to require sign-in again. Share links keep working either way.

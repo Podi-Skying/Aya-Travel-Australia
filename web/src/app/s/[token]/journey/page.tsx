@@ -12,5 +12,5 @@ export default async function SharedJourney({ params }: { params: Promise<{ toke
   const { token } = await params;
   const t = await getPublicTrip(token);
   if (!t) return <Notice title="此分享連結已停用或不存在" />;
-  return <JourneyView doc={t.doc as never} backHref={`/s/${token}`} dataUrl={`/api/s/${token}`} syncedAt={new Date().toISOString()} />;
+  return <JourneyView doc={t.doc as never} backHref={`/s/${token}/plan`} dataUrl={`/api/s/${token}`} syncedAt={new Date().toISOString()} />;
 }

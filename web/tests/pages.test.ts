@@ -15,6 +15,7 @@ vi.mock("next/navigation", () => ({ redirect }));
 vi.mock("@/server/public-home", () => ({ getPublicHomeTrip }));
 vi.mock("@/components/TripApp", () => ({ TripApp: () => null }));
 vi.mock("@/components/journey/JourneyView", () => ({ JourneyView: () => null }));
+vi.mock("@/components/walk/WalkView", () => ({ WalkView: () => null }));
 
 beforeEach(() => {
   process.env.OWNER_GITHUB_IDS = OWNER_ID;
@@ -26,6 +27,7 @@ beforeEach(() => {
 
 const pages = [
   ["/", () => import("@/app/page")],
+  ["/plan", () => import("@/app/plan/page")],
   ["/journey", () => import("@/app/journey/page")],
 ] as const;
 
@@ -63,7 +65,7 @@ describe("public home", () => {
       const Page = (await load()).default;
       const out = (await Page()) as { props: Record<string, unknown> };
       expect(getCurrentTrip).not.toHaveBeenCalled();
-      expect(out.props.mode ?? out.props.dataUrl).toBe(path === "/" ? "public" : "/api/public");
+      expect(out.props.mode ?? out.props.dataUrl).toBe(path === "/plan" ? "public" : "/api/public");
     });
   }
 });

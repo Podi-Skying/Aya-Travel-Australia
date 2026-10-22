@@ -2,37 +2,35 @@
 
 import "@/app/walk.css";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { signIn, signOut } from "next-auth/react";
 import type { TripDoc } from "@/domain/schema";
 import { walkDays } from "@/domain/walk";
 import { api, registerServiceWorker } from "@/client/api";
 import { fmtTs } from "@/domain/format";
 
 /*
- * Route-walk page (port of prototypes/route-walk). Always receives the redacted public document.
- * variant "hero" shows one day with a day switcher, for reuse as a home-page first view.
+ * Home page: the hand-drawn route walk (prototypes/route-walk/index.html, DESIGN.md).
+ * Always receives the redacted public document. Links lead to the planner and the 3D page.
  */
 export function WalkView({
   doc: initialDoc,
-  backHref,
   dataUrl,
   syncedAt,
-  variant = "page",
-  initialDate,
+  planHref,
+  journeyHref,
+  account,
 }: {
   doc: TripDoc;
-  backHref: string;
   dataUrl: string;
   syncedAt: string;
-  variant?: "page" | "hero";
-  initialDate?: string;
+  planHref: string;
+  journeyHref: string;
+  account: "signin" | "owner" | null;
 }) {
   const root = useRef<HTMLDivElement>(null);
   const [doc, setDoc] = useState(initialDoc);
   const [sync, setSync] = useState({ at: syncedAt, offline: false });
-  const allDays = useMemo(() => walkDays(doc), [doc]);
-  const [picked, setPicked] = useState<string | null>(null);
-  const heroDate = picked ?? (allDays.some((d) => d.date === initialDate) ? initialDate! : allDays[0]?.date);
-  const days = useMemo(() => (variant === "hero" ? allDays.filter((d) => d.date === heroDate) : allDays), [variant, allDays, heroDate]);
+  const days = useMemo(() => walkDays(doc), [doc]);
 
   useEffect(() => {
     registerServiceWorker([dataUrl]);
@@ -64,56 +62,82 @@ export function WalkView({
 
   return (
     <div className="rw" ref={root}>
-      <header className="top">
-        <a className="brand" href="#rw-intro">
-          每日路線散步
-        </a>
-        <nav className="daynav" id="rw-daynav" aria-label="跳到某一天" hidden={variant === "hero"} />
-        {variant === "hero" && (
-          <label className="day-pick">
-            <span className="sr-only">選擇日期</span>
-            <select value={heroDate} onChange={(e) => setPicked(e.target.value)}>
-              {allDays.map((d, i) => (
-                <option key={d.date} value={d.date}>
-                  第 {i + 1} 天・{d.date.slice(5).replace("-", "/")} {d.title}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-        <a className="brand" href={backHref}>
-          打開行程 →
-        </a>
-      </header>
-      <section className="intro" id="rw-intro" hidden={variant === "hero"}>
-        <div>
-          <h1>跟著 Aya 走一天</h1>
-          <p>往下捲動，小人會沿著當天路線走過每個景點；走完最後一站就換到下一天。開車、搭船、坐飛機的路段會自動換交通工具。</p>
-          <div className="cue">
-            往下捲動開始
-            <i />
-          </div>
-        </div>
-      </section>
-      <main id="rw-days" />
-      <section className="outro" hidden={variant === "hero"}>
-        <div>
-          <h2>旅程走完了</h2>
-          <p className="note">路線為示意圖，距離與時間是估計值，非實際比例。尚未排入行程的景點不會出現。</p>
-          <p className="sync">
-            最後同步：{fmtTs(sync.at)}
-            {sync.offline ? "（離線副本，可能不是最新資料）" : ""}
-          </p>
-          <a className="btn" href={backHref}>
-            打開完整行程
-          </a>
-        </div>
-      </section>
+      {/* Hand-drawn wobble for geometric paths. */}
+      <svg width="0" height="0" style={{ position: "absolute" }} aria-hidden="true">
+        <filter id="rough" x="-5%" y="-5%" width="110%" height="110%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves={2} seed={4} result="t" />
+          <feDisplacementMap in="SourceGraphic" in2="t" scale={2.4} xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+      </svg>
+
       {sync.offline && (
         <div className="offline" role="status">
           離線副本，可能不是最新資料（最後同步：{fmtTs(sync.at)}）
         </div>
       )}
+
+      <header className="top">
+        <a className="logo" href="#rw-top" aria-label="回到開頭">
+          <svg viewBox="0 0 26 26" aria-hidden="true">
+            <circle cx="13" cy="13" r="11" fill="none" stroke="#2b2a27" strokeWidth="1.3" />
+            <path d="M6 17 Q10 9 13 13 T20 9" fill="none" stroke="#d2483a" strokeWidth="1.6" strokeLinecap="round" />
+          </svg>
+          南方散步
+        </a>
+        <div className="right">
+          <nav className="links" aria-label="網站">
+            <a href={planHref} className="keep">
+              行程
+            </a>
+            <a href={`${planHref}#budget`}>預算</a>
+            <a href={journeyHref}>3D 旅程</a>
+          </nav>
+          {account === "signin" && (
+            <button type="button" className="account" onClick={() => void signIn("github", { callbackUrl: "/plan" })}>
+              登入
+            </button>
+          )}
+          {account === "owner" && (
+            <button type="button" className="account" onClick={() => void signOut({ callbackUrl: "/" })}>
+              登出
+            </button>
+          )}
+        </div>
+      </header>
+
+      <main id="rw-days" />
+
+      <section className="end" id="rw-end">
+        <div>
+          <h2>{days.length} 天，走完了。</h2>
+          <p>路線是手繪示意，時間與費用都是估計。尚未排入行程的景點不會出現。</p>
+          <p className="sync">
+            最後同步：{fmtTs(sync.at)}
+            {sync.offline ? "（離線副本，可能不是最新資料）" : ""}
+          </p>
+          <div className="go">
+            <a href={planHref}>{account === "owner" ? "打開行程管理" : "看完整行程"}</a>
+            <a href="#rw-top">從頭再走一次</a>
+          </div>
+        </div>
+      </section>
+
+      <div className="bar" aria-live="polite">
+        <button type="button" id="rw-prev" aria-label="前一天">
+          ‹
+        </button>
+        <div className="now" id="rw-now" />
+        <div className="prog" aria-hidden="true">
+          <i id="rw-prog" />
+        </div>
+        <label>
+          <span className="sr">跳到某一天</span>
+          <select id="rw-jump" />
+        </label>
+        <button type="button" id="rw-next" aria-label="後一天">
+          ›
+        </button>
+      </div>
     </div>
   );
 }
