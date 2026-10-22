@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from "react";
 import { useTrip } from "./TripApp";
 import { Icon, MODE_ICON } from "./Icon";
-import { Badge, LEG, MODE, PRI, STATUS, VERIFY, useReducedMotion } from "./ui";
+import { Badge, LEG, MODE, PRI, STATUS, VERIFY, useHobartToday, useReducedMotion } from "./ui";
 import { DayMap } from "./MapViews";
 import { effectiveDay, isTentative } from "@/domain/effective-day";
 import { checks, feasibility } from "@/domain/rules";
@@ -24,6 +24,99 @@ function Legs({ travel }: { travel: Item["travel"] }) {
       ))}
       <span>・約 {mins(total)}（估計）</span>
     </li>
+  );
+}
+
+/*
+ * Day picker (DESIGN.md「日期清單」): region section headers instead of solid/dotted badges,
+ * one selection treatment (a tinted plate that slides between rows), a separate 今天 marker,
+ * reminders as a trailing dot with an accessible label. Listbox with roving tabindex.
+ */
+function DayStrip({ stripRef }: { stripRef: RefObject<HTMLDivElement | null> }) {
+  const { doc, currentDay, setCurrentDay } = useTrip();
+  const today = useHobartToday();
+  const plate = useRef<HTMLSpanElement>(null);
+
+  // Move the selection plate to the selected row; a CSS transition retargets from the current position.
+  useLayoutEffect(() => {
+    const strip = stripRef.current;
+    const row = strip?.querySelector<HTMLElement>(`[data-day="${currentDay}"]`);
+    if (!strip || !row || !plate.current) return;
+    const place = () => {
+      const p = plate.current!;
+      if (!row.offsetWidth) return;
+      // The first placement (and any placement while hidden) jumps; later ones slide.
+      const first = !p.style.width;
+      if (first) p.style.transition = "none";
+      p.style.transform = `translate(${row.offsetLeft}px, ${row.offsetTop}px)`;
+      p.style.width = `${row.offsetWidth}px`;
+      p.style.height = `${row.offsetHeight}px`;
+      if (first) {
+        void p.offsetWidth;
+        p.style.transition = "";
+      }
+    };
+    place();
+    const ro = new ResizeObserver(place);
+    ro.observe(strip);
+    return () => ro.disconnect();
+  }, [currentDay, stripRef, doc.days.length]);
+
+  function onKey(e: ReactKeyboardEvent) {
+    const next = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[e.key];
+    const edge = e.key === "Home" ? 0 : e.key === "End" ? doc.days.length - 1 : null;
+    if (next === undefined && edge === null) return;
+    e.preventDefault();
+    const i = edge ?? Math.max(0, Math.min(doc.days.length - 1, currentDay + next!));
+    setCurrentDay(i);
+    stripRef.current?.querySelector<HTMLElement>(`[data-day="${i}"]`)?.focus();
+  }
+
+  return (
+    <div className="day-strip" ref={stripRef} role="listbox" aria-label="選擇日期" aria-orientation="vertical" onKeyDown={onKey}>
+      <span className="strip-plate" ref={plate} aria-hidden="true" />
+      {doc.days.map((x, i) => {
+        const dt = parseDate(x.date);
+        const w = checks(doc, effectiveDay(x), { showWindow: false }).some((c) => c.lv === "warn");
+        const isToday = x.date === today;
+        const seg = doc.segments[x.seg];
+        const head = i === 0 || doc.days[i - 1].seg !== x.seg;
+        return (
+          <Fragment key={x.date}>
+            {head && (
+              <div className="strip-seg" role="presentation">
+                <span>{seg?.name ?? x.seg}</span>
+                {seg?.range && <span className="r">{seg.range}</span>}
+              </div>
+            )}
+            <button
+              type="button"
+              role="option"
+              className="day-chip"
+              data-day={i}
+              tabIndex={i === currentDay ? 0 : -1}
+              aria-selected={i === currentDay}
+              aria-current={isToday ? "date" : undefined}
+              aria-label={`${fmtDay(x.date)} ${x.title}${isToday ? "，今天" : ""}${w ? "，有提醒" : ""}`}
+              title={x.title}
+              onClick={() => setCurrentDay(i)}
+            >
+              <span className="d">
+                <b>
+                  {dt.getMonth() + 1}/{dt.getDate()}
+                </b>
+                <small>週{WD[dt.getDay()]}</small>
+              </span>
+              <span className="t">{x.title}</span>
+              <span className="m" aria-hidden="true">
+                {isToday && <span className="today">今天</span>}
+                {w && <span className="dot" title="有提醒" />}
+              </span>
+            </button>
+          </Fragment>
+        );
+      })}
+    </div>
   );
 }
 
@@ -151,37 +244,8 @@ export function DaysView({ active }: { active: boolean }) {
 
   return (
     <div className="days-layout">
-      <div className="day-strip" ref={stripRef} aria-label="選擇日期">
-        {doc.days.map((x, i) => {
-          const dt = parseDate(x.date);
-          const w = checks(doc, effectiveDay(x), { showWindow: false }).some((c) => c.lv === "warn");
-          return (
-            <button
-              key={x.date}
-              type="button"
-              className="day-chip"
-              data-day={i}
-              aria-current={i === currentDay ? "true" : undefined}
-              aria-label={`${fmtDay(x.date)} ${x.title}${w ? "，有提醒" : ""}`}
-              onClick={() => setCurrentDay(i)}
-            >
-              <span className={`d ${x.seg}`}>
-                {dt.getMonth() + 1}/{dt.getDate()}
-                <small>週{WD[dt.getDay()]}</small>
-              </span>
-              <span className="t">
-                {w && (
-                  <span className="warn-tag" aria-hidden="true">
-                    <span className="dot" />
-                    提醒
-                  </span>
-                )}
-                {x.title}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+      <DayStrip stripRef={stripRef} />
+
       <div className="day-main">
         <article className="day-detail">
           <div className="day-head">
