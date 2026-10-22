@@ -103,6 +103,9 @@ describe("auth (AC5)", () => {
     const call = (id: number) => signIn({ account: { provider: "github" }, profile: { id } } as never);
     expect(await call(32431832)).toBe(true);
     expect(await call(1)).toBe(false);
+    process.env.OWNER_GITHUB_IDS = ' "32431832" ';
+    expect(await call(32431832)).toBe(true);
+    process.env.OWNER_GITHUB_IDS = "32431832";
   });
 });
 

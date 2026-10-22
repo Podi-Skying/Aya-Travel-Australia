@@ -10,8 +10,13 @@ import GitHubProvider from "next-auth/providers/github";
 export function ownerIds(): string[] {
   return (process.env.OWNER_GITHUB_IDS ?? "")
     .split(",")
-    .map((s) => s.trim())
+    .map((s) => s.trim().replace(/^["']|["']$/g, "").trim())
     .filter(Boolean);
+}
+
+/** Env values pasted into a dashboard often carry spaces or quotes; GitHub rejects them silently. */
+function clean(v: string | undefined): string {
+  return (v ?? "").trim().replace(/^["']|["']$/g, "").trim();
 }
 
 export function isOwnerId(id: string | null | undefined): boolean {
@@ -21,11 +26,12 @@ export function isOwnerId(id: string | null | undefined): boolean {
 export const authOptions: NextAuthOptions = {
   providers: [
     GitHubProvider({
-      clientId: process.env.GITHUB_ID ?? "",
-      clientSecret: process.env.GITHUB_SECRET ?? "",
+      clientId: clean(process.env.GITHUB_ID),
+      clientSecret: clean(process.env.GITHUB_SECRET),
     }),
   ],
   session: { strategy: "jwt", maxAge: 30 * 24 * 60 * 60 },
+  pages: { error: "/auth-error" },
   callbacks: {
     async signIn({ account, profile }) {
       if (account?.provider !== "github") return false;
