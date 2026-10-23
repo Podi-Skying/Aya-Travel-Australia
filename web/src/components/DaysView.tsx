@@ -96,8 +96,8 @@ function MoveTo({ item, date, disabled }: { item: Item; date: string; disabled: 
   const locked = item.status === "confirmed";
   return (
     <span className="move-to">
-      <label className="small">
-        移到{" "}
+      <label className="field-inline">
+        <span>移到</span>
         <select value={to} disabled={disabled || locked} onChange={(e) => setTo(e.target.value)}>
           <option value="">選擇日期…</option>
           {days.map((d) => (
@@ -110,7 +110,7 @@ function MoveTo({ item, date, disabled }: { item: Item; date: string; disabled: 
       <button className="btn ghost small" type="button" disabled={disabled || locked || !to} onClick={() => void runOp({ op: "moveItem", date, itemId: item.id, toDate: to })}>
         移動
       </button>
-      {locked && <span className="small muted">已確認的預訂鎖定，不能移動</span>}
+      {locked ? <span className="hint">已確認的預訂鎖定中；要移動請先把狀態改成待確認</span> : !to && <span className="hint">先選一個日期，就能移動</span>}
     </span>
   );
 }
@@ -133,7 +133,7 @@ function ActNote({ text }: { text: string }) {
 }
 
 export function DaysView({ active }: { active: boolean }) {
-  const { doc, mode, currentDay, setCurrentDay, runOp, ask, online, myVotes, vote, unvote, counts, canVote } = useTrip();
+  const { doc, mode, currentDay, setCurrentDay, runOp, runOpUndoable, ask, online, myVotes, vote, unvote, counts, canVote } = useTrip();
   const [focusId, setFocusId] = useState<string | null>(null);
   const [viewer, setViewer] = useState<number | null>(null);
   const [addOpen, setAddOpen] = useState(false);
@@ -223,7 +223,7 @@ export function DaysView({ active }: { active: boolean }) {
 
   async function removeItem(it: Item) {
     const isMust = it.pri === "must";
-    const r = await ask(isMust ? "移除必去活動？" : "移除活動？", {
+    const r = await ask(isMust ? "永久刪除必去活動？" : "永久刪除這個活動？", {
       body: (
         <>
           <p>
@@ -232,17 +232,17 @@ export function DaysView({ active }: { active: boolean }) {
                 「{it.name}」是<strong>必去</strong>活動。依規則，必去活動不會被默默移除。若確定要移除，請輸入活動名稱。
               </>
             ) : (
-              <>確定移除「{it.name}」？</>
+              <>「{it.name}」會從行程裡刪掉，不會放回待安排景點。想之後再排，請改用「移回待安排」。</>
             )}
           </p>
-          <p className="small muted">移除後仍可從版本紀錄還原。</p>
+          <p className="small muted">刪除後 5 秒內可以按「復原」，之後也能從「版本與分享」還原。</p>
         </>
       ),
       fields: isMust ? [{ name: "confirm", label: "活動名稱", required: true }] : [],
-      ok: "移除",
+      ok: "永久刪除",
     });
     if (!r) return;
-    await runOp({ op: "removeItem", date: d.date, itemId: it.id, ...(isMust ? { confirmMustName: r.confirm } : {}) });
+    await runOpUndoable({ op: "removeItem", date: d.date, itemId: it.id, ...(isMust ? { confirmMustName: r.confirm } : {}) }, `已刪除「${it.name}」`);
   }
 
   async function confirmDriver() {
@@ -459,50 +459,60 @@ export function DaysView({ active }: { active: boolean }) {
                           ) : (
                             <details className="act-manage">
                               <summary>管理</summary>
-                              <div className="manage-row">
-                                <label className="small">
-                                  狀態{" "}
-                                  <select
-                                    value={i.status ?? ""}
-                                    disabled={!editable}
-                                    onChange={(e) => void runOp({ op: "setStatus", date: d.date, itemId: i.id, status: e.target.value as "" | "confirmed" | "pending" })}
+                              <div className="manage">
+                                <div className="manage-group">
+                                  <label className="field-inline">
+                                    <span>狀態</span>
+                                    <select
+                                      value={i.status ?? ""}
+                                      disabled={!editable}
+                                      onChange={(e) => void runOp({ op: "setStatus", date: d.date, itemId: i.id, status: e.target.value as "" | "confirmed" | "pending" })}
+                                    >
+                                      <option value="">已安排</option>
+                                      <option value="pending">待確認</option>
+                                      <option value="confirmed">已確認（鎖定）</option>
+                                    </select>
+                                  </label>
+                                  <MoveTo item={i} date={d.date} disabled={!editable} />
+                                </div>
+                                <div className="manage-group">
+                                  <label className="field-inline">
+                                    <span>優先度</span>
+                                    <select value={i.pri} disabled={!editable} onChange={(e) => void runOp({ op: "setPriority", date: d.date, itemId: i.id, pri: e.target.value })}>
+                                      {Object.entries(PRI).map(([v, p]) => (
+                                        <option key={v} value={v}>
+                                          {p.t}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </label>
+                                  <button className="btn ghost small" type="button" disabled={!editable} onClick={() => void runOp({ op: "toggleVerify", date: d.date, itemId: i.id })}>
+                                    {i.verify === "verified" ? "取消查核" : "✓ 標記已查核"}
+                                  </button>
+                                  <button className="btn ghost small" type="button" disabled={!editable} onClick={() => void editItem(i)}>
+                                    修改
+                                  </button>
+                                  <button
+                                    className="btn ghost small"
+                                    type="button"
+                                    disabled={!editable || i.status === "confirmed"}
+                                    title={i.status === "confirmed" ? "已確認的預訂鎖定中，請先把狀態改成待確認" : undefined}
+                                    onClick={() => void runOpUndoable({ op: "unscheduleItem", date: d.date, itemId: i.id }, `已把「${i.name}」移回待安排景點`)}
                                   >
-                                    <option value="">已安排</option>
-                                    <option value="pending">待確認</option>
-                                    <option value="confirmed">已確認（鎖定）</option>
-                                  </select>
-                                </label>
-                                <MoveTo item={i} date={d.date} disabled={!editable} />
-                              <label className="small">
-                                優先度{" "}
-                                <select value={i.pri} disabled={!editable} onChange={(e) => void runOp({ op: "setPriority", date: d.date, itemId: i.id, pri: e.target.value })}>
-                                  {Object.entries(PRI).map(([v, p]) => (
-                                    <option key={v} value={v}>
-                                      {p.t}
-                                    </option>
-                                  ))}
-                                </select>
-                              </label>
-                              <button className="btn ghost small" type="button" disabled={!editable} onClick={() => void runOp({ op: "toggleVerify", date: d.date, itemId: i.id })}>
-                                {i.verify === "verified" ? "取消查核" : "✓ 標記已查核"}
-                              </button>
-                              <button className="btn ghost small" type="button" disabled={!editable} onClick={() => void editItem(i)}>
-                                修改
-                              </button>
-                              {i.originPackage ? (
-                                <button className="btn ghost small" type="button" disabled={!editable} onClick={() => void runOp({ op: "unscheduleItem", date: d.date, itemId: i.id })}>
-                                  移回待安排
-                                </button>
-                              ) : (
-                                <button className="btn ghost small" type="button" disabled={!editable} onClick={() => void removeItem(i)}>
-                                  移除
-                                </button>
-                              )}
-                              {cnt > 0 && (
-                                <span className="count-pill" title="訪客興趣（合計）">
-                                  <Icon name="hand" size={14} label="訪客興趣" /> {cnt}
-                                </span>
-                              )}
+                                    移回待安排
+                                  </button>
+                                  {cnt > 0 && (
+                                    <span className="count-pill" title="訪客興趣（合計）">
+                                      <Icon name="hand" size={14} label="訪客興趣" /> {cnt}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="manage-danger">
+                                  <button className="btn danger ghost small" type="button" disabled={!editable || i.status === "confirmed"} onClick={() => void removeItem(i)}>
+                                    永久刪除…
+                                  </button>
+                                  <span className="small muted">一般請用「移回待安排」，資料和照片都會保留。</span>
+                                </div>
                               </div>
                             </details>
                           )}

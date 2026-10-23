@@ -9,7 +9,7 @@ import { api, registerServiceWorker } from "@/client/api";
 import { keyFor, loadSnapshot, saveSnapshot, mergeVersions, type VersionMeta } from "@/client/offline";
 import { SiteHeader } from "./SiteHeader";
 import { Icon } from "./Icon";
-import { useAsk, useToast, useHobartToday, useUrlState, writeUrl } from "./ui";
+import { useAsk, useToast, useHobartToday, useUrlState, writeUrl, type ToastAction } from "./ui";
 import { Overview } from "./Overview";
 import { DaysView } from "./DaysView";
 import { PlacesMap } from "./Places";
@@ -35,7 +35,9 @@ type Ctx = {
   token?: string;
   runOp: (op: Record<string, unknown>) => Promise<boolean>;
   ask: ReturnType<typeof useAsk>["ask"];
-  toast: (m: string) => void;
+  toast: (m: string, action?: ToastAction) => void;
+  /** Runs an op and offers 「復原」 for 5 seconds, which restores the version before it. */
+  runOpUndoable: (op: Record<string, unknown>, done: string) => Promise<boolean>;
   gotoDay: (i: number) => void;
   currentDay: number;
   setCurrentDay: (i: number) => void;
@@ -261,6 +263,35 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
     [mode, versionNo, applyServerDoc, toast, reloadVersions, refresh],
   );
 
+  const runOpUndoable = useCallback(
+    async (op: Record<string, unknown>, done: string) => {
+      if (mode !== "owner") return false;
+      const before = versionNo;
+      const r = await api<{ versionNo: number; summary: string; doc: TripDoc }>("/api/trip/ops", { method: "POST", body: { baseVersionNo: versionNo, op: op as Op } });
+      if (!r.ok) {
+        toast(r.offline ? "目前離線：修改需要網路連線" : r.error);
+        if (r.status === 409) await refresh();
+        return false;
+      }
+      applyServerDoc(r.data.doc, r.data.versionNo);
+      void reloadVersions();
+      const after = r.data.versionNo;
+      toast(done, {
+        label: "復原",
+        run: async () => {
+          const u = await api<{ versionNo: number; doc: TripDoc }>("/api/trip/restore", { method: "POST", body: { baseVersionNo: after, versionNo: before } });
+          if (u.ok) {
+            applyServerDoc(u.data.doc, u.data.versionNo);
+            toast(`已復原（存成 v${u.data.versionNo}）`);
+            void reloadVersions();
+          } else toast(u.status === 409 ? "行程已有其他修改，請到「版本與分享」手動還原" : u.error);
+        },
+      });
+      return true;
+    },
+    [mode, versionNo, applyServerDoc, toast, reloadVersions, refresh],
+  );
+
   const vote = useCallback(
     async (itemId: string, dayDate: string) => {
       const prev = myVotes.find((v) => v.itemId === itemId && v.dayDate === dayDate);
@@ -302,6 +333,7 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
   );
 
   const ctx: Ctx = {
+    runOpUndoable,
     mode,
     doc,
     versionNo,

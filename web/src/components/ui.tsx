@@ -89,19 +89,41 @@ export function useToday(): string | null {
 
 /* ---------- toast ---------- */
 
+export type ToastAction = { label: string; run: () => void };
+
+/** Short status message; with an action (e.g. 復原) it stays 5 seconds and shows a 44px button. */
 export function useToast() {
   const [msg, setMsg] = useState("");
+  const [action, setAction] = useState<ToastAction | null>(null);
   const [show, setShow] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const toast = useCallback((m: string) => {
+  const actionBtn = useRef<HTMLButtonElement>(null);
+  // The card that triggered an undoable action is gone, so 「復原」 takes keyboard focus.
+  useEffect(() => {
+    if (show && action) actionBtn.current?.focus({ preventScroll: true });
+  }, [show, action]);
+  const toast = useCallback((m: string, act?: ToastAction) => {
     setMsg(m);
+    setAction(act ?? null);
     setShow(true);
     if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => setShow(false), 2600);
+    timer.current = setTimeout(() => setShow(false), act ? 5000 : 2600);
   }, []);
   const node = (
-    <div className={`toast ${show ? "show" : ""}`} role="status" aria-live="polite">
-      {msg}
+    <div className={`toast ${show ? "show" : ""}${action ? " has-action" : ""}`} role="status" aria-live="polite">
+      <span>{msg}</span>
+      {action && show && (
+        <button
+          type="button"
+          ref={actionBtn}
+          onClick={() => {
+            setShow(false);
+            action.run();
+          }}
+        >
+          {action.label}
+        </button>
+      )}
     </div>
   );
   return { toast, node };

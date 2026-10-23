@@ -230,6 +230,7 @@ export function applyOp(input: TripDoc, op: Op): OpResult {
       const d = findDay(doc, op.date);
       const it = d && findItem(d, op.itemId);
       if (!d || !it) return err(404, "找不到活動");
+      if (it.status === "confirmed") return err(400, `「${it.name}」已確認預訂，請先把狀態改成「待確認」`);
       // FR-04: a Must-do activity is never removed without an explicit confirmation naming it.
       if (it.pri === "must" && op.confirmMustName !== it.name) return err(400, `「${it.name}」是必去活動，需要明確確認才能移除`);
       d.items = d.items.filter((x) => x !== it);
@@ -273,15 +274,16 @@ export function applyOp(input: TripDoc, op: Op): OpResult {
       const d = findDay(doc, op.date);
       const it = d && findItem(d, op.itemId);
       if (!d || !it) return err(404, "找不到活動");
-      if (!it.originPackage) return err(400, "這個活動不是來自待安排景點，無法移回");
-      const key = it.originPackage;
+      if (it.status === "confirmed") return err(400, `「${it.name}」已確認預訂，請先把狀態改成「待確認」`);
+      // Activities that never came from the pool go to a per-region 「從行程移出的景點」 group, so nothing is lost.
+      const key = it.originPackage ?? `removed-${d.seg}`;
       const att = d.attached?.find((a) => a.key === key);
       let pkg = doc.attractionPool.find((p) => p.key === key);
       if (!pkg) {
         const src = att ?? it.packageContext;
         pkg = strip({
           key,
-          title: src?.title ?? key,
+          title: src?.title ?? (it.originPackage ? key : "從行程移出的景點"),
           seg: d.seg,
           items: [],
           costs: att?.costs ?? [],

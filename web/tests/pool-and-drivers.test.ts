@@ -159,3 +159,32 @@ describe("moving activities and booking status", () => {
     expect(cross.ok).toBe(false);
   });
 });
+
+describe("removing from a day never loses a place", () => {
+  it("moves a non-pool activity back to 「從行程移出的景點」 with its data, and back again", () => {
+    const doc = seedDoc();
+    const day = doc.days.find((d) => d.items.some((i) => !i.originPackage))!;
+    const it = day.items.find((i) => !i.originPackage)!;
+    const r = applyOp(doc, { op: "unscheduleItem", date: day.date, itemId: it.id });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const pkg = r.doc.attractionPool.find((p) => p.key === `removed-${day.seg}`)!;
+    expect(pkg.title).toBe("從行程移出的景點");
+    expect(pkg.items.find((x) => x.id === it.id)?.name).toBe(it.name);
+    const back = applyOp(r.doc, { op: "scheduleItem", key: pkg.key, itemId: it.id, date: day.date });
+    expect(back.ok && back.doc.days.find((d) => d.date === day.date)!.items.some((x) => x.id === it.id)).toBe(true);
+  });
+});
+
+describe("confirmed bookings are locked on the server too", () => {
+  it("refuses to unschedule or delete a confirmed activity", () => {
+    const doc = seedDoc();
+    const day = doc.days.find((d) => d.items.length)!;
+    const id = day.items[0].id;
+    const c = applyOp(doc, { op: "setStatus", date: day.date, itemId: id, status: "confirmed" });
+    expect(c.ok).toBe(true);
+    if (!c.ok) return;
+    expect(applyOp(structuredClone(c.doc), { op: "unscheduleItem", date: day.date, itemId: id }).ok).toBe(false);
+    expect(applyOp(structuredClone(c.doc), { op: "removeItem", date: day.date, itemId: id, confirmMustName: day.items[0].name }).ok).toBe(false);
+  });
+});

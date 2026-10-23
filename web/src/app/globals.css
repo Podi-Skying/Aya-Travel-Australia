@@ -619,3 +619,23 @@ details.card.day-summary > summary h3 { margin: 0; }
 .leaflet-marker-icon.place-pin-hit { display: grid; place-items: center; background: none; border: 0; }
 .place-pin-hit > .place-pin { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; background: var(--bg); border: 2px solid var(--vermilion); color: var(--vermilion); box-shadow: 0 1px 3px rgba(41, 40, 35, .25); }
 .place-pin-hit > .place-pin svg { width: 14px; height: 14px; }
+
+/* Activity card never grows past its column (long <select> options pushed it under the map). */
+.act { grid-template-columns: 44px minmax(0, 1fr); }
+.act .body { min-width: 0; }
+.act select { max-width: 100%; min-width: 0; text-overflow: ellipsis; }
+/* 管理 panel: primary (status + move) / secondary actions / separated destructive action. */
+.manage { display: grid; gap: 10px; padding: 6px 0 4px; animation: dayIn 160ms ease-out; }
+.manage-group { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; padding: 10px; border-radius: 12px; background: var(--paper-raised); min-width: 0; }
+.field-inline { display: grid; gap: 4px; min-width: 0; max-width: 100%; font-size: .75rem; color: var(--ink-2); }
+.field-inline select { min-height: 44px; font-size: 16px; border-radius: 10px; padding: 0 8px; }
+.manage .btn { min-height: 44px; }
+.move-to { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; min-width: 0; max-width: 100%; flex: 1 1 220px; }
+.move-to .field-inline { flex: 1 1 160px; }
+.move-to .field-inline select { width: 100%; }
+.move-to .hint { flex-basis: 100%; font-size: .72rem; color: var(--ink-muted); }
+.manage-danger { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 2px 0; border-top: 1px solid var(--line); }
+.manage-danger .small { flex: 1 1 200px; }
+.toast { display: flex; align-items: center; gap: 12px; }
+.toast.has-action { padding-right: 6px; }
+.toast button { min-height: 44px; padding: 0 14px; border: 0; border-radius: 10px; background: rgba(250, 247, 240, .16); color: var(--bg); font: inherit; font-weight: 600; cursor: pointer; }
