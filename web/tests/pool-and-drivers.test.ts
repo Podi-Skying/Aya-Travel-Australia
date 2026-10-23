@@ -223,3 +223,22 @@ describe("participants", () => {
     expect(applyOp(doc, { op: "setPeople", date: day.date, itemId: id, people: ["bob"] }).ok).toBe(false);
   });
 });
+
+describe("owner-covered driver costs", () => {
+  it("adds fuel on fuel-covered driver days and stay + tickets on the others, following the plan", () => {
+    const doc = seedDoc();
+    const day = doc.days.find((d) => d.needsDriver && d.driveHrs > 0)!;
+    const name = day.needsDriver!;
+    doc.drivers[name] = { ...doc.drivers[name], covers: ["fuel"], fuel: { lPer100: 8, price: 2.5, kmPerHour: 80, source: "test" } };
+    const fuel = budgetLines(doc, 2).find((l) => l.day === day.date && l.label === "Kai 負擔：油費")!;
+    expect(fuel.total).toBe(Math.round(day.driveHrs * 80 * 0.08 * 2.5));
+    doc.drivers[name] = { ...doc.drivers[name], covers: ["stay", "tickets"], fuel: undefined };
+    day.items[0].cost = { cat: "tickets", amount: 30, unit: "pp", status: "estimate" };
+    const lines = budgetLines(doc, 2).filter((l) => l.day === day.date && l.label.startsWith("Kai 負擔"));
+    expect(lines.some((l) => l.label === "Kai 負擔：油費")).toBe(false);
+    const pp = day.items.filter((i) => i.cost?.cat === "tickets" && i.cost.unit === "pp" && i.cost.status !== "unknown").reduce((a, i) => a + i.cost!.amount, 0);
+    expect(lines.find((l) => l.label === "Kai 負擔：司機門票")?.total).toBe(pp);
+    day.items = [];
+    expect(budgetLines(doc, 2).some((l) => l.day === day.date && l.label === "Kai 負擔：司機門票")).toBe(false);
+  });
+});

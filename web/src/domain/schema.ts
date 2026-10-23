@@ -181,7 +181,14 @@ export const tripDocSchema = z
     ),
     drivers: z.record(
       z.string(),
-      z.object({ weekdays: z.array(z.number().int().min(0).max(6)), label: shortText(80), note: shortText(300) }),
+      z.object({
+        weekdays: z.array(z.number().int().min(0).max(6)),
+        label: shortText(80),
+        note: shortText(300),
+        /** What the owner pays on this driver's days; budget.ts adds the lines. */
+        covers: z.array(z.enum(["fuel", "stay", "tickets"])).max(3).optional(),
+        fuel: z.object({ lPer100: z.number().min(1).max(30), price: z.number().min(0.5).max(10), kmPerHour: z.number().min(20).max(120), source: shortText(200) }).optional(),
+      }),
     ),
     stays: z.record(
       z.string(),

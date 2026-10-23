@@ -52,6 +52,26 @@ export function budgetLines(doc: TripDoc, N: number): BudgetLine[] {
       if (i.cost) lines.push({ day: d.date, seg: d.seg, idx, cat: i.cost.cat, label: i.name, c: i.cost, total: 0 });
     });
     d.costs.forEach((c, ci) => lines.push({ day: d.date, seg: d.seg, idx, ci, cat: c.cat, label: c.label ?? "", c, total: 0 }));
+    // What the owner covers for a friend who drives (labels never name the driver).
+    const drv = d.needsDriver ? doc.drivers[d.needsDriver] : undefined;
+    for (const what of drv?.covers ?? []) {
+      if (what === "fuel" && drv?.fuel && d.driveHrs > 0) {
+        const km = Math.round(d.driveHrs * drv.fuel.kmPerHour);
+        const amount = Math.round(((km * drv.fuel.lPer100) / 100) * drv.fuel.price);
+        lines.push({ day: d.date, seg: d.seg, idx, cat: "transport", label: "Kai 負擔：油費", c: { amount, unit: "group", status: "estimate", note: `約 ${km} 公里（車程 ${d.driveHrs} 小時估算）× ${drv.fuel.lPer100}L/100km × AUD ${drv.fuel.price}/L（${drv.fuel.source}）` }, total: 0 });
+      }
+      if (what === "stay" && d.stay !== "none") {
+        const st = stayOf(doc, d.stay);
+        if (st.nightly > 0)
+          lines.push({ day: d.date, seg: d.seg, idx, cat: "stay", label: "Kai 負擔：司機住宿", c: { amount: st.nightly, unit: "night", status: "estimate", note: "假設司機另住一間同價位的房" }, total: 0 });
+      }
+      if (what === "tickets") {
+        const t = d.items.filter((i) => i.cost && i.cost.cat === "tickets" && i.cost.unit === "pp" && i.cost.status !== "unknown");
+        const amount = t.reduce((a, i) => a + i.cost!.amount, 0);
+        if (amount > 0)
+          lines.push({ day: d.date, seg: d.seg, idx, cat: "tickets", label: "Kai 負擔：司機門票", c: { amount, unit: "group", status: "estimate", note: `司機一人份：${t.map((i) => i.name).join("、")}` }, total: 0 });
+      }
+    }
     const st = stayOf(doc, d.stay);
     if (d.stay !== "none")
       lines.push({ day: d.date, seg: d.seg, idx, cat: "stay", label: st.name, c: { amount: st.nightly, unit: "night", status: st.status, note: st.note }, total: 0 });
