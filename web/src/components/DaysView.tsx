@@ -5,6 +5,8 @@ import { useTrip } from "./TripApp";
 import { Icon, MODE_ICON } from "./Icon";
 import { Badge, LEG, MODE, PendingButton, PRI, STATUS, VERIFY } from "./ui";
 import { clearDaySplit } from "@/domain/ops";
+import { AvatarStack, PeopleToggle, peopleOf } from "./People";
+import { PEOPLE, type Person } from "@/domain/schema";
 import { DayCalendar } from "./DayCalendar";
 import { CATEGORY_META, distanceLabel, nearbyPlaces, type NearbyPlace } from "./Places";
 import { ActPhoto, PhotoCredit, PhotoViewer, mapsPhotoLink, type DayPhoto } from "./Photos";
@@ -151,6 +153,8 @@ export function DaysView({ active }: { active: boolean }) {
   const seg = doc.segments[d.seg];
   const nearby = nearbyPlaces(doc, d.date, 12);
   const dayPhotos: DayPhoto[] = d.items.flatMap((i) => (i.photo ? [{ id: i.id, name: i.name, photo: i.photo }] : []));
+  // Everyone who takes part in at least one of the day's activities (Kai + Aya when the day is empty).
+  const dayPeople: Person[] = PEOPLE.filter((p) => (raw.items.length ? raw.items.some((i) => peopleOf(i, raw).includes(p)) : peopleOf({}, raw).includes(p)));
   // The day's headline picture: its first major stop with a photo, else any photo.
   const dayHero = d.items.find((i) => i.photo && i.major) ?? d.items.find((i) => i.photo);
 
@@ -246,7 +250,9 @@ export function DaysView({ active }: { active: boolean }) {
     return runOpUndoable({ op: "removeItem", date: d.date, itemId: it.id, ...(isMust ? { confirmMustName: r.confirm } : {}) }, `已刪除「${it.name}」`);
   }
 
-  /** 「清空這天」: everything except confirmed bookings, flights and stay notes goes back to the pool, in one version. */
+  const samePeople = (a: Person[], b: Person[]) => a.length === b.length && a.every((p) => b.includes(p));
+
+/** 「清空這天」: everything except confirmed bookings, flights and stay notes goes back to the pool, in one version. */
   async function clearDay() {
     const { move, keep } = clearDaySplit(raw.items);
     const r = await ask("清空這天？", {
@@ -286,6 +292,7 @@ export function DaysView({ active }: { active: boolean }) {
                 第 {currentDay + 1} 天・{fmtDay(d.date)}・{seg?.name}
               </div>
               <h2>{d.title}</h2>
+              <AvatarStack people={dayPeople} size={30} />
             </div>
             <div className="day-nav">
               <button className="btn ghost small" type="button" disabled={currentDay === 0} onClick={() => setCurrentDay(currentDay - 1)} aria-label="前一天">
@@ -405,6 +412,8 @@ export function DaysView({ active }: { active: boolean }) {
                               ) : i.pri === "must" ? (
                                 <Badge {...PRI[i.pri]} />
                               ) : null}
+                              {/* Only when this activity's people differ from the day's group. */}
+                              {!samePeople(peopleOf(i, raw), dayPeople) && <AvatarStack people={peopleOf(i, raw)} size={22} />}
                             </div>
                             <h4>{i.name}</h4>
                             <div className="meta">
@@ -500,6 +509,11 @@ export function DaysView({ active }: { active: boolean }) {
                                     </select>
                                   </label>
                                   <MoveTo item={i} date={d.date} disabled={!editable} />
+                                  <PeopleToggle
+                                    value={peopleOf(i, raw)}
+                                    disabled={!editable}
+                                    onChange={(next) => void runOp({ op: "setPeople", date: d.date, itemId: i.id, people: next })}
+                                  />
                                 </div>
                                 <div className="manage-group">
                                   <label className="field-inline">

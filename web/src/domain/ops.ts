@@ -1,4 +1,4 @@
-import { CATEGORIES, MODES, PRIORITIES, COST_STATUS, COST_UNITS, COST_CATS, TIME_RE, validWindow } from "./schema";
+import { CATEGORIES, DEFAULT_PEOPLE, PEOPLE, MODES, PRIORITIES, COST_STATUS, COST_UNITS, COST_CATS, TIME_RE, validWindow } from "./schema";
 import type { Cost, Day, Item, Package, TripDoc } from "./schema";
 import { effectiveDay } from "./effective-day";
 import { fmtDay } from "./format";
@@ -27,6 +27,7 @@ export type Op =
   | { op: "moveItem"; date: string; itemId: string; toDate: string }
   | { op: "setStatus"; date: string; itemId: string; status: "" | "confirmed" | "pending" }
   | { op: "clearDay"; date: string }
+  | { op: "setPeople"; date: string; itemId: string; people: string[] }
   | { op: "snapshot"; summary: string };
 
 export type ItemFields = {
@@ -349,6 +350,17 @@ export function applyOp(input: TripDoc, op: Op): OpResult {
       else return err(400, "狀態不正確");
       const label = { "": "已安排", confirmed: "已確認", pending: "待確認" }[op.status];
       return { ok: true, doc, summary: `${fmtDay(d.date)}「${it.name}」改為${label}` };
+    }
+    case "setPeople": {
+      const d = findDay(doc, op.date);
+      const it = d && findItem(d, op.itemId);
+      if (!d || !it) return err(404, "找不到活動");
+      const ppl = PEOPLE.filter((p) => op.people.includes(p));
+      if (!ppl.length) return err(400, "至少要有一個人參加");
+      const dayPeople = d.people ?? DEFAULT_PEOPLE;
+      if (ppl.length === dayPeople.length && ppl.every((p) => dayPeople.includes(p))) delete it.people;
+      else it.people = ppl;
+      return { ok: true, doc, summary: `${fmtDay(d.date)}「${it.name}」參加的人改為 ${ppl.length} 人` };
     }
     case "clearDay": {
       const d = findDay(doc, op.date);

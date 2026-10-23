@@ -208,3 +208,18 @@ describe("清空這天", () => {
     expect(applyOp(r.doc, { op: "clearDay", date: day.date }).ok).toBe(false);
   });
 });
+
+describe("participants", () => {
+  it("sets who joins an activity, falls back to the day's people, and needs at least one person", () => {
+    const doc = seedDoc();
+    const day = doc.days.find((d) => d.items.length)!;
+    const id = day.items[0].id;
+    const r = applyOp(doc, { op: "setPeople", date: day.date, itemId: id, people: ["kai"] });
+    expect(r.ok && r.doc.days.find((d) => d.date === day.date)!.items[0].people).toEqual(["kai"]);
+    if (!r.ok) return;
+    const back = applyOp(r.doc, { op: "setPeople", date: day.date, itemId: id, people: ["aya", "kai"] });
+    expect(back.ok && back.doc.days.find((d) => d.date === day.date)!.items[0].people).toBeUndefined();
+    expect(applyOp(doc, { op: "setPeople", date: day.date, itemId: id, people: [] }).ok).toBe(false);
+    expect(applyOp(doc, { op: "setPeople", date: day.date, itemId: id, people: ["bob"] }).ok).toBe(false);
+  });
+});

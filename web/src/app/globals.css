@@ -663,3 +663,16 @@ details.card.day-summary > summary h3 { margin: 0; }
   .pbtn-spin { animation: none !important; border-style: dotted; border-right-color: currentColor; }
   .save-bar::before { animation: none !important; left: 0; width: 100%; opacity: .6; }
 }
+
+/* Participants (DESIGN.md「參加的人」): overlapping illustrated avatars with a paper ring. */
+.avatars { display: inline-flex; align-items: center; vertical-align: middle; }
+.avatars img { width: var(--av, 28px); height: var(--av, 28px); border-radius: 50%; box-shadow: 0 0 0 2px var(--bg); background: var(--paper-raised); }
+.avatars img + img { margin-left: calc(var(--av, 28px) * -0.3); }
+.day-head h2 + .avatars { margin-top: 6px; }
+.act-main .top .avatars { margin-left: auto; }
+.people-toggle { display: flex; flex-wrap: wrap; gap: 6px; flex-basis: 100%; }
+.people-toggle .person { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 12px 0 6px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); color: var(--ink-2); font: inherit; font-size: .82rem; cursor: pointer; }
+.people-toggle .person img { width: 28px; height: 28px; border-radius: 50%; opacity: .45; filter: grayscale(.6); transition: opacity 120ms ease-out, filter 120ms ease-out; }
+.people-toggle .person.on { border-color: var(--ink); color: var(--ink); }
+.people-toggle .person.on img { opacity: 1; filter: none; }
+.people-toggle .person:disabled { cursor: default; }

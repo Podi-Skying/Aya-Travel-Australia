@@ -63,6 +63,12 @@ export const photoSchema = z.object({
   license: shortText(60).optional(),
 });
 
+/* Who takes part (DESIGN.md「參加的人」). Absent = the day's people, and a day without people = Kai + Aya. */
+export const PEOPLE = ["kai", "aya", "mina"] as const;
+export type Person = (typeof PEOPLE)[number];
+export const DEFAULT_PEOPLE: Person[] = ["kai", "aya"];
+const peopleSchema = z.array(z.enum(PEOPLE)).min(1).max(PEOPLE.length);
+
 /* Place categories for browsing unscheduled places on the map (DESIGN.md「地圖與待安排景點」). */
 export const CATEGORIES = ["nature", "beach", "lookout", "wildlife", "food", "market", "town", "history", "art", "activity"] as const;
 export type Category = (typeof CATEGORIES)[number];
@@ -92,6 +98,7 @@ export const itemSchema = z.object({
   status: z.enum(["confirmed", "pending"]).optional(),
   /** Owner-only detail (flight numbers, workplace); removed from every public document. */
   ownerNote: shortText(500).optional(),
+  people: peopleSchema.optional(),
 });
 
 /* "08:30–18:00" (en dash) or "08:30-18:00"; start must be before end. */
@@ -132,6 +139,7 @@ export const daySchema = z.object({
   transfer: z.boolean().optional(),
   open: z.boolean().optional(),
   items: z.array(itemSchema).max(40),
+  people: peopleSchema.optional(),
   costs: z.array(costSchema).max(20).optional(),
   attached: z.array(attachmentSchema).max(10).optional(),
   driverConfirmation: driverConfirmationSchema.optional(),

@@ -26,7 +26,7 @@ export const getTrip = ownerRoute(async (_req, owner) => {
 
 const OPS = new Set<Op["op"]>([
   "setPriority", "toggleVerify", "confirmDriver", "clearDriver", "setPartySize", "setParticipants",
-  "editItem", "addItem", "removeItem", "schedulePackage", "scheduleItem", "unscheduleItem", "moveItem", "setStatus", "clearDay", "snapshot",
+  "editItem", "addItem", "removeItem", "schedulePackage", "scheduleItem", "unscheduleItem", "moveItem", "setStatus", "clearDay", "setPeople", "snapshot",
 ]);
 
 export const postOp = ownerRoute(async (req, owner) => {
