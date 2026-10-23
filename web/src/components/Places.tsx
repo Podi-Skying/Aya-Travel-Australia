@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as
 import type * as Leaflet from "leaflet";
 import { useTrip } from "./TripApp";
 import { Icon, iconSvg } from "./Icon";
-import { useReducedMotion } from "./ui";
+import { PendingButton, useReducedMotion } from "./ui";
 import { esc, loadLeaflet, segColor, tiles } from "./MapViews";
 import { PhotoCredit } from "./Photos";
 import { project, rubber, spring } from "./motion";
@@ -412,8 +412,9 @@ export function PlacesMap({ active }: { active: boolean }) {
                 requestAnimationFrame(() => wrap.current?.querySelector<HTMLElement>(`.place-row[data-id="${id}"]`)?.focus());
               }}
               onSchedule={async (date) => {
-                await runOp({ op: "scheduleItem", key: selected.p.key, itemId: selected.i.id, date });
-                patch({ place: null });
+                const ok = await runOp({ op: "scheduleItem", key: selected.p.key, itemId: selected.i.id, date });
+                if (ok) patch({ place: null });
+                return ok;
               }}
             />
           )}
@@ -530,7 +531,7 @@ function PlaceCard({
   suggestion: { date: string; km: number } | null;
   editable: boolean;
   onClose: () => void;
-  onSchedule: (date: string) => Promise<void>;
+  onSchedule: (date: string) => Promise<boolean>;
 }) {
   const { doc } = useTrip();
   const { i, p } = place;
@@ -583,9 +584,9 @@ function PlaceCard({
               ))}
             </select>
           </label>
-          <button type="button" className="btn small" disabled={!date} onClick={() => void onSchedule(date)}>
+          <PendingButton className="btn small" disabled={!date} pendingLabel="排入中…" onAction={() => onSchedule(date)}>
             排入
-          </button>
+          </PendingButton>
           {suggestion && (
             <p className="muted small">
               建議 {fmtDay(suggestion.date)}：離當天行程最近（直線約 {Math.round(suggestion.km)} 公里）。

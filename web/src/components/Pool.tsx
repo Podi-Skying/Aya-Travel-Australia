@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useTrip } from "./TripApp";
 import { Icon } from "./Icon";
-import { Badge, MODE, PRI } from "./ui";
+import { Badge, MODE, PendingButton, PRI } from "./ui";
 import { packageEstimate } from "@/domain/budget";
 import { fmtDay, money } from "@/domain/format";
 import type { Package } from "@/domain/schema";
@@ -70,9 +70,9 @@ function PackageCard({ pkg }: { pkg: Package }) {
             {editable && (
               <>
                 {" "}
-                <button className="btn ghost small" type="button" disabled={!date} onClick={() => void runOp({ op: "scheduleItem", key: pkg.key, itemId: i.id, date })}>
+                <PendingButton className="btn ghost small" disabled={!date} pendingLabel="排入中…" onAction={() => runOp({ op: "scheduleItem", key: pkg.key, itemId: i.id, date })}>
                   只排這個
-                </button>
+                </PendingButton>
               </>
             )}
           </li>
@@ -104,9 +104,9 @@ function PackageCard({ pkg }: { pkg: Package }) {
               ))}
             </select>
           </label>
-          <button className="btn small" type="button" disabled={!date} onClick={() => void runOp({ op: "schedulePackage", key: pkg.key, date })}>
+          <PendingButton className="btn small" disabled={!date} pendingLabel="排入中…" onAction={() => runOp({ op: "schedulePackage", key: pkg.key, date })}>
             整組排入
-          </button>
+          </PendingButton>
         </div>
       )}
     </div>

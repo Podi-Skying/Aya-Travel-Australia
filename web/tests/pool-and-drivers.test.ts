@@ -188,3 +188,23 @@ describe("confirmed bookings are locked on the server too", () => {
     expect(applyOp(structuredClone(c.doc), { op: "removeItem", date: day.date, itemId: id, confirmMustName: day.items[0].name }).ok).toBe(false);
   });
 });
+
+describe("清空這天", () => {
+  it("moves every activity to the pool in one op, keeping confirmed bookings, flights and stay notes", async () => {
+    const { clearDaySplit } = await import("@/domain/ops");
+    const doc = seedDoc();
+    const day = doc.days.find((d) => d.items.length >= 2 && d.items.every((i) => i.mode !== "flight"))!;
+    day.items[0].status = "confirmed";
+    const before = day.items.length;
+    const { move, keep } = clearDaySplit(day.items);
+    expect(move.length + keep.length).toBe(before);
+    const r = applyOp(doc, { op: "clearDay", date: day.date });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const after = r.doc.days.find((d) => d.date === day.date)!;
+    expect(after.items.map((i) => i.id)).toEqual(keep.map((i) => i.id));
+    const pooled = new Set(r.doc.attractionPool.flatMap((p) => p.items.map((i) => i.id)));
+    expect(move.every((i) => pooled.has(i.id))).toBe(true);
+    expect(applyOp(r.doc, { op: "clearDay", date: day.date }).ok).toBe(false);
+  });
+});

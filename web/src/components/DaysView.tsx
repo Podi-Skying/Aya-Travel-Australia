@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useTrip } from "./TripApp";
 import { Icon, MODE_ICON } from "./Icon";
-import { Badge, LEG, MODE, PRI, STATUS, VERIFY } from "./ui";
+import { Badge, LEG, MODE, PendingButton, PRI, STATUS, VERIFY } from "./ui";
+import { clearDaySplit } from "@/domain/ops";
 import { DayCalendar } from "./DayCalendar";
 import { CATEGORY_META, distanceLabel, nearbyPlaces, type NearbyPlace } from "./Places";
 import { ActPhoto, PhotoCredit, PhotoViewer, mapsPhotoLink, type DayPhoto } from "./Photos";
@@ -40,7 +41,7 @@ function NearbyPicker({
 }: {
   date: string;
   places: NearbyPlace[];
-  onAdd: (key: string, id: string) => void;
+  onAdd: (key: string, id: string) => Promise<boolean>;
   onManual: () => void;
   onClose: () => void;
 }) {
@@ -71,9 +72,9 @@ function NearbyPicker({
                   {distanceLabel(km)}
                 </span>
               </span>
-              <button type="button" className="btn small" onClick={() => onAdd(p.key, i.id)} aria-label={`把「${i.name}」加入這天`}>
+              <PendingButton className="btn small" pendingLabel="加入中…" onAction={() => onAdd(p.key, i.id)} aria-label={`把「${i.name}」加入這天`}>
                 加入
-              </button>
+              </PendingButton>
             </li>
           ))}
         </ul>
@@ -107,9 +108,9 @@ function MoveTo({ item, date, disabled }: { item: Item; date: string; disabled: 
           ))}
         </select>
       </label>{" "}
-      <button className="btn ghost small" type="button" disabled={disabled || locked || !to} onClick={() => void runOp({ op: "moveItem", date, itemId: item.id, toDate: to })}>
+      <PendingButton className="btn ghost small" disabled={disabled || locked || !to} pendingLabel="移動中…" onAction={() => runOp({ op: "moveItem", date, itemId: item.id, toDate: to })}>
         移動
-      </button>
+      </PendingButton>
       {locked ? <span className="hint">已確認的預訂鎖定中；要移動請先把狀態改成待確認</span> : !to && <span className="hint">先選一個日期，就能移動</span>}
     </span>
   );
@@ -241,8 +242,26 @@ export function DaysView({ active }: { active: boolean }) {
       fields: isMust ? [{ name: "confirm", label: "活動名稱", required: true }] : [],
       ok: "永久刪除",
     });
-    if (!r) return;
-    await runOpUndoable({ op: "removeItem", date: d.date, itemId: it.id, ...(isMust ? { confirmMustName: r.confirm } : {}) }, `已刪除「${it.name}」`);
+    if (!r) return null;
+    return runOpUndoable({ op: "removeItem", date: d.date, itemId: it.id, ...(isMust ? { confirmMustName: r.confirm } : {}) }, `已刪除「${it.name}」`);
+  }
+
+  /** 「清空這天」: everything except confirmed bookings, flights and stay notes goes back to the pool, in one version. */
+  async function clearDay() {
+    const { move, keep } = clearDaySplit(raw.items);
+    const r = await ask("清空這天？", {
+      body: (
+        <>
+          <p>
+            將 <strong>{move.length}</strong> 個活動移回待安排{keep.length ? `，${keep.length} 個保留（已確認的預訂、航班、住宿）` : ""}。
+          </p>
+          <p className="small muted">不會刪除任何東西；之後可以從「新增活動」或地圖再排回來。完成後 5 秒內可以按「復原」整天還原。</p>
+        </>
+      ),
+      ok: "移回待安排",
+    });
+    if (!r) return null;
+    return runOpUndoable({ op: "clearDay", date: d.date }, `已清空 ${fmtDay(d.date)}：${move.length} 個活動移回待安排`);
   }
 
   async function confirmDriver() {
@@ -251,8 +270,8 @@ export function DaysView({ active }: { active: boolean }) {
       fields: [{ name: "win", label: "可開車時段（HH:MM–HH:MM）", placeholder: "例如 08:30–18:00", required: true }],
       ok: "確認",
     });
-    if (!r) return;
-    await runOp({ op: "confirmDriver", date: d.date, window: r.win });
+    if (!r) return null;
+    return runOp({ op: "confirmDriver", date: d.date, window: r.win });
   }
 
   return (
@@ -300,6 +319,13 @@ export function DaysView({ active }: { active: boolean }) {
               <div className="v">{d.stay === "none" ? "不住宿" : st.area || st.name}</div>
             </div>
           </div>
+          {editable && clearDaySplit(raw.items).move.length > 0 && (
+            <div className="day-actions">
+              <PendingButton className="btn ghost small clear-day" pendingLabel="清空中…" onAction={clearDay}>
+                清空這天…
+              </PendingButton>
+            </div>
+          )}
           <details className="day-summary">
             <summary>當日摘要</summary>
             <ul>
@@ -338,14 +364,14 @@ export function DaysView({ active }: { active: boolean }) {
           {editable && d.needsDriver && (
             <p>
               {d.driverOk || raw.driverConfirmation ? (
-                <button className="btn ghost small" type="button" onClick={() => void runOp({ op: "clearDriver", date: d.date })}>
+                <PendingButton className="btn ghost small" pendingLabel="儲存中…" onAction={() => runOp({ op: "clearDriver", date: d.date })}>
                   改回未確認
-                </button>
+                </PendingButton>
               ) : null}{" "}
               {!d.driverOk && (
-                <button className="btn small" type="button" onClick={() => void confirmDriver()}>
+                <PendingButton className="btn small" pendingLabel="確認中…" onAction={confirmDriver}>
                   ✓ 確認司機與時段
-                </button>
+                </PendingButton>
               )}
             </p>
           )}
@@ -486,21 +512,21 @@ export function DaysView({ active }: { active: boolean }) {
                                       ))}
                                     </select>
                                   </label>
-                                  <button className="btn ghost small" type="button" disabled={!editable} onClick={() => void runOp({ op: "toggleVerify", date: d.date, itemId: i.id })}>
+                                  <PendingButton className="btn ghost small" disabled={!editable} pendingLabel="儲存中…" onAction={() => runOp({ op: "toggleVerify", date: d.date, itemId: i.id })}>
                                     {i.verify === "verified" ? "取消查核" : "✓ 標記已查核"}
-                                  </button>
+                                  </PendingButton>
                                   <button className="btn ghost small" type="button" disabled={!editable} onClick={() => void editItem(i)}>
                                     修改
                                   </button>
-                                  <button
+                                  <PendingButton
                                     className="btn ghost small"
-                                    type="button"
                                     disabled={!editable || i.status === "confirmed"}
                                     title={i.status === "confirmed" ? "已確認的預訂鎖定中，請先把狀態改成待確認" : undefined}
-                                    onClick={() => void runOpUndoable({ op: "unscheduleItem", date: d.date, itemId: i.id }, `已把「${i.name}」移回待安排景點`)}
+                                    pendingLabel="移回中…"
+                                    onAction={() => runOpUndoable({ op: "unscheduleItem", date: d.date, itemId: i.id }, `已把「${i.name}」移回待安排景點`)}
                                   >
                                     移回待安排
-                                  </button>
+                                  </PendingButton>
                                   {cnt > 0 && (
                                     <span className="count-pill" title="訪客興趣（合計）">
                                       <Icon name="hand" size={14} label="訪客興趣" /> {cnt}
@@ -508,9 +534,9 @@ export function DaysView({ active }: { active: boolean }) {
                                   )}
                                 </div>
                                 <div className="manage-danger">
-                                  <button className="btn danger ghost small" type="button" disabled={!editable || i.status === "confirmed"} onClick={() => void removeItem(i)}>
+                                  <PendingButton className="btn danger ghost small" disabled={!editable || i.status === "confirmed"} pendingLabel="刪除中…" onAction={() => removeItem(i)}>
                                     永久刪除…
-                                  </button>
+                                  </PendingButton>
                                   <span className="small muted">一般請用「移回待安排」，資料和照片都會保留。</span>
                                 </div>
                               </div>
@@ -539,7 +565,7 @@ export function DaysView({ active }: { active: boolean }) {
               <NearbyPicker
                 date={d.date}
                 places={nearby}
-                onAdd={(key, id) => void runOp({ op: "scheduleItem", key, itemId: id, date: d.date })}
+                onAdd={(key, id) => runOp({ op: "scheduleItem", key, itemId: id, date: d.date })}
                 onManual={() => {
                   setAddOpen(false);
                   void addItem();
@@ -584,7 +610,7 @@ export function DaysView({ active }: { active: boolean }) {
                 photo: n.i.photo?.url,
                 icon: n.i.cat ? CATEGORY_META[n.i.cat].icon : undefined,
               }))}
-            onAdd={editable ? (key, id) => void runOp({ op: "scheduleItem", key, itemId: id, date: d.date }) : undefined}
+            onAdd={editable ? (key, id) => runOp({ op: "scheduleItem", key, itemId: id, date: d.date }) : undefined}
           />
           <p className="map-note">路線為點對點直線示意，非實際道路；實際路線與時間請以導航為準。</p>
         </aside>

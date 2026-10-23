@@ -9,7 +9,7 @@ import { api, registerServiceWorker } from "@/client/api";
 import { keyFor, loadSnapshot, saveSnapshot, mergeVersions, type VersionMeta } from "@/client/offline";
 import { SiteHeader } from "./SiteHeader";
 import { Icon } from "./Icon";
-import { useAsk, useToast, useHobartToday, useUrlState, writeUrl, type ToastAction } from "./ui";
+import { useAsk, useToast, useHobartToday, useUrlState, withTimeout, writeUrl, type ToastAction } from "./ui";
 import { Overview } from "./Overview";
 import { DaysView } from "./DaysView";
 import { PlacesMap } from "./Places";
@@ -136,6 +136,16 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
   const [versions, setVersions] = useState<VersionMeta[]>([]);
   const { ask, node: dialog } = useAsk();
   const { toast, node: toastNode } = useToast();
+  // Any server write in flight shows the save bar under the tabs (selects and dialogs have no button to spin).
+  const [busy, setBusy] = useState(0);
+  const track = useCallback(async <T,>(p: Promise<T>) => {
+    setBusy((n) => n + 1);
+    try {
+      return await withTimeout(p);
+    } finally {
+      setBusy((n) => n - 1);
+    }
+  }, []);
 
   const tripUrl = mode === "owner" ? "/api/trip" : home ? "/api/public" : `/api/s/${token}`;
 
@@ -246,7 +256,7 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
   const runOp = useCallback(
     async (op: Record<string, unknown>) => {
       if (mode !== "owner") return false;
-      const r = await api<{ versionNo: number; summary: string; doc: TripDoc }>("/api/trip/ops", { method: "POST", body: { baseVersionNo: versionNo, op: op as Op } });
+      const r = await track(api<{ versionNo: number; summary: string; doc: TripDoc }>("/api/trip/ops", { method: "POST", body: { baseVersionNo: versionNo, op: op as Op } }));
       if (r.ok) {
         applyServerDoc(r.data.doc, r.data.versionNo);
         toast(`已儲存為新版本 v${r.data.versionNo}`);
@@ -260,14 +270,14 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
       } else toast(r.error);
       return false;
     },
-    [mode, versionNo, applyServerDoc, toast, reloadVersions, refresh],
+    [mode, versionNo, applyServerDoc, toast, reloadVersions, refresh, track],
   );
 
   const runOpUndoable = useCallback(
     async (op: Record<string, unknown>, done: string) => {
       if (mode !== "owner") return false;
       const before = versionNo;
-      const r = await api<{ versionNo: number; summary: string; doc: TripDoc }>("/api/trip/ops", { method: "POST", body: { baseVersionNo: versionNo, op: op as Op } });
+      const r = await track(api<{ versionNo: number; summary: string; doc: TripDoc }>("/api/trip/ops", { method: "POST", body: { baseVersionNo: versionNo, op: op as Op } }));
       if (!r.ok) {
         toast(r.offline ? "目前離線：修改需要網路連線" : r.error);
         if (r.status === 409) await refresh();
@@ -279,7 +289,7 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
       toast(done, {
         label: "復原",
         run: async () => {
-          const u = await api<{ versionNo: number; doc: TripDoc }>("/api/trip/restore", { method: "POST", body: { baseVersionNo: after, versionNo: before } });
+          const u = await track(api<{ versionNo: number; doc: TripDoc }>("/api/trip/restore", { method: "POST", body: { baseVersionNo: after, versionNo: before } }));
           if (u.ok) {
             applyServerDoc(u.data.doc, u.data.versionNo);
             toast(`已復原（存成 v${u.data.versionNo}）`);
@@ -289,7 +299,7 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
       });
       return true;
     },
-    [mode, versionNo, applyServerDoc, toast, reloadVersions, refresh],
+    [mode, versionNo, applyServerDoc, toast, reloadVersions, refresh, track],
   );
 
   const vote = useCallback(
@@ -414,7 +424,11 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
             </button>
           ))}
         </div>
+        <div className={`save-bar${busy ? " on" : ""}`} aria-hidden="true" />
       </nav>
+      <p className="sr-only" role="status" aria-live="polite">
+        {busy ? "正在儲存…" : ""}
+      </p>
       <main id="main">
         <Panel id="overview" show={tab === "overview"}>
           <Overview />

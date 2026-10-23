@@ -53,7 +53,7 @@ export function DayMap({
   active: boolean;
   focusId: string | null;
   nearby?: MapExtra[];
-  onAdd?: (key: string, id: string) => void;
+  onAdd?: (key: string, id: string) => unknown;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const map = useRef<Leaflet.Map | null>(null);
@@ -85,9 +85,12 @@ export function DayMap({
           tiles(L).addTo(map.current);
           map.current.on("popupopen", (e) => {
             (e.popup.getElement() as HTMLElement | undefined)?.querySelector<HTMLButtonElement>("[data-add-id]")?.addEventListener("click", (ev) => {
-              const b = ev.currentTarget as HTMLElement;
-              map.current?.closePopup();
-              addRef.current?.(b.dataset.addKey!, b.dataset.addId!);
+              const b = ev.currentTarget as HTMLButtonElement;
+              // Popups are plain HTML: show the pending state by hand, then close once the save finishes.
+              b.disabled = true;
+              b.setAttribute("aria-busy", "true");
+              b.innerHTML = '<span class="pbtn-spin"></span> 加入中…';
+              void Promise.resolve(addRef.current?.(b.dataset.addKey!, b.dataset.addId!)).finally(() => map.current?.closePopup());
             });
           });
         }

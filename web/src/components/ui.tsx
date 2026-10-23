@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ButtonHTMLAttributes, type ReactNode } from "react";
 
 /* Shared UI pieces and labels ported from site/js/app.js. */
 
@@ -89,7 +89,78 @@ export function useToday(): string | null {
 
 /* ---------- toast ---------- */
 
-export type ToastAction = { label: string; run: () => void };
+/**
+ * Shared pending feedback for async buttons (DESIGN.md「等待回饋」): pressed state on pointer-down, then a
+ * spinner + pending label in the same footprint, disabled against double submits, aria-busy, ✓ on success,
+ * an inline retry hint on failure. The action returns false (or throws) when it did not succeed.
+ */
+/** Rejects after `ms` so a stalled request can never leave a button (or the save bar) pending forever. */
+export function withTimeout<T>(p: Promise<T>, ms = 20000): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error("timeout")), ms);
+    p.then(
+      (v) => (clearTimeout(t), resolve(v)),
+      (e) => (clearTimeout(t), reject(e)),
+    );
+  });
+}
+
+export function PendingButton({
+  onAction,
+  pendingLabel = "處理中…",
+  className = "btn",
+  children,
+  disabled,
+  ...rest
+}: Omit<ButtonHTMLAttributes<HTMLButtonElement>, "onClick" | "type"> & { onAction: () => unknown; pendingLabel?: string }) {
+  const [state, setState] = useState<"idle" | "pending" | "done" | "error">("idle");
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current);
+  }, []);
+  async function run() {
+    if (state === "pending") return;
+    setState("pending");
+    try {
+      const r = await withTimeout(Promise.resolve(onAction()), 30000);
+      // null = the user backed out (e.g. cancelled a confirm dialog): no ✓, no error.
+      setState(r === null ? "idle" : r === false ? "error" : "done");
+    } catch {
+      setState("error");
+    }
+    timer.current = setTimeout(() => setState((s) => (s === "done" ? "idle" : s)), 1200);
+  }
+  const pending = state === "pending";
+  return (
+    <>
+      <button
+        {...rest}
+        type="button"
+        className={`${className} pbtn is-${state}`}
+        disabled={disabled || pending}
+        aria-busy={pending}
+        aria-label={pending && rest["aria-label"] ? pendingLabel : rest["aria-label"]}
+        onClick={() => void run()}
+      >
+        <span className="pbtn-face" aria-hidden={pending}>
+          {state === "done" ? <span className="pbtn-ok">✓</span> : null}
+          {children}
+        </span>
+        <span className="pbtn-face pbtn-pending" aria-hidden={!pending}>
+          <span className="pbtn-spin" />
+          {pendingLabel}
+        </span>
+      </button>
+      {state === "error" && (
+        <span className="pbtn-msg" role="status">
+          沒有完成，可以再按一次重試
+        </span>
+      )}
+    </>
+  );
+}
+
+export type ToastAction = { label: string; run: () => unknown };
 
 /** Short status message; with an action (e.g. 復原) it stays 5 seconds and shows a 44px button. */
 export function useToast() {
@@ -98,6 +169,7 @@ export function useToast() {
   const [show, setShow] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const actionBtn = useRef<HTMLButtonElement>(null);
+  const [undoing, setUndoing] = useState(false);
   // The card that triggered an undoable action is gone, so 「復原」 takes keyboard focus.
   useEffect(() => {
     if (show && action) actionBtn.current?.focus({ preventScroll: true });
@@ -116,12 +188,26 @@ export function useToast() {
         <button
           type="button"
           ref={actionBtn}
-          onClick={() => {
-            setShow(false);
-            action.run();
+          disabled={undoing}
+          aria-busy={undoing}
+          onClick={async () => {
+            setUndoing(true);
+            if (timer.current) clearTimeout(timer.current);
+            try {
+              await action.run();
+            } finally {
+              setUndoing(false);
+              setShow(false);
+            }
           }}
         >
-          {action.label}
+          {undoing ? (
+            <>
+              <span className="pbtn-spin" /> 復原中…
+            </>
+          ) : (
+            action.label
+          )}
         </button>
       )}
     </div>

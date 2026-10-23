@@ -26,6 +26,7 @@ export type Op =
   | { op: "unscheduleItem"; date: string; itemId: string }
   | { op: "moveItem"; date: string; itemId: string; toDate: string }
   | { op: "setStatus"; date: string; itemId: string; status: "" | "confirmed" | "pending" }
+  | { op: "clearDay"; date: string }
   | { op: "snapshot"; summary: string };
 
 export type ItemFields = {
@@ -136,6 +137,15 @@ function contextOf(pkg: Package) {
 
 function strip<T extends object>(o: T): T {
   return Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as T;
+}
+
+/**
+ * 「清空這天」 keeps confirmed bookings, flights and stay notes; everything else goes back to the pool
+ * the same way 「移回待安排」 does.
+ */
+export function clearDaySplit(items: Item[]): { move: Item[]; keep: Item[] } {
+  const keep = (i: Item) => i.status === "confirmed" || i.mode === "flight" || i.name.startsWith("住宿：");
+  return { move: items.filter((i) => !keep(i)), keep: items.filter(keep) };
 }
 
 export function applyOp(input: TripDoc, op: Op): OpResult {
@@ -339,6 +349,19 @@ export function applyOp(input: TripDoc, op: Op): OpResult {
       else return err(400, "狀態不正確");
       const label = { "": "已安排", confirmed: "已確認", pending: "待確認" }[op.status];
       return { ok: true, doc, summary: `${fmtDay(d.date)}「${it.name}」改為${label}` };
+    }
+    case "clearDay": {
+      const d = findDay(doc, op.date);
+      if (!d) return err(404, "找不到日期");
+      const { move, keep } = clearDaySplit(d.items);
+      if (!move.length) return err(400, "這天沒有可以移回待安排的活動");
+      let cur = doc;
+      for (const it of move) {
+        const r = applyOp(cur, { op: "unscheduleItem", date: op.date, itemId: it.id });
+        if (!r.ok) return r;
+        cur = r.doc;
+      }
+      return { ok: true, doc: cur, summary: `${fmtDay(d.date)} 清空：${move.length} 個活動移回待安排${keep.length ? `，保留 ${keep.length} 個` : ""}` };
     }
     case "snapshot": {
       const s = op.summary.trim();
