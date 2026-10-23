@@ -38,6 +38,9 @@ export function Budget() {
           />
           <span className="muted small">改人數後，每人費用、共乘分攤會自動重算。</span>
         </div>
+        <p className="small">
+          <strong>金額依活動計算：</strong>每天只加總當天活動的費用、整組行程的共乘費用和住宿。沒有安排活動的日子是 $0；餐費要算進來，請把餐廳加成活動。
+        </p>
         {N > 2 && (
           <div className="alert info">
             <span className="ic">
@@ -104,11 +107,13 @@ export function Budget() {
               );
             })}
           </div>
-          <p className="muted small">不套用固定誤差百分比；每筆都列出計算基礎與狀態。抵達澳洲與離開的國際機票未列入；待安排景點不計入總額。</p>
+          <p className="muted small">每筆都列出計算基礎與狀態；國際機票與待安排景點不計入總額。</p>
         </div>
       </div>
-      <div className="card section">
-        <h3>逐項明細</h3>
+      <details className="card section budget-detail">
+        <summary>
+          <h3>逐項明細（{shown.length} 筆）</h3>
+        </summary>
         <div className="table-wrap">
           <table>
             <thead>
@@ -154,7 +159,7 @@ export function Budget() {
             </tfoot>
           </table>
         </div>
-      </div>
+      </details>
     </>
   );
 }

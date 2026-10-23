@@ -2,6 +2,8 @@
 
 import { useTrip } from "./TripApp";
 import { Badge } from "./ui";
+import { Icon, MODE_ICON } from "./Icon";
+import type { Item } from "@/domain/schema";
 import { effectiveDay } from "@/domain/effective-day";
 import { checks } from "@/domain/rules";
 import { budgetLines, stayOf, sum } from "@/domain/budget";
@@ -59,7 +61,7 @@ export function Overview() {
 
       <div className="card section">
         <h2>旅程時間軸</h2>
-        <p className="muted small">每格一天，顏色代表目的地；淡色為尚未安排；黃點代表有提醒。點一下即可查看當天。</p>
+        <p className="muted small">點一格看當天；淡色是尚未安排，點點是有提醒。</p>
         <div className="timeline-mini">
           {doc.days.map((d, i) => (
             <button
@@ -103,39 +105,49 @@ export function Overview() {
         })}
       </div>
 
-      <div className="grid cols-2 section">
-        <div className="card">
-          <h3>下一步待辦</h3>
-          <ol className="todo-list">
-            {todo.map((t) => (
-              <li key={t}>{t}</li>
-            ))}
-          </ol>
-        </div>
-        <div className="card">
-          <h3>必去清單</h3>
-          <ul className="todo-list">
-            {must.map(({ i, idx }) => (
-              <li key={i.id}>
-                <a
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    gotoDay(idx);
-                  }}
-                >
-                  {fmtDay(doc.days[idx].date)}
-                </a>{" "}
-                {i.name}
-              </li>
-            ))}
-          </ul>
-        </div>
+      <div className="card section">
+        <h3>必去清單</h3>
+        <ul className="must-grid">
+          {must.slice(0, 4).map(({ i, idx }) => (
+            <MustCard key={i.id} item={i} date={doc.days[idx].date} onOpen={() => gotoDay(idx)} />
+          ))}
+        </ul>
+        {must.length > 4 && (
+          <details className="day-summary">
+            <summary>看全部 {must.length} 個</summary>
+            <ul className="must-grid">
+              {must.slice(4).map(({ i, idx }) => (
+                <MustCard key={i.id} item={i} date={doc.days[idx].date} onOpen={() => gotoDay(idx)} />
+              ))}
+            </ul>
+          </details>
+        )}
+      </div>
+
+      <div className="card section">
+        <h3>下一步待辦</h3>
+        <ol className="todo-list">
+          {todo.slice(0, 3).map((t) => (
+            <li key={t}>{t}</li>
+          ))}
+        </ol>
+        {todo.length > 3 && (
+          <details className="day-summary">
+            <summary>還有 {todo.length - 3} 項</summary>
+            <ol className="todo-list" start={4}>
+              {todo.slice(3).map((t) => (
+                <li key={t}>{t}</li>
+              ))}
+            </ol>
+          </details>
+        )}
       </div>
 
       {mode === "owner" && (
-        <div className="card section">
-          <h3>司機安排</h3>
+        <details className="card section day-summary">
+          <summary>
+            <h3>司機安排</h3>
+          </summary>
           <p className="muted small">依規則：司機的日期與時段確認之前，開車行程一律為「暫定」，並提供替代方案。</p>
           <div className="grid cols-2">
             {Object.entries(doc.drivers).map(([n, dr]) => {
@@ -152,8 +164,30 @@ export function Overview() {
               );
             })}
           </div>
-        </div>
+        </details>
       )}
     </>
+  );
+}
+
+/** A must-see stop with its photo (owner and share links only; others get an icon tile). */
+function MustCard({ item, date, onOpen }: { item: Item; date: string; onOpen: () => void }) {
+  return (
+    <li>
+      <button type="button" className="must-card" onClick={onOpen}>
+        {item.photo ? (
+          // eslint-disable-next-line @next/next/no-img-element -- hotlinked photo, see Photos.tsx
+          <img src={item.photo.url} alt="" referrerPolicy="no-referrer" loading="lazy" decoding="async" />
+        ) : (
+          <span className="ph-icon" aria-hidden="true">
+            <Icon name={MODE_ICON[item.mode] ?? "pin"} size={22} />
+          </span>
+        )}
+        <span className="t">
+          <span className="d">{fmtDay(date)}</span>
+          {item.name}
+        </span>
+      </button>
+    </li>
   );
 }

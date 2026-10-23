@@ -1,7 +1,11 @@
 import type { Cost, TripDoc } from "./schema";
 import { effectiveDay } from "./effective-day";
 
-/* Ports of lineAmount / basis / budgetLines / dayTotal from site/js/app.js (FR-13〜17). */
+/*
+ * Ports of lineAmount / basis / budgetLines / dayTotal from site/js/app.js (FR-13〜17).
+ * Since 2026-10-23 a day costs only what its activities, attached package costs and stay cost:
+ * there is no implicit daily meal allowance any more (meals count only as activities).
+ */
 
 export type LineCost = Pick<Cost, "amount" | "unit" | "status" | "note" | "participants">;
 
@@ -51,8 +55,6 @@ export function budgetLines(doc: TripDoc, N: number): BudgetLine[] {
     const st = stayOf(doc, d.stay);
     if (d.stay !== "none")
       lines.push({ day: d.date, seg: d.seg, idx, cat: "stay", label: st.name, c: { amount: st.nightly, unit: "night", status: st.status, note: st.note }, total: 0 });
-    const f = doc.meta.foodPerPersonPerDay[d.seg];
-    lines.push({ day: d.date, seg: d.seg, idx, cat: "food", label: "三餐", c: { amount: f, unit: "pp", status: "estimate", note: "每人每日估計" }, total: 0 });
   });
   lines.forEach((l) => {
     l.total = lineAmount(l.c, N);

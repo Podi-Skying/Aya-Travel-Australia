@@ -4,6 +4,7 @@ import { parseTripDoc } from "@/domain/schema";
 import { applyOp } from "@/domain/ops";
 import { assertPublicSafe, PrivacyGuardError, toPublicDoc } from "@/domain/privacy";
 import { effectiveDay } from "@/domain/effective-day";
+import { budgetLines, dayTotal } from "@/domain/budget";
 
 describe("schema", () => {
   it("rejects duplicate item ids within a day and across day/pool", () => {
@@ -106,10 +107,12 @@ describe("inspection 2 findings", () => {
     expect(effectiveDay(day).requiredDrivers.sort()).toEqual(["JJ", "Zayden"]);
   });
 
-  it("F-02: a segment without a food estimate is rejected", () => {
+  it("a day without activities costs nothing (no implicit meal allowance)", () => {
     const doc = seedDoc();
-    delete doc.meta.foodPerPersonPerDay.syd;
-    expect(parseTripDoc(doc).ok).toBe(false);
+    const i = doc.days.findIndex((d) => !d.items.length && !(d.costs ?? []).length);
+    doc.days[i].stay = "none";
+    expect(dayTotal(doc, i, 2)).toBe(0);
+    expect(budgetLines(doc, 2).some((l) => l.label === "三餐")).toBe(false);
   });
 
   it("F-03: driver names are masked and checked case-insensitively", () => {

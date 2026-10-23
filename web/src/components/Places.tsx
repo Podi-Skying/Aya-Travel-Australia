@@ -104,6 +104,7 @@ export function PlacesMap({ active }: { active: boolean }) {
   const [f, setF] = useState<Filters>(readUrl);
   const [q, setQ] = useState("");
   const [inView, setInView] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
   const [bounds, setBounds] = useState<Leaflet.LatLngBounds | null>(null);
   const [failed, setFailed] = useState(false);
   const editable = mode === "owner" && online;
@@ -174,7 +175,10 @@ export function PlacesMap({ active }: { active: boolean }) {
               all.push([i.lat!, i.lng!]);
               L.circleMarker([i.lat!, i.lng!], { radius: i.pri === "must" ? 7 : 5, color: "#fff", weight: 2, fillColor: segColor(d.seg), fillOpacity: 1 })
                 .addTo(dayLayer.current!)
-                .bindPopup(`<strong>${fmtDay(d.date)}</strong> ${esc(d.title)}<br>${esc(i.name)}<br><a href="#" data-goto="${idx}">查看當天 →</a>`);
+                .bindPopup(
+                  `<div class="stop-pop">${i.photo ? `<img src="${esc(i.photo.url)}" alt="" referrerpolicy="no-referrer" loading="lazy">` : ""}<div><div class="d">${fmtDay(d.date)}・${esc(d.title)}</div><strong>${esc(i.name)}</strong><a href="#" data-goto="${idx}">查看當天行程 →</a>${i.photo ? `<div class="src">圖片來源：${esc(i.photo.site)}</div>` : ""}</div></div>`,
+                  { maxWidth: 300, minWidth: 240 },
+                );
             });
           });
         const pins = shown.filter(({ i }) => i.lat != null && i.lng != null);
@@ -381,7 +385,11 @@ export function PlacesMap({ active }: { active: boolean }) {
               place={selected}
               suggestion={sug}
               editable={editable}
-              onClose={() => patch({ place: null })}
+              onClose={() => {
+                const id = f.place;
+                patch({ place: null });
+                requestAnimationFrame(() => wrap.current?.querySelector<HTMLElement>(`.place-row[data-id="${id}"]`)?.focus());
+              }}
               onSchedule={async (date) => {
                 await runOp({ op: "scheduleItem", key: selected.p.key, itemId: selected.i.id, date });
                 patch({ place: null });
@@ -401,22 +409,42 @@ export function PlacesMap({ active }: { active: boolean }) {
               <i className="lg-pool" aria-hidden="true" /> 待安排
             </button>
           </div>
-          <div className="chips cats" role="group" aria-label="分類">
-            <button type="button" className={`chip ${f.cat === "all" ? "on" : ""}`} aria-pressed={f.cat === "all"} onClick={() => patch({ cat: "all" })}>
-              全部 {base.length}
+          <button type="button" className={`chip filter-toggle${f.cat !== "all" || inView ? " on" : ""}`} aria-expanded={showFilters} onClick={() => setShowFilters(!showFilters)}>
+            篩選{f.cat !== "all" ? `：${CATEGORY_META[f.cat as Category]?.t ?? "未分類"}` : ""}
+            {inView ? "・畫面內" : ""}
+          </button>
+          {showFilters && (
+            <>
+              <div className="chips cats" role="group" aria-label="分類">
+                <button type="button" className={`chip ${f.cat === "all" ? "on" : ""}`} aria-pressed={f.cat === "all"} onClick={() => patch({ cat: "all" })}>
+                  全部 {base.length}
+                </button>
+                {CAT_KEYS.filter((c) => counts.get(c)).map((c) => (
+                  <button key={c} type="button" className={`chip ${f.cat === c ? "on" : ""}`} aria-pressed={f.cat === c} onClick={() => patch({ cat: f.cat === c ? "all" : c })}>
+                    <Icon name={CATEGORY_META[c].icon} size={16} /> {CATEGORY_META[c].t} {counts.get(c)}
+                  </button>
+                ))}
+              </div>
+              <label className="in-view">
+                <input type="checkbox" checked={inView} onChange={(e) => setInView(e.target.checked)} /> 只列出地圖畫面內的景點
+              </label>
+            </>
+          )}
+
+
+          {selected ? (
+            <button
+              type="button"
+              className="back-to-list"
+              onClick={() => {
+                const id = f.place;
+                patch({ place: null });
+                requestAnimationFrame(() => wrap.current?.querySelector<HTMLElement>(`.place-row[data-id="${id}"]`)?.focus());
+              }}
+            >
+              ← 返回清單（{listed.length}）
             </button>
-            {CAT_KEYS.filter((c) => counts.get(c)).map((c) => (
-              <button key={c} type="button" className={`chip ${f.cat === c ? "on" : ""}`} aria-pressed={f.cat === c} onClick={() => patch({ cat: f.cat === c ? "all" : c })}>
-                <Icon name={CATEGORY_META[c].icon} size={16} /> {CATEGORY_META[c].t} {counts.get(c)}
-              </button>
-            ))}
-          </div>
-          <label className="in-view">
-            <input type="checkbox" checked={inView} onChange={(e) => setInView(e.target.checked)} /> 只列出地圖畫面內的景點
-          </label>
-
-
-          {!f.pool ? (
+          ) : !f.pool ? (
             <p className="muted small">已關閉「待安排」圖層。</p>
           ) : !listed.length ? (
             <p className="muted small">{inView ? "地圖畫面內沒有符合的景點，移動或縮小地圖看看。" : "沒有符合的景點。"}</p>
@@ -455,6 +483,21 @@ export function PlacesMap({ active }: { active: boolean }) {
   );
 }
 
+function CardNote({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const long = text.length > 50;
+  return (
+    <div className="note-wrap">
+      <p className={`note-text${long && !open ? " clamp" : ""}`}>{text}</p>
+      {long && (
+        <button type="button" className="more" onClick={() => setOpen(!open)} aria-expanded={open}>
+          {open ? "收起" : "更多"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 function PlaceCard({
   place,
   suggestion,
@@ -473,9 +516,12 @@ function PlaceCard({
   const days = doc.days.filter((d) => d.seg === p.seg);
   const [date, setDate] = useState(suggestion?.date ?? days[0]?.date ?? "");
   const meta = i.cat ? CATEGORY_META[i.cat] : null;
+  // Move focus into the card when it opens (the list row that opened it is no longer shown).
+  const closeRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => closeRef.current?.focus({ preventScroll: true }), []);
   return (
     <article className="place-card" aria-label={`景點：${i.name}`}>
-      <button type="button" className="close" onClick={onClose} aria-label="關閉景點卡片">
+      <button type="button" className="close" ref={closeRef} onClick={onClose} aria-label="關閉景點卡片">
         <Icon name="close" size={18} />
       </button>
       {i.photo && (
@@ -497,7 +543,7 @@ function PlaceCard({
         )}
         <span className="tag">{p.title.replace(/（Google 地圖收藏）/, "")}</span>
       </p>
-      {i.note && <p className="note-text">{i.note}</p>}
+      {i.note && <CardNote text={i.note} />}
       <p>
         <a href={mapsUrl(i.en || i.name, i.lat, i.lng)} target="_blank" rel="noopener noreferrer">
           在 Google 地圖開啟

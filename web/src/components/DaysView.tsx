@@ -5,7 +5,7 @@ import { useTrip } from "./TripApp";
 import { Icon, MODE_ICON } from "./Icon";
 import { Badge, LEG, MODE, PRI, STATUS, VERIFY } from "./ui";
 import { DayCalendar } from "./DayCalendar";
-import { ActPhoto, PhotoViewer, mapsPhotoLink, type DayPhoto } from "./Photos";
+import { ActPhoto, PhotoCredit, PhotoViewer, mapsPhotoLink, type DayPhoto } from "./Photos";
 import { DayMap } from "./MapViews";
 import { effectiveDay, isTentative } from "@/domain/effective-day";
 import { checks, feasibility } from "@/domain/rules";
@@ -29,6 +29,23 @@ function Legs({ travel }: { travel: Item["travel"] }) {
   );
 }
 
+/** Long notes start at two lines with 「更多」; warnings (⚠) always show in full. */
+function ActNote({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const warn = text.includes("⚠");
+  const long = text.length > 60;
+  return (
+    <div className={`note${warn ? " warn-note" : ""}${!warn && long && !open ? " clamp" : ""}`}>
+      <Icon name={warn ? "warn" : "note"} size={16} /> <span>{text}</span>
+      {!warn && long && (
+        <button type="button" className="more" onClick={() => setOpen(!open)} aria-expanded={open}>
+          {open ? "收起" : "更多"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function DaysView({ active }: { active: boolean }) {
   const { doc, mode, currentDay, setCurrentDay, runOp, ask, online, myVotes, vote, unvote, counts, canVote } = useTrip();
   const [focusId, setFocusId] = useState<string | null>(null);
@@ -45,6 +62,8 @@ export function DaysView({ active }: { active: boolean }) {
   const majors = d.items.filter((i) => i.major).length;
   const seg = doc.segments[d.seg];
   const dayPhotos: DayPhoto[] = d.items.flatMap((i) => (i.photo ? [{ id: i.id, name: i.name, photo: i.photo }] : []));
+  // The day's headline picture: its first major stop with a photo, else any photo.
+  const dayHero = d.items.find((i) => i.photo && i.major) ?? d.items.find((i) => i.photo);
 
   useEffect(() => {
     if (!active) return;
@@ -170,40 +189,48 @@ export function DaysView({ active }: { active: boolean }) {
               </button>
             </div>
           </div>
-          <div className="day-badges">
-            <Badge t={seg?.name ?? d.seg} c={`b-${d.seg}`} />
-            <Badge t={`可行性：${fe.t}`} c={fe.c} />
-            <Badge t={warnN ? `規劃檢查：${warnN} 項提醒` : "規劃檢查：無警示"} c={warnN ? "b-warn" : "b-ok"} />
-            {d.needsDriver && <Badge t={d.driverOk ? `司機：${d.needsDriver} 已確認` : `司機：${d.needsDriver}（未確認）`} c={d.driverOk ? "b-ok" : "b-warn"} />}
-            {d.transfer && <Badge t="移動日" c="b-info" />}
-            {d.ferry && <Badge t="渡輪" c="b-info" />}
-            {d.hike && <Badge t="步道" c="b-info" />}
-          </div>
-          <div className="day-facts">
-            <div className="fact">
-              <div className="k">主要活動</div>
-              <div className="v">{majors} 個</div>
+          {dayHero?.photo && (
+            <button type="button" className="day-hero" onClick={() => setViewer(dayPhotos.findIndex((p) => p.id === dayHero.id))} aria-label={`放大看照片：${dayHero.name}`}>
+              {/* eslint-disable-next-line @next/next/no-img-element -- hotlinked photo, see Photos.tsx */}
+              <img src={dayHero.photo.url} alt="" referrerPolicy="no-referrer" loading="lazy" decoding="async" data-photo-id={dayHero.id} />
+              <span className="cap">{dayHero.name}</span>
+            </button>
+          )}
+          {(warnN > 0 || d.needsDriver) && (
+            <div className="day-badges">
+              {warnN > 0 && <Badge t={`${warnN} 項提醒`} c="b-warn" />}
+              {d.needsDriver && <Badge t={d.driverOk ? `司機：${d.needsDriver} 已確認` : `司機：${d.needsDriver}（未確認）`} c={d.driverOk ? "b-ok" : "b-warn"} />}
             </div>
-            <div className="fact">
-              <div className="k">預估開車</div>
-              <div className="v">{d.driveHrs ? `約 ${d.driveHrs} 小時` : "不開車"}</div>
-            </div>
+          )}
+          <div className="day-facts two">
             <div className="fact">
               <div className="k">當日花費（{N} 人）</div>
               <div className="v">{money(dayTotal(doc, currentDay, N))}</div>
             </div>
             <div className="fact">
               <div className="k">今晚住宿</div>
-              <div className="v">{st.area || st.name}</div>
+              <div className="v">{d.stay === "none" ? "不住宿" : st.area || st.name}</div>
             </div>
           </div>
-          {st.name && d.stay !== "none" && (
-            <p className="small muted">
-              <Icon name="home" size={16} /> {st.name}
-              {owner && st.address ? `・地址：${st.address}` : "・確切地址已隱藏"}
-              {st.note ? `・${st.note}` : ""}
-            </p>
-          )}
+          <details className="day-summary">
+            <summary>當日摘要</summary>
+            <ul>
+              <li>主要活動 {majors} 個・{d.driveHrs ? `開車約 ${d.driveHrs} 小時` : "不開車"}</li>
+              <li>
+                可行性：{fe.t}
+                {d.transfer ? "・移動日" : ""}
+                {d.ferry ? "・有渡輪" : ""}
+                {d.hike ? "・有步道" : ""}
+              </li>
+              {st.name && d.stay !== "none" && (
+                <li>
+                  <Icon name="home" size={16} /> {st.name}
+                  {owner && st.address ? `・地址：${st.address}` : "・確切地址已隱藏"}
+                  {st.note ? `・${st.note}` : ""}
+                </li>
+              )}
+            </ul>
+          </details>
           {cs.map((c, k) => (
             <div key={k} className={`alert ${c.lv}`}>
               <span className="ic">
@@ -249,61 +276,73 @@ export function DaysView({ active }: { active: boolean }) {
                         {k + 1}
                       </div>
                       <div className="body">
-                        <div className="top">
-                          <span className="time">
-                            {i.time}・{mins(i.dur)}
-                          </span>
-                          <span>
-                            <Badge {...PRI[i.pri]} /> {tent && <Badge t="暫定（司機未確認）" c="b-warn" />} <Badge {...VERIFY[i.verify]} />{" "}
-                            {i.originPackage && <Badge t="來自待安排景點" c="b-line" />}
-                          </span>
-                        </div>
-                        <h4>{i.name}</h4>
-                        <div className="en">{i.en}</div>
-                        {i.photo && (
-                          <ActPhoto id={i.id} name={i.name} photo={i.photo} onOpen={() => setViewer(dayPhotos.findIndex((p) => p.id === i.id))} />
-                        )}
-                        <div className="meta">
-                          <span>
-                            <Icon name={MODE_ICON[i.mode] ?? "route"} size={16} /> {MODE[i.mode]}
-                          </span>
-                          {i.src && (
-                            <span>
-                              來源：
-                              <a href={i.src.url} target="_blank" rel="noopener noreferrer">
-                                {i.src.label}
-                              </a>
-                              {i.checked ? `（${i.checked} 查核）` : "（未查核）"}
-                            </span>
-                          )}
-                          {!i.photo && (i.src || i.originPackage) && i.mode !== "flight" && (
-                            <span>
-                              <a href={mapsPhotoLink(i.en || i.name)} target="_blank" rel="noopener noreferrer">
-                                在 Google 地圖看照片
-                              </a>
-                            </span>
-                          )}
-                          {i.cost && (
-                            <span>
-                              {i.cost.status === "unknown" ? "費用未知" : `${basis(i.cost, N)} = ${money(lineAmount(i.cost, N))}`} <Badge {...STATUS[i.cost.status]} />
-                            </span>
-                          )}
-                        </div>
-                        {i.note && (
-                          <div className="note">
-                            <Icon name="note" size={16} /> {i.note}
+                        <div className="act-main">
+                          <div className="act-text">
+                            <div className="top">
+                              <span className="time">
+                                {i.time}・{mins(i.dur)}
+                              </span>
+                              {tent ? <Badge t="暫定（司機未確認）" c="b-warn" /> : i.pri === "must" ? <Badge {...PRI[i.pri]} /> : null}
+                            </div>
+                            <h4>{i.name}</h4>
+                            <div className="meta">
+                              <span>
+                                <Icon name={MODE_ICON[i.mode] ?? "route"} size={16} /> {MODE[i.mode]}
+                              </span>
+                              {i.cost && i.cost.status !== "unknown" && <span>{money(lineAmount(i.cost, N))}</span>}
+                            </div>
                           </div>
-                        )}
+                          {i.photo && i.id !== dayHero?.id && (
+                            <ActPhoto id={i.id} name={i.name} photo={i.photo} caption={false} onOpen={() => setViewer(dayPhotos.findIndex((p) => p.id === i.id))} />
+                          )}
+                        </div>
+                        {i.note && <ActNote text={i.note} />}
                         {i.ownerNote && (
                           <div className="note owner-note">
                             <Icon name="info" size={16} /> 只有你看得到：{i.ownerNote}
                           </div>
                         )}
-                        {i.packageContext && (
-                          <div className="note small">
-                            <Icon name="compass" size={16} /> 來自「{i.packageContext.title ?? i.packageContext.key}」：{i.packageContext.driveHrs ? `整趟約開車 ${i.packageContext.driveHrs} 小時；` : ""}共乘費用未套用。
-                          </div>
-                        )}
+                        <details className="act-more">
+                          <summary>更多資訊</summary>
+                          <ul>
+                            {i.en && <li className="en">{i.en}</li>}
+                            <li>
+                              <Badge {...VERIFY[i.verify]} /> <Badge {...PRI[i.pri]} /> {i.originPackage && <Badge t="來自待安排景點" c="b-line" />}
+                            </li>
+                            {i.src && (
+                              <li>
+                                來源：
+                                <a href={i.src.url} target="_blank" rel="noopener noreferrer">
+                                  {i.src.label}
+                                </a>
+                                {i.checked ? `（${i.checked} 查核）` : "（未查核）"}
+                              </li>
+                            )}
+                            {i.cost && (
+                              <li>
+                                {i.cost.status === "unknown" ? "費用未知" : `${basis(i.cost, N)} = ${money(lineAmount(i.cost, N))}`} <Badge {...STATUS[i.cost.status]} />
+                                {i.cost.note ? `・${i.cost.note}` : ""}
+                              </li>
+                            )}
+                            {i.photo && (
+                              <li>
+                                <PhotoCredit photo={i.photo} />
+                              </li>
+                            )}
+                            {!i.photo && (i.src || i.originPackage) && i.mode !== "flight" && (
+                              <li>
+                                <a href={mapsPhotoLink(i.en || i.name)} target="_blank" rel="noopener noreferrer">
+                                  在 Google 地圖看照片
+                                </a>
+                              </li>
+                            )}
+                            {i.packageContext && (
+                              <li>
+                                來自「{i.packageContext.title ?? i.packageContext.key}」：{i.packageContext.driveHrs ? `整趟約開車 ${i.packageContext.driveHrs} 小時；` : ""}共乘費用未套用。
+                              </li>
+                            )}
+                          </ul>
+                        </details>
                         <div className="tools">
                           <button className="btn ghost small" type="button" onClick={() => setFocusId(i.id)}>
                             <Icon name="map" size={16} /> 地圖
@@ -322,7 +361,9 @@ export function DaysView({ active }: { active: boolean }) {
                             </span>
                             )
                           ) : (
-                            <>
+                            <details className="act-manage">
+                              <summary>管理</summary>
+                              <div className="manage-row">
                               <label className="small">
                                 優先度{" "}
                                 <select value={i.pri} disabled={!editable} onChange={(e) => void runOp({ op: "setPriority", date: d.date, itemId: i.id, pri: e.target.value })}>
@@ -353,7 +394,8 @@ export function DaysView({ active }: { active: boolean }) {
                                   <Icon name="hand" size={14} label="訪客興趣" /> {cnt}
                                 </span>
                               )}
-                            </>
+                              </div>
+                            </details>
                           )}
                         </div>
                       </div>

@@ -39,7 +39,7 @@ export function PhotoCredit({ photo }: { photo: Photo }) {
   );
 }
 
-export function ActPhoto({ id, name, photo, onOpen }: { id: string; name: string; photo: Photo; onOpen: () => void }) {
+export function ActPhoto({ id, name, photo, onOpen, caption = true }: { id: string; name: string; photo: Photo; onOpen: () => void; caption?: boolean }) {
   const [state, setState] = useState<"loading" | "ok" | "error">("loading");
   const ratio = photo.w && photo.h ? `${photo.w} / ${photo.h}` : "3 / 2";
   return (
@@ -67,9 +67,11 @@ export function ActPhoto({ id, name, photo, onOpen }: { id: string; name: string
           />
         </button>
       )}
-      <figcaption>
-        <PhotoCredit photo={photo} />
-      </figcaption>
+      {caption && (
+        <figcaption>
+          <PhotoCredit photo={photo} />
+        </figcaption>
+      )}
     </figure>
   );
 }

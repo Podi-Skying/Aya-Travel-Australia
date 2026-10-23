@@ -65,9 +65,10 @@ export function Info() {
           </ul>
         )}
       </div>
-      <div className="grid cols-2 section">
-        <div className="card">
+      <details className="card section day-summary">
+        <summary>
           <h3>標籤說明</h3>
+        </summary>
           <p>
             <strong>活動優先度</strong>
             <br />
@@ -85,11 +86,11 @@ export function Info() {
             <br />
             {legend(STATUS)}
           </p>
-        </div>
-      </div>
-      <div className="grid cols-2 section">
-        <div className="card">
+      </details>
+      <details className="card section day-summary">
+        <summary>
           <h3>規劃原則</h3>
+        </summary>
           <ul className="todo-list">
             <li>每天 3–4 個主要活動是彈性目標，移動日、渡輪日、健行日會減量。</li>
             <li>一般開車日以總車程 2–3 小時為準（提案中，待確認），移動日例外但需安排休息。</li>
@@ -97,20 +98,23 @@ export function Info() {
             <li>任何變更都保留原始行程，確認後才套用並重新檢查。</li>
             <li>網站只提供外部預訂連結，不會代為預訂或付款。</li>
           </ul>
-        </div>
-        <div className="card">
+      </details>
+      <details className="card section day-summary">
+        <summary>
           <h3>隱私</h3>
+        </summary>
           <ul className="todo-list">
             <li>分享連結為唯讀，伺服器只送出已隱藏確切住宿地址與司機等私人交通細節的版本。</li>
             <li>即使隱藏地址，分享連結仍會透露旅行日期與活動模式，分享前請先檢查。</li>
             <li>訪客表達興趣只需暱稱（可留空）；擁有者只看到合計人數。</li>
             <li>已下載或截圖的離線副本無法收回。</li>
           </ul>
-        </div>
-      </div>
+      </details>
       {mode === "owner" && (
-        <div className="card section">
-          <h3>尚未決定的事項（TBD）</h3>
+        <details className="card section day-summary">
+          <summary>
+            <h3>尚未決定的事項（TBD）</h3>
+          </summary>
           <ul className="todo-list">
             <li>司機可開車的確切日期與時段、乘客與路線限制</li>
             <li>需付費住宿的晚數與每晚／全程預算上限</li>
@@ -118,7 +122,7 @@ export function Info() {
             <li>資料更新頻率、重大警示的定義</li>
             <li>哪些資料要即時、哪些用估計或外部連結；AI 規劃（第二階段）</li>
           </ul>
-        </div>
+        </details>
       )}
     </>
   );

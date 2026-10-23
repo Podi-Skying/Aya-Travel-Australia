@@ -161,7 +161,8 @@ export const tripDocSchema = z
       defaultPartySize: z.number().int().min(1).max(10),
       draftCreated: dateStr.optional(),
       lastSync: z.string().optional(),
-      foodPerPersonPerDay: z.record(z.string(), z.number().min(0).max(1000)),
+      /** Legacy daily meal estimate; no longer added to the budget (meals are activities). */
+      foodPerPersonPerDay: z.record(z.string(), z.number().min(0).max(1000)).default({}),
     }),
     partySize: z.number().int().min(1).max(10),
     segments: z.record(
@@ -210,8 +211,6 @@ export const tripDocSchema = z
       if (d.driverConfirmation && !doc.drivers[d.driverConfirmation.driver])
         ctx.addIssue({ code: "custom", message: `未知的司機 ${d.driverConfirmation.driver}`, path: ["days", di, "driverConfirmation", "driver"] });
       d.items.forEach((it, ii) => note(it.id, d.date, ["days", di, "items", ii, "id"]));
-      if (doc.meta.foodPerPersonPerDay[d.seg] === undefined)
-        ctx.addIssue({ code: "custom", message: `目的地 ${d.seg} 缺少每人每日餐費估計`, path: ["meta", "foodPerPersonPerDay"] });
       // Package contexts sharing a key on one day must agree (they describe the same package).
       const byKey = new Map<string, string>();
       const contexts = [...(d.attached ?? []).map((a) => ({ ...a, costs: undefined, title: undefined })), ...d.items.flatMap((i) => (i.packageContext ? [{ ...i.packageContext, title: undefined }] : []))];

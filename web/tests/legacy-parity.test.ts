@@ -60,7 +60,8 @@ describe("legacy parity (AC3)", () => {
       it(`budget totals match for party size ${N}, drivers ${confirmed ? "confirmed" : "unconfirmed"}`, () => {
         const { legacyDays, doc } = variants(confirmed);
         const L = legacyFns(legacyDays, N);
-        const legacyLines = L.budgetLines(N);
+        // The legacy site added a daily meal allowance; the app counts meals only as activities now.
+        const legacyLines = L.budgetLines(N).filter((l) => (l as { label?: string }).label !== "三餐");
         const lines = budgetLines(doc, N);
         expect(lines.length).toBe(legacyLines.length);
         expect(sum(lines)).toBeCloseTo(legacyLines.reduce((a, l) => a + l.total, 0), 9);
@@ -69,7 +70,9 @@ describe("legacy parity (AC3)", () => {
         const cats = byCategory(lines);
         expect(Object.keys(cats).sort()).toEqual(Object.keys(legacyCats).sort());
         for (const k of Object.keys(cats)) expect(cats[k]).toBeCloseTo(legacyCats[k], 9);
-        doc.days.forEach((_, idx) => expect(dayTotal(doc, idx, N)).toBeCloseTo(L.dayTotal(idx, N), 9));
+        doc.days.forEach((_, idx) =>
+          expect(dayTotal(doc, idx, N)).toBeCloseTo(legacyLines.filter((l) => l.idx === idx).reduce((a, l) => a + l.total, 0), 9),
+        );
       });
     }
 
