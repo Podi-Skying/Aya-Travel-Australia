@@ -5,15 +5,14 @@ import { DEFAULT_PEOPLE, PEOPLE, type Person } from "@/domain/schema";
 
 /*
  * Illustrated avatars for who takes part (DESIGN.md「參加的人」). Kai and Aya are named everywhere;
- * other people are named only for the owner, like driver names.
+ * other people are named only for the owner (doc.peopleNames, emptied for guests), like driver names.
  */
 
-const NAME: Record<Person, string> = { kai: "Kai", aya: "Aya", mina: "Mina" };
-const PUBLIC_NAMED: Person[] = ["kai", "aya"];
+const PUBLIC_NAME: Partial<Record<Person, string>> = { kai: "Kai", aya: "Aya" };
 
 export function usePersonName() {
-  const { mode } = useTrip();
-  return (p: Person) => (mode === "owner" || PUBLIC_NAMED.includes(p) ? NAME[p] : "朋友");
+  const { doc, mode } = useTrip();
+  return (p: Person) => PUBLIC_NAME[p] ?? (mode === "owner" ? doc.peopleNames?.[p] : undefined) ?? "朋友";
 }
 
 export const peopleOf = (item: { people?: Person[] }, day: { people?: Person[] }): Person[] => item.people ?? day.people ?? DEFAULT_PEOPLE;

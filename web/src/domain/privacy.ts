@@ -60,8 +60,8 @@ export function toPublicDoc(doc: TripDoc, opts: { photos?: boolean } = {}) {
   // Keep only the confirmation outcome, computed before the confirmation is removed.
   const okByDate = new Map(doc.days.map((d) => [d.date, effectiveDay(d).driverOk]));
   // Free text written by the owner may mention a driver; mask names everywhere.
-  const names = Object.keys(doc.drivers).filter(Boolean).sort((a, b) => b.length - a.length);
-  const scrubbed = scrub({ ...doc, drivers: {} }, names, !!opts.photos) as TripDoc & { drivers: Record<string, never> };
+  const names = [...Object.keys(doc.drivers), ...Object.values(doc.peopleNames ?? {})].filter(Boolean).sort((a, b) => b.length - a.length);
+  const scrubbed = scrub({ ...doc, drivers: {}, peopleNames: {} }, names, !!opts.photos) as TripDoc & { drivers: Record<string, never> };
   scrubbed.days = scrubbed.days.map((d) => (okByDate.get(d.date) ? { ...d, publicDriverOk: true } : d));
   assertPublicSafe(scrubbed, doc);
   return scrubbed;
@@ -75,6 +75,9 @@ export function assertPublicSafe(out: unknown, source: TripDoc): void {
   const text = norm(json);
   for (const name of Object.keys(source.drivers)) {
     if (name && text.includes(norm(name))) throw new PrivacyGuardError("driver name present");
+  }
+  for (const name of Object.values(source.peopleNames ?? {})) {
+    if (name && text.includes(norm(name))) throw new PrivacyGuardError("person name present");
   }
   for (const st of Object.values(source.stays)) {
     const a = norm(st.address.trim());

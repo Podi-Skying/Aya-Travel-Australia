@@ -64,10 +64,12 @@ export const photoSchema = z.object({
 });
 
 /* Who takes part (DESIGN.md「參加的人」). Absent = the day's people, and a day without people = Kai + Aya. */
-export const PEOPLE = ["kai", "aya", "mina"] as const;
+export const PEOPLE = ["kai", "aya", "friend"] as const;
 export type Person = (typeof PEOPLE)[number];
 export const DEFAULT_PEOPLE: Person[] = ["kai", "aya"];
-const peopleSchema = z.array(z.enum(PEOPLE)).min(1).max(PEOPLE.length);
+// "mina" was the first id for the friend; ids reach guests, so names now live only in peopleNames.
+const personSchema = z.preprocess((v) => (v === "mina" ? "friend" : v), z.enum(PEOPLE));
+const peopleSchema = z.array(personSchema).min(1).max(PEOPLE.length);
 
 /* Place categories for browsing unscheduled places on the map (DESIGN.md「地圖與待安排景點」). */
 export const CATEGORIES = ["nature", "beach", "lookout", "wildlife", "food", "market", "town", "history", "art", "activity"] as const;
@@ -179,6 +181,8 @@ export const tripDocSchema = z
       z.string(),
       z.object({ name: z.string(), en: z.string(), range: z.string(), color: z.string().regex(/^#[0-9a-fA-F]{6}$/) }),
     ),
+    /** Owner-only display names for people other than Kai and Aya; emptied for guests. */
+    peopleNames: z.record(z.string(), shortText(40)).default({}),
     drivers: z.record(
       z.string(),
       z.object({

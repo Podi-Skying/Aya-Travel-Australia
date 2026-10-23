@@ -26,6 +26,22 @@ describe("schema", () => {
   });
 });
 
+describe("people names", () => {
+  it("maps the legacy friend id and keeps the friend's name out of guest docs", () => {
+    const raw = seedDoc() as unknown as Record<string, unknown> & ReturnType<typeof seedDoc>;
+    raw.days[0].people = ["kai", "aya", "mina"] as never;
+    raw.days[0].items[0].note = "和 Mina 一起";
+    (raw as Record<string, unknown>).peopleNames = { friend: "Mina" };
+    const r = parseTripDoc(raw);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.doc.days[0].people).toEqual(["kai", "aya", "friend"]);
+    const json = JSON.stringify(toPublicDoc(r.doc));
+    expect(json).not.toMatch(/mina/i);
+    expect(() => assertPublicSafe({ note: "Mina" }, r.doc)).toThrow(PrivacyGuardError);
+  });
+});
+
 describe("privacy filter (AC6)", () => {
   const forbidden = (doc: ReturnType<typeof seedDoc>, json: string) => {
     expect(json).not.toMatch(/Zayden|JJ/);
