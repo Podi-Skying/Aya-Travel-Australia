@@ -15,7 +15,8 @@ import type { Photo } from "@/domain/schema";
 
 export type DayPhoto = { id: string; name: string; photo: Photo };
 
-const COMMONS_WIDTHS = [640, 1280, 1920];
+// Wikimedia only serves its standard thumbnail steps; other widths return HTTP 400.
+const COMMONS_WIDTHS = [500, 960, 1280, 1920];
 
 /** Commons thumbnails come in any width, so phones can take a smaller file. */
 function srcSet(p: Photo): string | undefined {
