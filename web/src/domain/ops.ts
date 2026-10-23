@@ -24,6 +24,8 @@ export type Op =
   | { op: "schedulePackage"; key: string; date: string }
   | { op: "scheduleItem"; key: string; itemId: string; date: string }
   | { op: "unscheduleItem"; date: string; itemId: string }
+  | { op: "moveItem"; date: string; itemId: string; toDate: string }
+  | { op: "setStatus"; date: string; itemId: string; status: "" | "confirmed" | "pending" }
   | { op: "snapshot"; summary: string };
 
 export type ItemFields = {
@@ -302,6 +304,39 @@ export function applyOp(input: TripDoc, op: Op): OpResult {
       }
       if (!d.items.length) d.open = true;
       return { ok: true, doc, summary: `將「${it.name}」從 ${fmtDay(d.date)} 移回待安排景點` };
+    }
+    case "moveItem": {
+      const from = findDay(doc, op.date);
+      const it = from && findItem(from, op.itemId);
+      const to = findDay(doc, op.toDate);
+      if (!from || !it || !to) return err(404, "找不到活動或日期");
+      if (from === to) return err(400, "已經在這一天");
+      if (it.status === "confirmed") return err(400, `「${it.name}」已確認預訂，不能移動；請先改成「待確認」`);
+      if (to.seg !== from.seg) return err(400, "只能移到同一個目的地的日子");
+      from.items = from.items.filter((x) => x !== it);
+      to.items.push(it);
+      sortItems(to);
+      // A package's shared costs follow its last activity.
+      const key = it.originPackage;
+      const att = key ? from.attached?.find((a) => a.key === key) : undefined;
+      if (att && !from.items.some((x) => x.originPackage === key)) {
+        from.attached = from.attached!.filter((a) => a !== att);
+        if (!from.attached.length) delete from.attached;
+        to.attached = [...(to.attached ?? []).filter((a) => a.key !== key), att];
+      }
+      if (!from.items.length) from.open = true;
+      to.open = false;
+      return { ok: true, doc, summary: `將「${it.name}」從 ${fmtDay(from.date)} 移到 ${fmtDay(to.date)}` };
+    }
+    case "setStatus": {
+      const d = findDay(doc, op.date);
+      const it = d && findItem(d, op.itemId);
+      if (!d || !it) return err(404, "找不到活動");
+      if (op.status === "") delete it.status;
+      else if (op.status === "confirmed" || op.status === "pending") it.status = op.status;
+      else return err(400, "狀態不正確");
+      const label = { "": "已安排", confirmed: "已確認", pending: "待確認" }[op.status];
+      return { ok: true, doc, summary: `${fmtDay(d.date)}「${it.name}」改為${label}` };
     }
     case "snapshot": {
       const s = op.summary.trim();

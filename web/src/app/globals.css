@@ -583,3 +583,21 @@ details.card.day-summary > summary h3 { margin: 0; }
 /* UI review round 2: 44px targets for the new disclosure buttons and popup links. */
 .act .note .more, .place-card .note-wrap .more { min-height: 44px; padding: 0 8px; }
 .stop-pop a { min-height: 44px; }
+
+/* Calendar status colours (Kai 2026-10-23): available = sage green, scheduled = region tint, pending = muted amber with "?". */
+:root { --avail: #dfe9d8; --avail-ink: #2f5a47; --sched-syd: #f1e3d3; --sched-tas: #e3e7ee; --pending: #f3e4bd; }
+.cal-cell.st-available { background: var(--avail); color: var(--avail-ink); }
+.cal-cell.st-scheduled.seg-syd { background: var(--sched-syd); }
+.cal-cell.st-scheduled.seg-tas { background: var(--sched-tas); }
+.cal-cell.st-pending { background: var(--pending); }
+.cal-cell.sel { background: var(--ink) !important; color: var(--bg) !important; }
+.cal-cell .q { position: absolute; left: 5px; top: 3px; font-size: .58rem; font-weight: 700; color: #7a4f00; }
+.cal-cell.sel .q { color: #f3e4bd; }
+.cal-cell .car { position: absolute; left: 50%; bottom: 2px; transform: translateX(-50%); display: grid; color: var(--ink-2); line-height: 0; }
+.cal-cell.sel .car { color: var(--bg); }
+.cal-legend { flex-wrap: wrap; row-gap: 4px; }
+.cal-legend .st-available i { background: var(--avail); box-shadow: inset 0 0 0 1px rgba(41, 40, 35, .12); }
+.cal-legend .st-scheduled i { background: linear-gradient(90deg, var(--sched-syd) 50%, var(--sched-tas) 50%); box-shadow: inset 0 0 0 1px rgba(41, 40, 35, .12); }
+.cal-legend .st-pending i { background: var(--pending); font-style: normal; font-size: .55rem; font-weight: 700; color: #7a4f00; display: inline-grid; place-items: center; }
+.cal-legend .car { color: var(--ink-2); }
+@media (prefers-contrast: more) { .cal-cell.st-available { box-shadow: inset 0 0 0 1px var(--avail-ink); } .cal-cell.st-pending { box-shadow: inset 0 0 0 1px #7a4f00; } }

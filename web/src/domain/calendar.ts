@@ -47,3 +47,15 @@ export function moveInGrid(grid: CalCell[][], dayIdx: number, key: string): numb
   const c = flat[to];
   return c?.inTrip ? c.dayIdx : dayIdx;
 }
+
+export type DayStatus = "available" | "scheduled" | "pending";
+
+/**
+ * Calendar colour status (DESIGN.md「月曆」): no activities → available (green); any activity awaiting
+ * confirmation, or a driver day whose driver has not confirmed → pending; otherwise scheduled.
+ */
+export function dayStatus(day: { items: { status?: string }[]; needsDriver?: string; driverOk?: boolean }): DayStatus {
+  if (!day.items.length) return "available";
+  if (day.items.some((i) => i.status === "pending") || (day.needsDriver && !day.driverOk)) return "pending";
+  return "scheduled";
+}

@@ -25,6 +25,13 @@ export function Overview() {
   const flights = doc.days.flatMap((d) => d.items.filter((i) => i.mode === "flight" && i.cost?.status !== "confirmed").map((i) => `${fmtMD(d.date)} ${i.name}`));
   const poolCount = doc.attractionPool.reduce((a, p) => a + p.items.length, 0);
 
+  // Everything awaiting confirmation: unconfirmed driver days, pending activities, and places still to arrange.
+  const pending: { key: string; idx: number; t: string }[] = [
+    ...eff.flatMap((d, idx) => (d.needsDriver && !d.driverOk ? [{ key: `drv-${d.date}`, idx, t: `${mode === "owner" ? d.needsDriver : "朋友"}開車的時段（${d.title}）` }] : [])),
+    ...doc.days.flatMap((d, idx) => d.items.filter((i) => i.status === "pending").map((i) => ({ key: i.id, idx, t: i.name }))),
+    ...doc.attractionPool.filter((p) => p.key === "arrange").flatMap((p) => p.items.map((i) => ({ key: i.id, idx: -1, t: i.name }))),
+  ];
+
   const todo: string[] = [];
   if (mode === "owner" && pendingDriver.length) todo.push(`與司機確認可開車的日期與時段（${pendingDriver.length} 天依賴司機）`);
   if (paid.length) todo.push(`預訂需付費住宿（${paid.length} 晚：${paidAreas.join("、")}）`);
@@ -121,6 +128,34 @@ export function Overview() {
               ))}
             </ul>
           </details>
+        )}
+      </div>
+
+      <div className="card section">
+        <h3>待確認（{pending.length}）</h3>
+        {pending.length ? (
+          <ul className="todo-list pending-list">
+            {pending.map((x) => (
+              <li key={x.key}>
+                {x.idx >= 0 ? (
+                  <a
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      gotoDay(x.idx);
+                    }}
+                  >
+                    {fmtDay(doc.days[x.idx].date)}
+                  </a>
+                ) : (
+                  <span className="muted">未排日期</span>
+                )}{" "}
+                {x.t}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="muted small">目前沒有待確認的事項。</p>
         )}
       </div>
 

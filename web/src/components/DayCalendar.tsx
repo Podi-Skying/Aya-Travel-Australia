@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { useTrip } from "./TripApp";
 import { useHobartToday, useReducedMotion } from "./ui";
-import { monthGrid, moveInGrid, weekIndexOf } from "@/domain/calendar";
+import { Icon } from "./Icon";
+import { dayStatus, monthGrid, moveInGrid, weekIndexOf, type DayStatus } from "@/domain/calendar";
 import { effectiveDay } from "@/domain/effective-day";
 import { checks } from "@/domain/rules";
 import { fmtDay, parseDate } from "@/domain/format";
@@ -16,6 +17,7 @@ import { project, rubber, spring } from "./motion";
  */
 
 const WEEK_HEAD = ["一", "二", "三", "四", "五", "六", "日"];
+const STATUS_T: Record<DayStatus, string> = { available: "可安排（還沒有活動）", scheduled: "已安排", pending: "待確認" };
 const THRESHOLD = 10;
 
 function useNarrow() {
@@ -37,6 +39,7 @@ export function DayCalendar() {
   const narrow = useNarrow();
   const grid = useMemo(() => monthGrid(doc.days.map((d) => d.date)), [doc.days]);
   const warn = useMemo(() => doc.days.map((x) => checks(doc, effectiveDay(x), { showWindow: false }).some((c) => c.lv === "warn")), [doc]);
+  const status = useMemo(() => doc.days.map((x) => dayStatus(effectiveDay(x))), [doc]);
   const [focusIdx, setFocusIdx] = useState(currentDay);
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const selWeek = weekIndexOf(grid, currentDay);
@@ -197,7 +200,6 @@ export function DayCalendar() {
 
   const shown = hoverIdx ?? currentDay;
   const sd = doc.days[shown];
-  const segs = Object.entries(doc.segments).filter(([k]) => doc.days.some((d) => d.seg === k));
   const first = parseDate(doc.days[0].date);
   const last = parseDate(doc.days[doc.days.length - 1].date);
   const monthLabel =
@@ -208,12 +210,22 @@ export function DayCalendar() {
       <div className="cal-head">
         <span className="cal-month">{monthLabel}</span>
         <span className="cal-legend" aria-hidden="true">
-          {segs.map(([k, s]) => (
-            <span key={k} className={`lg seg-${k}`}>
-              <i />
-              {s.name}
-            </span>
-          ))}
+          <span className="lg st-available">
+            <i />
+            可安排
+          </span>
+          <span className="lg st-scheduled">
+            <i />
+            已安排
+          </span>
+          <span className="lg st-pending">
+            <i>?</i>
+            待確認
+          </span>
+          <span className="lg car">
+            <Icon name="car" size={12} />
+            朋友開車
+          </span>
           <span className="lg warn">
             <i />
             提醒
@@ -259,11 +271,11 @@ export function DayCalendar() {
                     type="button"
                     role="gridcell"
                     data-day={c.dayIdx}
-                    className={`cal-cell seg-${x2.seg}${sel ? " sel" : ""}${isToday ? " today" : ""}`}
+                    className={`cal-cell seg-${x2.seg} st-${status[c.dayIdx]}${sel ? " sel" : ""}${isToday ? " today" : ""}`}
                     tabIndex={c.dayIdx === focusIdx ? 0 : -1}
                     aria-selected={sel}
                     aria-current={isToday ? "date" : undefined}
-                    aria-label={`${fmtDay(c.date)} ${x2.title}${isToday ? "，今天" : ""}${warn[c.dayIdx] ? "，有提醒" : ""}`}
+                    aria-label={`${fmtDay(c.date)} ${x2.title}${isToday ? "，今天" : ""}，${STATUS_T[status[c.dayIdx]]}${x2.needsDriver ? "，朋友開車" : ""}${warn[c.dayIdx] ? "，有提醒" : ""}`}
                     onClick={() => setCurrentDay(c.dayIdx)}
                     onPointerEnter={(e) => e.pointerType === "mouse" && setHoverIdx(c.dayIdx)}
                     onPointerLeave={() => setHoverIdx(null)}
@@ -271,6 +283,12 @@ export function DayCalendar() {
                   >
                     <span className="n">{c.day}</span>
                     {warn[c.dayIdx] && <span className="dot" />}
+                    {status[c.dayIdx] === "pending" && <span className="q" aria-hidden="true">?</span>}
+                    {x2.needsDriver && (
+                      <span className="car" aria-hidden="true">
+                        <Icon name="car" size={11} />
+                      </span>
+                    )}
                   </button>
                 );
               })}

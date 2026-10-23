@@ -29,6 +29,34 @@ function Legs({ travel }: { travel: Item["travel"] }) {
   );
 }
 
+/** 「移到…」: move an activity to another day of the same region; confirmed bookings stay locked. */
+function MoveTo({ item, date, disabled }: { item: Item; date: string; disabled: boolean }) {
+  const { doc, runOp } = useTrip();
+  const seg = doc.days.find((d) => d.date === date)?.seg;
+  const days = doc.days.filter((d) => d.seg === seg && d.date !== date);
+  const [to, setTo] = useState("");
+  const locked = item.status === "confirmed";
+  return (
+    <span className="move-to">
+      <label className="small">
+        移到{" "}
+        <select value={to} disabled={disabled || locked} onChange={(e) => setTo(e.target.value)}>
+          <option value="">選擇日期…</option>
+          {days.map((d) => (
+            <option key={d.date} value={d.date}>
+              {fmtDay(d.date)} {d.items.length ? d.title : "（可安排）"}
+            </option>
+          ))}
+        </select>
+      </label>{" "}
+      <button className="btn ghost small" type="button" disabled={disabled || locked || !to} onClick={() => void runOp({ op: "moveItem", date, itemId: item.id, toDate: to })}>
+        移動
+      </button>
+      {locked && <span className="small muted">已確認的預訂鎖定，不能移動</span>}
+    </span>
+  );
+}
+
 /** Long notes start at two lines with 「更多」; warnings (⚠) always show in full. */
 function ActNote({ text }: { text: string }) {
   const [open, setOpen] = useState(false);
@@ -282,7 +310,15 @@ export function DaysView({ active }: { active: boolean }) {
                               <span className="time">
                                 {i.time}・{mins(i.dur)}
                               </span>
-                              {tent ? <Badge t="暫定（司機未確認）" c="b-warn" /> : i.pri === "must" ? <Badge {...PRI[i.pri]} /> : null}
+                              {i.status === "pending" ? (
+                                <Badge t="待確認" c="b-warn" />
+                              ) : i.status === "confirmed" ? (
+                                <Badge t="已確認" c="b-ok" />
+                              ) : tent ? (
+                                <Badge t="暫定（司機未確認）" c="b-warn" />
+                              ) : i.pri === "must" ? (
+                                <Badge {...PRI[i.pri]} />
+                              ) : null}
                             </div>
                             <h4>{i.name}</h4>
                             <div className="meta">
@@ -364,6 +400,19 @@ export function DaysView({ active }: { active: boolean }) {
                             <details className="act-manage">
                               <summary>管理</summary>
                               <div className="manage-row">
+                                <label className="small">
+                                  狀態{" "}
+                                  <select
+                                    value={i.status ?? ""}
+                                    disabled={!editable}
+                                    onChange={(e) => void runOp({ op: "setStatus", date: d.date, itemId: i.id, status: e.target.value as "" | "confirmed" | "pending" })}
+                                  >
+                                    <option value="">已安排</option>
+                                    <option value="pending">待確認</option>
+                                    <option value="confirmed">已確認（鎖定）</option>
+                                  </select>
+                                </label>
+                                <MoveTo item={i} date={d.date} disabled={!editable} />
                               <label className="small">
                                 優先度{" "}
                                 <select value={i.pri} disabled={!editable} onChange={(e) => void runOp({ op: "setPriority", date: d.date, itemId: i.id, pri: e.target.value })}>

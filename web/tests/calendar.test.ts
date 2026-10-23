@@ -32,3 +32,14 @@ describe("calendar grid", () => {
     expect(moveInGrid(grid, 22, "End")).toBe(24); // last row ends 11/27 (Fri)
   });
 });
+
+describe("calendar day status", () => {
+  it("is available without activities, pending with a pending item or an unconfirmed driver, else scheduled", async () => {
+    const { dayStatus } = await import("@/domain/calendar");
+    expect(dayStatus({ items: [] })).toBe("available");
+    expect(dayStatus({ items: [{}] })).toBe("scheduled");
+    expect(dayStatus({ items: [{ status: "pending" }] })).toBe("pending");
+    expect(dayStatus({ items: [{}], needsDriver: "X", driverOk: false })).toBe("pending");
+    expect(dayStatus({ items: [{ status: "confirmed" }], needsDriver: "X", driverOk: true })).toBe("scheduled");
+  });
+});

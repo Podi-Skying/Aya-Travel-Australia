@@ -88,6 +88,8 @@ export const itemSchema = z.object({
   packageContext: packageContextSchema.optional(),
   photo: photoSchema.optional(),
   cat: z.enum(CATEGORIES).optional(),
+  /** Booking state: confirmed (locked against moves) or pending; absent = planned. Driver days add "tentative" (effective-day.ts). */
+  status: z.enum(["confirmed", "pending"]).optional(),
   /** Owner-only detail (flight numbers, workplace); removed from every public document. */
   ownerNote: shortText(500).optional(),
 });

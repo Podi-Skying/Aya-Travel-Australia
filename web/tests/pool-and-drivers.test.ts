@@ -141,3 +141,21 @@ describe("driver dependencies of single items", () => {
     expect(line.total).toBeCloseTo((d.costs![ci].amount * 2) / 4, 9);
   });
 });
+
+describe("moving activities and booking status", () => {
+  it("moves an activity to another day, keeps package costs with it, and locks confirmed bookings", () => {
+    const doc = seedDoc();
+    const from = doc.days.find((d) => d.seg === "tas" && d.items.length)!;
+    const to = doc.days.find((d) => d.seg === "tas" && d !== from)!;
+    const id = from.items[0].id;
+    const moved = applyOp(structuredClone(doc), { op: "moveItem", date: from.date, itemId: id, toDate: to.date });
+    expect(moved.ok && moved.doc.days.find((d) => d.date === to.date)!.items.some((i) => i.id === id)).toBe(true);
+    const locked = applyOp(doc, { op: "setStatus", date: from.date, itemId: id, status: "confirmed" });
+    expect(locked.ok).toBe(true);
+    if (!locked.ok) return;
+    const refused = applyOp(locked.doc, { op: "moveItem", date: from.date, itemId: id, toDate: to.date });
+    expect(refused.ok).toBe(false);
+    const cross = applyOp(seedDoc(), { op: "moveItem", date: from.date, itemId: id, toDate: doc.days.find((d) => d.seg === "syd")!.date });
+    expect(cross.ok).toBe(false);
+  });
+});
