@@ -449,3 +449,25 @@ html, body { overflow-x: clip; }
 @keyframes viewerFade { from { opacity: 0; } }
 @media (prefers-reduced-transparency: reduce) { .viewer-btn { background: #3e3b34; -webkit-backdrop-filter: none; backdrop-filter: none; } }
 @media print { .act-photo { display: none; } }
+
+/* Trip map: scheduled stops vs unscheduled places (DESIGN.md「地圖」). */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.map-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 10px; }
+.map-filters .chip { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--rule); background: transparent; color: var(--ink-2); font: inherit; font-size: .875rem; cursor: pointer; }
+.map-filters .chip.on { background: var(--paper-raised); color: var(--ink); border-color: var(--ink); }
+.map-filters .chip:not(.on) i { opacity: .4; }
+.map-filters i { display: inline-block; width: 12px; height: 12px; border-radius: 50%; }
+.map-filters .lg-days { background: var(--ink); box-shadow: 0 0 0 2px #fff inset; border: 1px solid var(--ink); }
+.map-filters .lg-pool { border: 2px solid var(--vermilion); background: var(--bg); }
+.map-group select { min-height: 44px; font-size: 16px; border-radius: 12px; padding: 0 10px; background: var(--bg); color: var(--ink); max-width: 100%; }
+.leaflet-marker-icon.pool-cluster { display: grid; place-items: center; border-radius: 50%; background: var(--bg); color: var(--vermilion); border: 2px solid var(--vermilion); font-weight: 700; font-size: .8rem; font-variant-numeric: tabular-nums; box-shadow: 0 0 0 4px rgba(184, 58, 46, .14); }
+.pool-pop { display: grid; gap: 4px; font-size: .85rem; line-height: 1.45; }
+.pool-pop .en, .pool-pop .grp { color: var(--ink-muted); font-size: .75rem; }
+.pool-pop p { margin: 2px 0; }
+.pool-pop .pop-photo { width: 100%; aspect-ratio: 3 / 2; object-fit: cover; border-radius: 8px; background: var(--paper-raised); }
+.pool-pop a { min-height: 32px; display: inline-flex; align-items: center; }
+.pop-sched { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 4px; }
+.pop-sched select { font-size: 16px; max-width: 170px; min-height: 40px; }
+.pool-list { margin: 8px 0 0; padding-left: 1.2em; }
+.pool-list li { margin: 6px 0; }
+.pool-list a { display: inline-block; padding: 8px 0; margin: -8px 0; }
