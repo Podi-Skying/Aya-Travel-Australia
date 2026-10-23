@@ -29,3 +29,11 @@ The static prototype in `site/` stored everything in one browser's `localStorage
 - Map tiles: OpenStreetMap standard tiles. On 2026-10-23 they were blocked because the site sent `Referrer-Policy: no-referrer` and OSM's tile policy requires a Referer; fixed by sending the origin. OSM tiles suit light private use only; a public launch needs a commercial tile provider. (CARTO's basemaps now require an API key, so they were not used.) The site sends `Referrer-Policy: strict-origin-when-cross-origin`, so tile servers see only the origin, never a share-link path.
 - Every new field in the trip document must pass the privacy filter; the filter fails closed if a driver name or address remains.
 - Offline copies on visitors' devices cannot be recalled after deletion.
+
+## Addendum 2026-10-23: attraction photos
+
+- The trip site is private (owner + share link) and will be taken down after the trip, so attraction photos are **hotlinked** from the page they were found on: an official or tourism site's `og:image`, otherwise a Wikimedia Commons file. Each photo shows a visible source link; Commons photos also show author and licence. Images are never copied into our storage or proxied.
+- Not used: Google Images and Google Maps photo endpoints (terms of service, bot protection). A site that blocks hotlinking (Salamanca Market returned 403 even without a Referer) falls back to Commons instead of a proxy.
+- Photos are sent only to the owner and share-link viewers. The anonymous public pages strip the `photo` field (`toPublicDoc(doc, { photos: false })`), and pages stay `noindex`.
+- The enrichment ran once as an owner script and was written as a normal restorable version after a JSON backup. It respected robots.txt, rate-limited to about one request per second, and used an honest User-Agent (per Wikimedia's API policy).
+- **Possible later source: Google Places API (New) Place Photos.** Use it only if the owner creates a `GOOGLE_PLACES_API_KEY` (paid per request after the free tier). Google's terms require showing `authorAttributions`, keeping the key server-side, and storing only place ids and photo names, not photo bytes. Not implemented, because no key exists.

@@ -121,3 +121,36 @@ describe("inspection 2 findings", () => {
     expect(() => assertPublicSafe({ note: "ZAYDEN" }, doc)).toThrow(PrivacyGuardError);
   });
 });
+
+describe("attraction photos", () => {
+  const withPhoto = () => {
+    const d = seedDoc();
+    d.days[0].items[0].photo = { url: "https://upload.wikimedia.org/x/1920px-a.jpg", w: 1920, h: 1280, page: "https://commons.wikimedia.org/wiki/File:a.jpg", site: "Wikimedia Commons", kind: "commons", license: "CC BY-SA 4.0" };
+    return d;
+  };
+
+  it("validates photo URLs (https only)", () => {
+    expect(parseTripDoc(withPhoto()).ok).toBe(true);
+    const bad = withPhoto();
+    bad.days[0].items[0].photo!.url = "http://example.com/a.jpg";
+    expect(parseTripDoc(bad).ok).toBe(false);
+  });
+
+  it("strips photos from the anonymous public doc but keeps them for share links", () => {
+    const d = withPhoto();
+    expect(JSON.stringify(toPublicDoc(d))).not.toContain('"photo"');
+    expect(toPublicDoc(d, { photos: true }).days[0].items[0].photo?.site).toBe("Wikimedia Commons");
+  });
+
+  it("lets the owner set or clear a custom photo URL", () => {
+    const d = seedDoc();
+    const it0 = d.days[0].items[0];
+    const set = applyOp(d, { op: "editItem", date: d.days[0].date, itemId: it0.id, fields: { photoUrl: "https://www.example.com/p.jpg" } });
+    expect(set.ok && set.doc.days[0].items[0].photo).toMatchObject({ kind: "custom", site: "example.com" });
+    const bad = applyOp(d, { op: "editItem", date: d.days[0].date, itemId: it0.id, fields: { photoUrl: "javascript:alert(1)" } });
+    expect(bad.ok).toBe(false);
+    if (!set.ok) return;
+    const cleared = applyOp(set.doc, { op: "editItem", date: d.days[0].date, itemId: it0.id, fields: { photoUrl: "" } });
+    expect(cleared.ok && cleared.doc.days[0].items[0].photo).toBeUndefined();
+  });
+});

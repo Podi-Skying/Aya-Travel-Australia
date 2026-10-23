@@ -47,6 +47,22 @@ export const packageContextSchema = z.object({
   transfer: z.boolean().optional(),
 });
 
+/*
+ * A photo of the place, hotlinked from where it was found (official or tourism site, Wikimedia
+ * Commons, or a URL the owner typed). Only the owner and share-link viewers receive it (privacy.ts).
+ */
+export const PHOTO_KINDS = ["og", "commons", "custom"] as const;
+export const photoSchema = z.object({
+  url: z.url({ protocol: /^https$/ }),
+  w: z.number().int().min(1).max(20000).optional(),
+  h: z.number().int().min(1).max(20000).optional(),
+  page: z.url({ protocol: /^https?$/ }),
+  site: shortText(80),
+  kind: z.enum(PHOTO_KINDS),
+  credit: shortText(200).optional(),
+  license: shortText(60).optional(),
+});
+
 export const itemSchema = z.object({
   id: z.string().min(1).max(32).regex(/^[A-Za-z0-9_-]+$/, "活動 id 只能使用英數字、- 與 _"),
   time: z.string().regex(TIME_RE, "時間需為 00:00–23:59"),
@@ -66,6 +82,7 @@ export const itemSchema = z.object({
   cost: costSchema.optional(),
   originPackage: shortText(40).optional(),
   packageContext: packageContextSchema.optional(),
+  photo: photoSchema.optional(),
 });
 
 /* "08:30–18:00" (en dash) or "08:30-18:00"; start must be before end. */
@@ -212,6 +229,7 @@ export const tripDocSchema = z
 
 export type Cost = z.infer<typeof costSchema>;
 export type Item = z.infer<typeof itemSchema>;
+export type Photo = z.infer<typeof photoSchema>;
 export type Day = z.infer<typeof daySchema>;
 export type Attachment = z.infer<typeof attachmentSchema>;
 export type Package = z.infer<typeof packageSchema>;

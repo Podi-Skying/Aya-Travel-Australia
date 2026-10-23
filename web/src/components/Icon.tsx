@@ -28,6 +28,10 @@ const PATHS: Record<string, string> = {
   print: "M7 9V4h10v5 M5 9h14v7h-3 M8 16H5V9 M8 13h8v7H8z",
   route: "M5 18c3-6 6 2 9-4s3-7 5-9 M5 18h.01 M19 5h.01",
   cube: "M12 3l8 4.5v9L12 21l-8-4.5v-9z M12 12l8-4.5 M12 12v9 M12 12L4 7.5",
+  image: "M4 5h16v14H4z M4 16l5-5 4 4 2-2 5 5 M15.5 9.5h.01",
+  close: "M6 6l12 12 M18 6L6 18",
+  "chevron-left": "M15 5l-7 7 7 7",
+  "chevron-right": "M9 5l7 7-7 7",
 };
 
 export const MODE_ICON: Record<string, string> = { walk: "walk", bus: "bus", drive: "car", ferry: "ferry", train: "train", flight: "plane", transit: "bus", wait: "wait" };

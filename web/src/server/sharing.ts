@@ -123,7 +123,7 @@ export async function getPublicTrip(token: string) {
   if (!link) return null;
   const cur = await currentDocOf(db, link.tripId);
   if (!cur) return null;
-  return { doc: toPublicDoc(cur.doc), versionNo: cur.versionNo };
+  return { doc: toPublicDoc(cur.doc, { photos: true }), versionNo: cur.versionNo };
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;

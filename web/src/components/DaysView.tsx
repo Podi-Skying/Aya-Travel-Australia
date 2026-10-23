@@ -5,6 +5,7 @@ import { useTrip } from "./TripApp";
 import { Icon, MODE_ICON } from "./Icon";
 import { Badge, LEG, MODE, PRI, STATUS, VERIFY } from "./ui";
 import { DayCalendar } from "./DayCalendar";
+import { ActPhoto, PhotoViewer, mapsPhotoLink, type DayPhoto } from "./Photos";
 import { DayMap } from "./MapViews";
 import { effectiveDay, isTentative } from "@/domain/effective-day";
 import { checks, feasibility } from "@/domain/rules";
@@ -31,6 +32,7 @@ function Legs({ travel }: { travel: Item["travel"] }) {
 export function DaysView({ active }: { active: boolean }) {
   const { doc, mode, currentDay, setCurrentDay, runOp, ask, online, myVotes, vote, unvote, counts, canVote } = useTrip();
   const [focusId, setFocusId] = useState<string | null>(null);
+  const [viewer, setViewer] = useState<number | null>(null);
   const owner = mode === "owner";
   const editable = owner && online;
   const raw = doc.days[currentDay];
@@ -42,6 +44,7 @@ export function DaysView({ active }: { active: boolean }) {
   const warnN = cs.filter((c) => c.lv === "warn").length;
   const majors = d.items.filter((i) => i.major).length;
   const seg = doc.segments[d.seg];
+  const dayPhotos: DayPhoto[] = d.items.flatMap((i) => (i.photo ? [{ id: i.id, name: i.name, photo: i.photo }] : []));
 
   useEffect(() => {
     if (!active) return;
@@ -68,6 +71,7 @@ export function DaysView({ active }: { active: boolean }) {
         { name: "dur", label: "停留（分鐘）", type: "number", value: String(it.dur), min: 0, step: 15 },
         { name: "mode", label: "交通方式", type: "select", value: it.mode, options: Object.entries(MODE).map(([value, label]) => ({ value, label })) },
         { name: "note", label: "備註", value: it.note ?? "", maxLength: 500 },
+        { name: "photoUrl", label: "照片網址（https，留空表示不顯示照片）", value: it.photo?.url ?? "", maxLength: 2000 },
         { name: "amount", label: "費用金額（AUD，留空表示沒有費用）", type: "number", value: it.cost ? String(it.cost.amount) : "", min: 0 },
         { name: "unit", label: "費用單位", type: "select", value: it.cost?.unit ?? "pp", options: [{ value: "pp", label: "每人" }, { value: "group", label: "整組" }, { value: "shared", label: "共乘分攤" }] },
         { name: "status", label: "費用狀態", type: "select", value: it.cost?.status ?? "estimate", options: Object.entries(STATUS).map(([value, s]) => ({ value, label: s.t })) },
@@ -85,6 +89,7 @@ export function DaysView({ active }: { active: boolean }) {
         dur: Number(r.dur),
         mode: r.mode,
         note: r.note,
+        photoUrl: r.photoUrl,
         cost: r.amount === "" ? null : { amount: Number(r.amount), unit: r.unit, status: r.status },
       },
     });
@@ -255,6 +260,9 @@ export function DaysView({ active }: { active: boolean }) {
                         </div>
                         <h4>{i.name}</h4>
                         <div className="en">{i.en}</div>
+                        {i.photo && (
+                          <ActPhoto id={i.id} name={i.name} photo={i.photo} onOpen={() => setViewer(dayPhotos.findIndex((p) => p.id === i.id))} />
+                        )}
                         <div className="meta">
                           <span>
                             <Icon name={MODE_ICON[i.mode] ?? "route"} size={16} /> {MODE[i.mode]}
@@ -266,6 +274,13 @@ export function DaysView({ active }: { active: boolean }) {
                                 {i.src.label}
                               </a>
                               {i.checked ? `（${i.checked} 查核）` : "（未查核）"}
+                            </span>
+                          )}
+                          {!i.photo && (i.src || i.originPackage) && i.mode !== "flight" && (
+                            <span>
+                              <a href={mapsPhotoLink(i.en || i.name)} target="_blank" rel="noopener noreferrer">
+                                在 Google 地圖看照片
+                              </a>
                             </span>
                           )}
                           {i.cost && (
@@ -362,6 +377,17 @@ export function DaysView({ active }: { active: boolean }) {
           )}
           <SharedCosts />
         </article>
+        {viewer !== null && dayPhotos[viewer] && (
+          <PhotoViewer
+            key={d.date}
+            photos={dayPhotos}
+            start={viewer}
+            onClose={(id) => {
+              setViewer(null);
+              document.querySelector<HTMLElement>(`[data-photo-id="${id}"]`)?.closest("button")?.focus({ preventScroll: true });
+            }}
+          />
+        )}
         <aside className="day-map-wrap">
           <DayMap day={d} active={active} focusId={focusId} />
           <p className="map-note">路線為點對點直線示意，非實際道路；實際路線與時間請以導航為準。</p>

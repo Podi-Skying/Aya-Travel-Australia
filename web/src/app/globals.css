@@ -417,3 +417,35 @@ html, body { overflow-x: clip; }
   .cal-cell.sel { outline: 2px solid var(--ink); outline-offset: 2px; }
 }
 @media (prefers-reduced-transparency: reduce) { .day-cal { background: var(--bg); -webkit-backdrop-filter: none; backdrop-filter: none; } }
+
+/* Attraction photos and viewer (DESIGN.md「景點照片」). */
+.act-photo { margin: 10px 0 4px; }
+.act-photo .ph { position: relative; display: block; width: 100%; max-width: 560px; max-height: 380px; padding: 0; border: 0; border-radius: 12px; overflow: hidden;
+  background: var(--paper-raised); cursor: zoom-in; -webkit-tap-highlight-color: transparent; transition: transform 100ms ease-out; }
+.act-photo .ph:active { transform: scale(.985); }
+.act-photo img { display: block; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 180ms ease-out; }
+.act-photo .ph.is-loaded img { opacity: 1; }
+.act-photo .ph-error { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: .8rem; color: var(--ink-muted); cursor: default; }
+.act-photo figcaption, .viewer-caption span { font-size: .72rem; line-height: 1.5; color: var(--ink-muted); margin-top: 4px; }
+.act-photo figcaption a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.viewer { --scrim: 0; position: fixed; inset: 0; z-index: 2000; touch-action: none; overscroll-behavior: contain; }
+.viewer::before { content: ""; position: absolute; inset: 0; background: rgba(24, 23, 20, .94); opacity: var(--scrim); }
+.viewer-track { position: absolute; inset: 0; display: flex; will-change: transform; }
+.viewer-slide { flex: 0 0 100%; height: 100%; display: grid; place-items: center; }
+.viewer-slide img { max-width: 100%; max-height: calc(100% - 128px); object-fit: contain; user-select: none; -webkit-user-drag: none; transform-origin: center; will-change: transform; border-radius: 4px; }
+.viewer-bar { position: absolute; top: env(safe-area-inset-top); left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; opacity: var(--scrim); color: #faf7f0; }
+.viewer-count { font-size: .8rem; font-variant-numeric: tabular-nums; padding-right: 8px; }
+.viewer-btn { width: 44px; height: 44px; display: grid; place-items: center; border: 0; border-radius: 50%; background: rgba(250, 247, 240, .16); color: #faf7f0; cursor: pointer; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+.viewer-btn:disabled { opacity: .3; cursor: default; }
+.viewer-btn:focus-visible { outline: 2px solid #faf7f0; outline-offset: 2px; }
+.viewer-prev, .viewer-next { position: absolute; top: 50%; transform: translateY(-50%); opacity: var(--scrim); }
+.viewer-prev { left: 12px; }
+.viewer-next { right: 12px; }
+@media (pointer: coarse) { .viewer-prev, .viewer-next { display: none; } }
+.viewer-caption { position: absolute; left: 16px; right: 16px; bottom: calc(12px + env(safe-area-inset-bottom)); margin: 0; display: grid; gap: 2px; color: #faf7f0; opacity: var(--scrim); font-size: .9rem; }
+.viewer-caption span { color: rgba(250, 247, 240, .75); }
+.viewer-caption a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.viewer.reduce { animation: viewerFade 150ms linear; }
+@keyframes viewerFade { from { opacity: 0; } }
+@media (prefers-reduced-transparency: reduce) { .viewer-btn { background: #3e3b34; -webkit-backdrop-filter: none; backdrop-filter: none; } }
+@media print { .act-photo { display: none; } }

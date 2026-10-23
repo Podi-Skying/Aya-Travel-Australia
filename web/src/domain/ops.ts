@@ -33,6 +33,8 @@ export type ItemFields = {
   note?: string;
   mode?: string;
   cost?: { amount: number; unit: string; status: string; cat?: string } | null;
+  /** Owner-supplied photo URL; empty string removes the photo. */
+  photoUrl?: string;
 };
 
 const clone = <T>(o: T): T => structuredClone(o);
@@ -73,6 +75,20 @@ function applyFields(it: Item, f: ItemFields): string | null {
   if (f.mode !== undefined) {
     if (!(MODES as readonly string[]).includes(f.mode)) return "交通方式不正確";
     it.mode = f.mode as Item["mode"];
+  }
+  if (f.photoUrl !== undefined && f.photoUrl.trim() !== (it.photo?.url ?? "")) {
+    const u = f.photoUrl.trim();
+    if (!u) delete it.photo;
+    else {
+      let url: URL;
+      try {
+        url = new URL(u);
+      } catch {
+        return "照片網址不正確";
+      }
+      if (url.protocol !== "https:" || u.length > 2000) return "照片網址需為 https 開頭";
+      it.photo = { url: u, page: u, site: url.hostname.replace(/^www\./, ""), kind: "custom" };
+    }
   }
   if (f.cost !== undefined) {
     if (f.cost === null) delete it.cost;

@@ -33,30 +33,35 @@ function nameRegex(name: string): RegExp {
   return new RegExp(cls, "g");
 }
 
-function scrub(value: unknown, names: string[]): unknown {
+function scrub(value: unknown, names: string[], photos: boolean): unknown {
   if (typeof value === "string") return names.reduce((acc, n) => acc.replace(nameRegex(n), PUBLIC_DRIVER_LABEL), value);
-  if (Array.isArray(value)) return value.map((v) => scrub(v, names));
+  if (Array.isArray(value)) return value.map((v) => scrub(v, names, photos));
   if (value && typeof value === "object") {
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(value)) {
       if (k === "driverConfirmation" || k === "address") continue;
+      if (k === "photo" && !photos) continue;
       if (k === "needsDriver") {
         if (typeof v === "string" && v) out[k] = PUBLIC_DRIVER_LABEL;
         continue;
       }
-      out[k] = scrub(v, names);
+      out[k] = scrub(v, names, photos);
     }
     return out;
   }
   return value;
 }
 
-export function toPublicDoc(doc: TripDoc) {
+/**
+ * Photos are hotlinked from other sites for this private trip, so only share-link viewers
+ * (and the owner) get them; the anonymous public pages never do.
+ */
+export function toPublicDoc(doc: TripDoc, opts: { photos?: boolean } = {}) {
   // Keep only the confirmation outcome, computed before the confirmation is removed.
   const okByDate = new Map(doc.days.map((d) => [d.date, effectiveDay(d).driverOk]));
   // Free text written by the owner may mention a driver; mask names everywhere.
   const names = Object.keys(doc.drivers).filter(Boolean).sort((a, b) => b.length - a.length);
-  const scrubbed = scrub({ ...doc, drivers: {} }, names) as TripDoc & { drivers: Record<string, never> };
+  const scrubbed = scrub({ ...doc, drivers: {} }, names, !!opts.photos) as TripDoc & { drivers: Record<string, never> };
   scrubbed.days = scrubbed.days.map((d) => (okByDate.get(d.date) ? { ...d, publicDriverOk: true } : d));
   assertPublicSafe(scrubbed, doc);
   return scrubbed;
