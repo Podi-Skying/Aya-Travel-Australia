@@ -32,6 +32,18 @@ const PATHS: Record<string, string> = {
   close: "M6 6l12 12 M18 6L6 18",
   "chevron-left": "M15 5l-7 7 7 7",
   "chevron-right": "M9 5l7 7-7 7",
+  search: "M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13z M15.5 15.5L20 20",
+  // Place categories (CATEGORY_META in Places.tsx).
+  "cat-nature": "M12 3l6 9h-3l4 6H5l4-6H6z M12 18v3",
+  "cat-beach": "M3 18c2 0 2-1.5 4.5-1.5S9.5 18 12 18s2.5-1.5 4.5-1.5S19 18 21 18 M12 14V4 M12 4c-4 0-7 2.5-7 5h14c0-2.5-3-5-7-5z",
+  "cat-lookout": "M4 19l5-9 4 6 3-4 4 7z M16.5 6.5h.01",
+  "cat-wildlife": "M8 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4z M16 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4z M5 14.5a1.8 1.8 0 1 0 0-3.6 1.8 1.8 0 0 0 0 3.6z M19 14.5a1.8 1.8 0 1 0 0-3.6 1.8 1.8 0 0 0 0 3.6z M12 13c-3 0-5 3.5-5 5.5 0 1.5 1.5 2 3 1.5s2-.5 2-.5 .5 0 2 .5 3 0 3-1.5c0-2-2-5.5-5-5.5z",
+  "cat-food": "M5 9h11v5a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4z M16 10h1.5a2 2 0 0 1 0 4H16 M8 3v3 M11 3v3 M4 21h14",
+  "cat-market": "M5 8h14l-1 12H6z M9 8V6a3 3 0 0 1 6 0v2",
+  "cat-town": "M4 21V10l5-4 5 4v11 M14 21V13h6v8 M3 21h18 M8 14h2 M8 17h2",
+  "cat-history": "M4 9l8-5 8 5 M6 9v9 M10 9v9 M14 9v9 M18 9v9 M4 20h16",
+  "cat-art": "M12 3a9 9 0 0 0 0 18c1.5 0 2-1 2-2 0-1.5-1.5-1.5-1.5-3S14 14 15.5 14H18a3 3 0 0 0 3-3c0-4.5-4-8-9-8z M7.5 11.5h.01 M10 7.5h.01 M14.5 7.5h.01",
+  "cat-activity": "M5 21V4 M5 4h11l-2 4 2 4H5",
 };
 
 export const MODE_ICON: Record<string, string> = { walk: "walk", bus: "bus", drive: "car", ferry: "ferry", train: "train", flight: "plane", transit: "bus", wait: "wait" };

@@ -12,10 +12,9 @@ import { Icon } from "./Icon";
 import { useAsk, useToast, useHobartToday, useUrlState, writeUrl } from "./ui";
 import { Overview } from "./Overview";
 import { DaysView } from "./DaysView";
-import { TripMapTab } from "./MapViews";
+import { PlacesMap } from "./Places";
 import { Budget } from "./Budget";
 import { Info } from "./Info";
-import { Pool } from "./Pool";
 import { Manage } from "./Manage";
 
 /*
@@ -63,9 +62,8 @@ export function useTrip(): Ctx {
 const TABS = [
   { key: "overview", label: "總覽" },
   { key: "days", label: "每日行程" },
-  { key: "map", label: "地圖" },
+  { key: "map", label: "地圖與景點" },
   { key: "budget", label: "預算" },
-  { key: "pool", label: "待安排景點" },
   { key: "info", label: "資訊與警示" },
   { key: "manage", label: "版本與分享", owner: true },
 ] as const;
@@ -110,7 +108,9 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
   const [pickedDay, setPickedDay] = useState<number | null>(null);
   const url = useUrlState();
   // Only tabs this mode can show (visitors have no 版本與分享 tab) (RV-01).
-  const urlTab = TABS.some((t) => t.key === url.tab && (mode === "owner" || !("owner" in t))) ? (url.tab as TabKey) : null;
+  // The old 待安排景點 tab now lives on the map (?tab=pool keeps working).
+  const urlTabKey = url.tab === "pool" ? "map" : url.tab;
+  const urlTab = TABS.some((t) => t.key === urlTabKey && (mode === "owner" || !("owner" in t))) ? (urlTabKey as TabKey) : null;
   const urlDayIdx = url.day ? doc.days.findIndex((d) => d.date === url.day) : -1;
   const tab: TabKey = pickedTab ?? urlTab ?? (urlDayIdx >= 0 || inTrip ? "days" : "overview");
   const todayIdx = today ? doc.days.findIndex((d) => d.date >= today) : -1;
@@ -391,13 +391,10 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
           <DaysView active={tab === "days"} />
         </Panel>
         <Panel id="map" show={tab === "map"}>
-          <TripMapTab active={tab === "map"} />
+          <PlacesMap active={tab === "map"} />
         </Panel>
         <Panel id="budget" show={tab === "budget"}>
           <Budget />
-        </Panel>
-        <Panel id="pool" show={tab === "pool"}>
-          <Pool />
         </Panel>
         <Panel id="info" show={tab === "info"}>
           <Info />
