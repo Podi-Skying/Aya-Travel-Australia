@@ -154,3 +154,17 @@ describe("attraction photos", () => {
     expect(cleared.ok && cleared.doc.days[0].items[0].photo).toBeUndefined();
   });
 });
+
+describe("owner-only notes and categories", () => {
+  it("never sends ownerNote to public documents, and accepts known categories only", () => {
+    const d = seedDoc();
+    d.days[0].items[0].ownerNote = "QF060 HND 22:00";
+    d.days[0].items[0].cat = "lookout";
+    expect(parseTripDoc(d).ok).toBe(true);
+    for (const pub of [toPublicDoc(d), toPublicDoc(d, { photos: true })]) expect(JSON.stringify(pub)).not.toContain("QF060");
+    const bad = applyOp(d, { op: "editItem", date: d.days[0].date, itemId: d.days[0].items[0].id, fields: { cat: "zoo" } });
+    expect(bad.ok).toBe(false);
+    const ok = applyOp(d, { op: "editItem", date: d.days[0].date, itemId: d.days[0].items[0].id, fields: { cat: "wildlife" } });
+    expect(ok.ok && ok.doc.days[0].items[0].cat).toBe("wildlife");
+  });
+});

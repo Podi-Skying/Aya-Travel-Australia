@@ -1,4 +1,4 @@
-import { MODES, PRIORITIES, COST_STATUS, COST_UNITS, COST_CATS, TIME_RE, validWindow } from "./schema";
+import { CATEGORIES, MODES, PRIORITIES, COST_STATUS, COST_UNITS, COST_CATS, TIME_RE, validWindow } from "./schema";
 import type { Cost, Day, Item, Package, TripDoc } from "./schema";
 import { effectiveDay } from "./effective-day";
 import { fmtDay } from "./format";
@@ -35,6 +35,8 @@ export type ItemFields = {
   cost?: { amount: number; unit: string; status: string; cat?: string } | null;
   /** Owner-supplied photo URL; empty string removes the photo. */
   photoUrl?: string;
+  /** Place category; empty string removes it. */
+  cat?: string;
 };
 
 const clone = <T>(o: T): T => structuredClone(o);
@@ -89,6 +91,11 @@ function applyFields(it: Item, f: ItemFields): string | null {
       if (url.protocol !== "https:" || u.length > 2000) return "照片網址需為 https 開頭";
       it.photo = { url: u, page: u, site: url.hostname.replace(/^www\./, ""), kind: "custom" };
     }
+  }
+  if (f.cat !== undefined) {
+    if (!f.cat) delete it.cat;
+    else if (!(CATEGORIES as readonly string[]).includes(f.cat)) return "分類不正確";
+    else it.cat = f.cat as Item["cat"];
   }
   if (f.cost !== undefined) {
     if (f.cost === null) delete it.cost;

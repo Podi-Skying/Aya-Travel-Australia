@@ -471,3 +471,4 @@ html, body { overflow-x: clip; }
 .pool-list { margin: 8px 0 0; padding-left: 1.2em; }
 .pool-list li { margin: 6px 0; }
 .pool-list a { display: inline-block; padding: 8px 0; margin: -8px 0; }
+.owner-note { border-left: 2px solid var(--rule); color: var(--ink-2); }

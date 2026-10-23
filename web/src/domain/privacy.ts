@@ -39,7 +39,7 @@ function scrub(value: unknown, names: string[], photos: boolean): unknown {
   if (value && typeof value === "object") {
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(value)) {
-      if (k === "driverConfirmation" || k === "address") continue;
+      if (k === "driverConfirmation" || k === "address" || k === "ownerNote") continue;
       if (k === "photo" && !photos) continue;
       if (k === "needsDriver") {
         if (typeof v === "string" && v) out[k] = PUBLIC_DRIVER_LABEL;
@@ -71,7 +71,7 @@ export type PublicDoc = ReturnType<typeof toPublicDoc>;
 
 export function assertPublicSafe(out: unknown, source: TripDoc): void {
   const json = JSON.stringify(out);
-  if (/"(address|driverConfirmation)"\s*:/.test(json)) throw new PrivacyGuardError("private key present");
+  if (/"(address|driverConfirmation|ownerNote)"\s*:/.test(json)) throw new PrivacyGuardError("private key present");
   const text = norm(json);
   for (const name of Object.keys(source.drivers)) {
     if (name && text.includes(norm(name))) throw new PrivacyGuardError("driver name present");

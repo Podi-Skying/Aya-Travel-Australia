@@ -294,6 +294,11 @@ export function DaysView({ active }: { active: boolean }) {
                             <Icon name="note" size={16} /> {i.note}
                           </div>
                         )}
+                        {i.ownerNote && (
+                          <div className="note owner-note">
+                            <Icon name="info" size={16} /> 只有你看得到：{i.ownerNote}
+                          </div>
+                        )}
                         {i.packageContext && (
                           <div className="note small">
                             <Icon name="compass" size={16} /> 來自「{i.packageContext.title ?? i.packageContext.key}」：{i.packageContext.driveHrs ? `整趟約開車 ${i.packageContext.driveHrs} 小時；` : ""}共乘費用未套用。

@@ -63,6 +63,10 @@ export const photoSchema = z.object({
   license: shortText(60).optional(),
 });
 
+/* Place categories for browsing unscheduled places on the map (DESIGN.md「地圖與待安排景點」). */
+export const CATEGORIES = ["nature", "beach", "lookout", "wildlife", "food", "market", "town", "history", "art", "activity"] as const;
+export type Category = (typeof CATEGORIES)[number];
+
 export const itemSchema = z.object({
   id: z.string().min(1).max(32).regex(/^[A-Za-z0-9_-]+$/, "活動 id 只能使用英數字、- 與 _"),
   time: z.string().regex(TIME_RE, "時間需為 00:00–23:59"),
@@ -83,6 +87,9 @@ export const itemSchema = z.object({
   originPackage: shortText(40).optional(),
   packageContext: packageContextSchema.optional(),
   photo: photoSchema.optional(),
+  cat: z.enum(CATEGORIES).optional(),
+  /** Owner-only detail (flight numbers, workplace); removed from every public document. */
+  ownerNote: shortText(500).optional(),
 });
 
 /* "08:30–18:00" (en dash) or "08:30-18:00"; start must be before end. */
