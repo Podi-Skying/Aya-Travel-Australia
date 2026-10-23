@@ -69,3 +69,9 @@ export function Icon({ name, size = 20, label }: { name: string; size?: number; 
     </svg>
   );
 }
+
+/** The same icon as an SVG string, for HTML that Leaflet renders outside React (markers, popups). */
+export function iconSvg(name: string, size = 14): string {
+  const d = PATHS[name] ?? PATHS.info;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`;
+}

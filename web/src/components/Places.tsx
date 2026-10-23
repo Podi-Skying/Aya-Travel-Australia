@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import type * as Leaflet from "leaflet";
 import { useTrip } from "./TripApp";
-import { Icon } from "./Icon";
+import { Icon, iconSvg } from "./Icon";
 import { useReducedMotion } from "./ui";
 import { esc, loadLeaflet, segColor, tiles } from "./MapViews";
 import { PhotoCredit } from "./Photos";
@@ -44,6 +44,34 @@ function km(a: [number, number], b: [number, number]) {
   const x = (b[1] - a[1]) * r * Math.cos(((a[0] + b[0]) / 2) * r);
   const y = (b[0] - a[0]) * r;
   return 6371 * Math.hypot(x, y);
+}
+
+const BASE: Record<string, [number, number]> = { syd: [-33.87, 151.21], tas: [-42.88, 147.33] };
+
+export type NearbyPlace = Place & { km: number | null };
+
+/** Unscheduled places of the day's region, nearest first to the day's stops (or the city when the day is empty). */
+export function nearbyPlaces(doc: TripDoc, date: string, limit = 12): NearbyPlace[] {
+  const day = doc.days.find((d) => d.date === date);
+  if (!day) return [];
+  const pts = day.items.filter((i) => i.lat != null && i.lng != null).map((i) => [i.lat!, i.lng!] as [number, number]);
+  const refs = pts.length ? pts : [BASE[day.seg] ?? BASE.tas];
+  return doc.attractionPool
+    .filter((p) => p.seg === day.seg)
+    .flatMap((p) => p.items.map((i) => ({ i, p })))
+    .map((pl) => ({ ...pl, km: pl.i.lat == null || pl.i.lng == null ? null : Math.min(...refs.map((r) => km(r, [pl.i.lat!, pl.i.lng!]))) }))
+    .sort((a, b) => (a.km ?? 1e9) - (b.km ?? 1e9))
+    .slice(0, limit);
+}
+
+/** Rough drive time: straight-line distance × 1.3 for roads, at 70 km/h, rounded to 5 minutes. */
+export function driveMinutes(straightKm: number): number {
+  return Math.max(5, Math.round((straightKm * 1.3 * 60) / 70 / 5) * 5);
+}
+
+export function distanceLabel(k: number | null): string {
+  if (k == null) return "沒有座標";
+  return `直線約 ${k < 10 ? k.toFixed(1) : Math.round(k)} 公里・開車約 ${driveMinutes(k)} 分鐘（估計）`;
 }
 
 /** The trip day whose planned stops are closest to the place (same region). */
@@ -201,7 +229,7 @@ export function PlacesMap({ active }: { active: boolean }) {
               L.marker([i.lat!, i.lng!], {
                 icon: L.divIcon({
                   className: `place-pin${i.id === f.place ? " sel" : ""}`,
-                  html: meta ? `<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><use href="#ico-${meta.icon}"/></svg>` : "",
+                  html: meta ? iconSvg(meta.icon) : "",
                   iconSize: [28, 28],
                 }),
                 keyboard: true,
@@ -344,13 +372,6 @@ export function PlacesMap({ active }: { active: boolean }) {
 
   return (
     <div className={`places${narrow ? " narrow" : ""}`} ref={wrap}>
-      <svg width="0" height="0" style={{ position: "absolute" }} aria-hidden="true">
-        {CAT_KEYS.map((c) => (
-          <symbol key={c} id={`ico-${CATEGORY_META[c].icon}`} viewBox="0 0 24 24">
-            <Icon name={CATEGORY_META[c].icon} size={24} />
-          </symbol>
-        ))}
-      </svg>
       <div className="places-map map" ref={box} role="region" aria-label="地圖：已排行程與待安排景點">
         {failed && <div className="map-fallback">地圖無法載入（可能離線）。右側清單仍可使用。</div>}
       </div>

@@ -5,6 +5,7 @@ import { useTrip } from "./TripApp";
 import { Icon, MODE_ICON } from "./Icon";
 import { Badge, LEG, MODE, PRI, STATUS, VERIFY } from "./ui";
 import { DayCalendar } from "./DayCalendar";
+import { CATEGORY_META, distanceLabel, nearbyPlaces, type NearbyPlace } from "./Places";
 import { ActPhoto, PhotoCredit, PhotoViewer, mapsPhotoLink, type DayPhoto } from "./Photos";
 import { DayMap } from "./MapViews";
 import { effectiveDay, isTentative } from "@/domain/effective-day";
@@ -26,6 +27,63 @@ function Legs({ travel }: { travel: Item["travel"] }) {
       ))}
       <span>・約 {mins(total)}（估計）</span>
     </li>
+  );
+}
+
+/** 「新增活動」: nearby unscheduled places first (one tap to add), manual entry as the fallback. */
+function NearbyPicker({
+  date,
+  places,
+  onAdd,
+  onManual,
+  onClose,
+}: {
+  date: string;
+  places: NearbyPlace[];
+  onAdd: (key: string, id: string) => void;
+  onManual: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <section className="nearby-picker" aria-label={`新增活動到 ${fmtDay(date)}`}>
+      <header>
+        <h4>附近的待安排景點</h4>
+        <button type="button" className="close" onClick={onClose} aria-label="關閉">
+          <Icon name="close" size={18} />
+        </button>
+      </header>
+      {places.length ? (
+        <ul>
+          {places.map(({ i, p, km }) => (
+            <li key={i.id}>
+              {i.photo ? (
+                // eslint-disable-next-line @next/next/no-img-element -- hotlinked photo, see Photos.tsx
+                <img src={i.photo.url} alt="" referrerPolicy="no-referrer" loading="lazy" decoding="async" />
+              ) : (
+                <span className="ph-icon" aria-hidden="true">
+                  <Icon name={i.cat ? CATEGORY_META[i.cat].icon : "pin"} size={20} />
+                </span>
+              )}
+              <span className="t">
+                <strong>{i.name}</strong>
+                <span className="sub">
+                  {i.cat ? `${CATEGORY_META[i.cat].t}・` : ""}
+                  {distanceLabel(km)}
+                </span>
+              </span>
+              <button type="button" className="btn small" onClick={() => onAdd(p.key, i.id)} aria-label={`把「${i.name}」加入這天`}>
+                加入
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="muted small">這個地區沒有待安排景點了。</p>
+      )}
+      <button type="button" className="btn ghost small manual" onClick={onManual}>
+        都不是？手動新增活動
+      </button>
+    </section>
   );
 }
 
@@ -78,6 +136,7 @@ export function DaysView({ active }: { active: boolean }) {
   const { doc, mode, currentDay, setCurrentDay, runOp, ask, online, myVotes, vote, unvote, counts, canVote } = useTrip();
   const [focusId, setFocusId] = useState<string | null>(null);
   const [viewer, setViewer] = useState<number | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
   const owner = mode === "owner";
   const editable = owner && online;
   const raw = doc.days[currentDay];
@@ -89,6 +148,7 @@ export function DaysView({ active }: { active: boolean }) {
   const warnN = cs.filter((c) => c.lv === "warn").length;
   const majors = d.items.filter((i) => i.major).length;
   const seg = doc.segments[d.seg];
+  const nearby = nearbyPlaces(doc, d.date, 12);
   const dayPhotos: DayPhoto[] = d.items.flatMap((i) => (i.photo ? [{ id: i.id, name: i.name, photo: i.photo }] : []));
   // The day's headline picture: its first major stop with a photo, else any photo.
   const dayHero = d.items.find((i) => i.photo && i.major) ?? d.items.find((i) => i.photo);
@@ -464,13 +524,25 @@ export function DaysView({ active }: { active: boolean }) {
               )}
             </div>
           )}
-          {editable && (
-            <p>
-              <button className="btn ghost" type="button" onClick={() => void addItem()}>
-                ＋ 新增活動
-              </button>
-            </p>
-          )}
+          {editable &&
+            (addOpen ? (
+              <NearbyPicker
+                date={d.date}
+                places={nearby}
+                onAdd={(key, id) => void runOp({ op: "scheduleItem", key, itemId: id, date: d.date })}
+                onManual={() => {
+                  setAddOpen(false);
+                  void addItem();
+                }}
+                onClose={() => setAddOpen(false)}
+              />
+            ) : (
+              <p>
+                <button className="btn ghost" type="button" onClick={() => setAddOpen(true)}>
+                  ＋ 新增活動
+                </button>
+              </p>
+            ))}
           <SharedCosts />
         </article>
         {viewer !== null && dayPhotos[viewer] && (
@@ -485,7 +557,25 @@ export function DaysView({ active }: { active: boolean }) {
           />
         )}
         <aside className="day-map-wrap">
-          <DayMap day={d} active={active} focusId={focusId} />
+          <DayMap
+            day={d}
+            active={active}
+            focusId={focusId}
+            nearby={nearby
+              .filter((n) => n.i.lat != null && n.i.lng != null)
+              .slice(0, 8)
+              .map((n) => ({
+                id: n.i.id,
+                key: n.p.key,
+                lat: n.i.lat!,
+                lng: n.i.lng!,
+                name: n.i.name,
+                sub: [n.i.cat ? CATEGORY_META[n.i.cat].t : "", distanceLabel(n.km)].filter(Boolean).join("・"),
+                photo: n.i.photo?.url,
+                icon: n.i.cat ? CATEGORY_META[n.i.cat].icon : undefined,
+              }))}
+            onAdd={editable ? (key, id) => void runOp({ op: "scheduleItem", key, itemId: id, date: d.date }) : undefined}
+          />
           <p className="map-note">路線為點對點直線示意，非實際道路；實際路線與時間請以導航為準。</p>
         </aside>
       </div>

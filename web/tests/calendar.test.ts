@@ -43,3 +43,17 @@ describe("calendar day status", () => {
     expect(dayStatus({ items: [{ status: "confirmed" }], needsDriver: "X", driverOk: true })).toBe("scheduled");
   });
 });
+
+describe("nearby unscheduled places", () => {
+  it("sorts the region's pool places by distance to the day's stops", async () => {
+    const { seedDoc } = await import("./helpers");
+    const { nearbyPlaces, driveMinutes } = await import("@/components/Places");
+    const doc = seedDoc();
+    const day = doc.days.find((d) => d.seg === "tas" && d.items.some((i) => i.lat != null))!;
+    const list = nearbyPlaces(doc, day.date, 50);
+    expect(list.every((x) => x.p.seg === "tas")).toBe(true);
+    const ks = list.map((x) => x.km ?? Infinity);
+    expect([...ks].sort((a, b) => a - b)).toEqual(ks);
+    expect(driveMinutes(70)).toBe(80);
+  });
+});

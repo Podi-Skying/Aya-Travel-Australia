@@ -601,3 +601,21 @@ details.card.day-summary > summary h3 { margin: 0; }
 .cal-legend .st-pending i { background: var(--pending); font-style: normal; font-size: .55rem; font-weight: 700; color: #7a4f00; display: inline-grid; place-items: center; }
 .cal-legend .car { color: var(--ink-2); }
 @media (prefers-contrast: more) { .cal-cell.st-available { box-shadow: inset 0 0 0 1px var(--avail-ink); } .cal-cell.st-pending { box-shadow: inset 0 0 0 1px #7a4f00; } }
+
+/* Day map sits under the sticky header + tabs; 「新增活動」 picker. */
+.day-map-wrap { top: calc(56px + env(safe-area-inset-top) + 76px); }
+.nearby-picker { margin: 12px 0; padding: 12px; border-radius: 16px; background: var(--paper-raised); animation: dayIn 180ms ease-out; }
+.nearby-picker header { display: flex; align-items: center; justify-content: space-between; }
+.nearby-picker h4 { margin: 0; font-size: .95rem; }
+.nearby-picker .close { width: 44px; height: 44px; display: grid; place-items: center; border: 0; background: none; color: var(--ink); cursor: pointer; border-radius: 50%; }
+.nearby-picker ul { list-style: none; margin: 4px 0 8px; padding: 0; display: grid; gap: 6px; max-height: 420px; overflow-y: auto; }
+.nearby-picker li { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 6px; border-radius: 12px; background: var(--bg); }
+.nearby-picker img, .nearby-picker .ph-icon { width: 56px; height: 42px; border-radius: 8px; object-fit: cover; display: grid; place-items: center; background: var(--line); color: var(--ink-muted); }
+.nearby-picker .t { display: grid; gap: 2px; min-width: 0; }
+.nearby-picker .t strong { font-size: .88rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nearby-picker .sub { font-size: .72rem; color: var(--ink-muted); }
+.nearby-picker .btn { min-height: 44px; }
+.stop-pop .btn { margin-top: 6px; min-height: 44px; }
+.leaflet-marker-icon.place-pin-hit { display: grid; place-items: center; background: none; border: 0; }
+.place-pin-hit > .place-pin { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; background: var(--bg); border: 2px solid var(--vermilion); color: var(--vermilion); box-shadow: 0 1px 3px rgba(41, 40, 35, .25); }
+.place-pin-hit > .place-pin svg { width: 14px; height: 14px; }
