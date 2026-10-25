@@ -124,6 +124,7 @@ export function TripOptions() {
 /** Details of the selected plan, with each stop's photo for comparison. */
 function OptionDetail({ c }: { c: OptionCard }) {
   const { doc, mode, online, runOpUndoable, ask, counts, gotoDay } = useTrip();
+  const [broken, setBroken] = useState<Set<string>>(() => new Set());
   const o = c.option;
   const ids = new Set(o.days.flatMap((d) => d.itemIds));
   // Votes follow the activity: include votes recorded on a date it has since moved away from.
@@ -181,10 +182,10 @@ function OptionDetail({ c }: { c: OptionCard }) {
               <ul className="plan-stops">
                 {c.items[i].map((it) => (
                   <li key={it.id}>
-                    {it.photo ? (
+                    {it.photo && !broken.has(it.photo.url) ? (
                       <figure>
                         {/* eslint-disable-next-line @next/next/no-img-element -- hotlinked place photo with credit */}
-                        <img src={it.photo.url} alt={it.name} loading="lazy" referrerPolicy="no-referrer" />
+                        <img src={it.photo.url} alt={it.name} loading="lazy" referrerPolicy="no-referrer" onError={() => setBroken((b) => new Set(b).add(it.photo!.url))} />
                         <figcaption>
                           <PhotoCredit photo={it.photo} />
                         </figcaption>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, type KeyboardEvent } from "react";
+import { useRef, useState, type KeyboardEvent } from "react";
 
 /*
  * Photo reel for 推薦行程方案 (docs/PLAN-2026-10-26-plan-reel.md): a row of photo slices; the selected
@@ -38,6 +38,8 @@ export function PlanReel({
   orientation?: "horizontal" | "vertical";
 }) {
   const refs = useRef(new Map<string, HTMLButtonElement>());
+  // Hotlinked photos can be blocked or removed; those slices fall back to colour and line art.
+  const [failed, setFailed] = useState<Set<string>>(() => new Set());
   const keys = slices.map((s) => s.key);
   const onKey = (e: KeyboardEvent, key: string) => {
     const i = keys.indexOf(key);
@@ -70,9 +72,9 @@ export function PlanReel({
             onClick={() => onSelect(s.key)}
             onKeyDown={(e) => onKey(e, s.key)}
           >
-            {s.image ? (
+            {s.image && !failed.has(s.image) ? (
               // eslint-disable-next-line @next/next/no-img-element -- hotlinked place photo with credit below
-              <img src={s.image} alt="" loading="lazy" referrerPolicy="no-referrer" />
+              <img src={s.image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed((f) => new Set(f).add(s.image!))} />
             ) : (
               <svg viewBox="0 0 320 160" aria-hidden="true" className="reel-art" preserveAspectRatio="xMidYMid slice">
                 <path d="M0 118 C40 96 62 70 96 84 S150 40 188 62 S250 98 320 72" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
