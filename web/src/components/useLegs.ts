@@ -73,8 +73,22 @@ export const legLabel = (l: Leg) => {
   return `${t}・${l.distanceM >= 10000 ? Math.round(l.distanceM / 1000) : (l.distanceM / 1000).toFixed(1)} 公里`;
 };
 
-/** Stops of a day with coordinates; `drive` marks activities reached by car. */
-export const stopsOf = (items: { lat?: number; lng?: number; mode: string }[]): Stop[] =>
-  items.filter((i) => i.lat != null && i.lng != null).map((i) => ({ pt: [i.lat!, i.lng!] as Pt, drive: i.mode === "drive" }));
+/**
+ * Stops of a day with coordinates; `drive` marks a stop reached by car directly from the previous
+ * located stop. An activity without coordinates in between breaks the route (no leg across it).
+ */
+export function stopsOf(items: { lat?: number; lng?: number; mode: string }[]): Stop[] {
+  const out: Stop[] = [];
+  let gap = false;
+  for (const i of items) {
+    if (i.lat == null || i.lng == null) {
+      gap = true;
+      continue;
+    }
+    out.push({ pt: [i.lat, i.lng], drive: i.mode === "drive" && !gap });
+    gap = false;
+  }
+  return out;
+}
 
 export const ROUTE_CREDIT = "路線 © OSRM・地圖資料 © OpenStreetMap";

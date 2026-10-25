@@ -287,6 +287,7 @@ export const tripDocSchema = z
       p.items.forEach((it, ii) => note(it.id, `待安排「${p.key}」`, ["attractionPool", pi, "items", ii, "id"]));
     });
     // Options point at items that exist, stay inside the trip, and pick at most one per group.
+    const segOf = new Map<string, string>([...doc.days.flatMap((d) => d.items.map((i) => [i.id, d.seg] as const)), ...doc.attractionPool.flatMap((p) => p.items.map((i) => [i.id, p.seg] as const))]);
     const optKeys = new Set<string>();
     const chosenGroups = new Set<string>();
     doc.tripOptions.forEach((o, oi) => {
@@ -296,13 +297,16 @@ export const tripDocSchema = z
         if (chosenGroups.has(o.group)) ctx.addIssue({ code: "custom", message: `方案組 ${o.group} 有兩個採用中的方案`, path: ["tripOptions", oi, "chosen"] });
         chosenGroups.add(o.group);
       }
-      const start = doc.days.findIndex((d) => d.date === o.start);
-      if (start < 0 || start + o.days.length > doc.days.length)
-        ctx.addIssue({ code: "custom", message: `行程方案 ${o.key} 的日期超出旅程`, path: ["tripOptions", oi, "start"] });
+      // Every calendar date of the option must be a trip day, and items must stay in their region.
+      const targets = o.days.map((_, i) => doc.days.find((d) => d.date === new Date(Date.parse(o.start + "T00:00:00Z") + i * 86_400_000).toISOString().slice(0, 10)));
+      if (targets.some((t) => !t)) ctx.addIssue({ code: "custom", message: `行程方案 ${o.key} 的日期超出旅程`, path: ["tripOptions", oi, "start"] });
       const ids = new Set<string>();
       o.days.forEach((d, di) => {
         if (!doc.stays[d.stay]) ctx.addIssue({ code: "custom", message: `未知的住宿 ${d.stay}`, path: ["tripOptions", oi, "days", di, "stay"] });
         d.itemIds.forEach((id, ii) => {
+          const seg = segOf.get(id);
+          if (seg && targets[di] && seg !== targets[di]!.seg)
+            ctx.addIssue({ code: "custom", message: `行程方案 ${o.key} 把活動 ${id} 排到不同地區`, path: ["tripOptions", oi, "days", di, "itemIds", ii] });
           if (!seen.has(id)) ctx.addIssue({ code: "custom", message: `行程方案 ${o.key} 引用不存在的活動 ${id}`, path: ["tripOptions", oi, "days", di, "itemIds", ii] });
           if (ids.has(id)) ctx.addIssue({ code: "custom", message: `行程方案 ${o.key} 重複引用活動 ${id}`, path: ["tripOptions", oi, "days", di, "itemIds", ii] });
           ids.add(id);

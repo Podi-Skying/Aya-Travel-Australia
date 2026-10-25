@@ -195,9 +195,9 @@ tripOptions: {
 
 | key | group | title | days |
 |---|---|---|---|
-| east-3d2n | east | 東海岸三天兩夜 | 11/9 Swansea・Spiky Bridge → 酒杯灣 → Honeymoon Bay (a38, a39, a40, h09; stay coles) / 11/10 Bay of Fires → Ross? → Launceston (a41, a44, a42, h10; stay lst) / 11/11 Cataract Gorge → back to Hobart (a43; stay utas) |
-| nw-cradle-3d2n | northwest | 搖籃山＋Stanley＋Penguin 三天兩夜 | 11/16 Sheffield → Cradle visitor centre → Devils@Cradle (a49, a50, a52, h16; stay cradle) / 11/17 Dove Lake → Stanley (a51, g37, h17; stay stanley) / 11/18 Penguin → Hobart (g38, a53; stay utas) |
-| nw-stanley-2d1n | northwest | 只去 Stanley＋Penguin 兩天一夜 | 11/16 Hobart → Penguin → Stanley (a53, g38, g37, h17; stay stanley; 5 h) / 11/17 Stanley → Hobart (stay utas; 5 h) / 11/18 free day in Hobart (no items, stay utas, 0 h) |
+| east-3d2n | east | 東海岸三天兩夜 | 11/9 Swansea・Spiky Bridge → 酒杯灣 → Honeymoon Bay (a38, a39, a40, h09; stay coles) / 11/10 Bay of Fires → Launceston (a41, a42, h10; stay lst) / 11/11 Cataract Gorge → Ross → back to Hobart (a43, a44; stay utas). Ross sits on the Launceston–Hobart road, so it belongs to the way back. |
+| nw-cradle-3d2n | northwest | 搖籃山＋Stanley＋Penguin 三天兩夜 | 11/16 Sheffield → Cradle visitor centre → Devils@Cradle (a49, a50, a52, h16; stay cradle) / 11/17 Dove Lake → Ronny Creek → Stanley (a51, g36, g37, h17; stay stanley) / 11/18 Penguin → Hobart (g38, a53; stay utas) |
+| nw-stanley-2d1n | northwest | 只去 Stanley＋Penguin 兩天一夜 | 11/16 Hobart → Penguin → Stanley (g38, g37, h17; stay stanley; 5 h) / 11/17 Stanley → Hobart via Bothwell/Oatlands (a53; stay utas; 5 h) / 11/18 rest day in Hobart (no items, stay utas, 0 h, noDriver) |
 
 - `east-3d2n` and `nw-cradle-3d2n` are seeded with `chosen: false`, because the days are currently empty.
 - The seed does not apply them. Kai picks.
@@ -389,3 +389,14 @@ Added:
   - Adding 409 to OpResult would touch every op for no user-visible gain.
   - The §3 wording now says 400.
 - **F-020, accepted.** Numbered day pins sit in a 44px hit area.
+
+## Revision 3: dispositions of Codex round-3 findings
+
+- **R3-001, accepted.** On a `noDriver` option day, the driver need is also removed from attached packages and from the item package contexts.
+- **R3-002, accepted.** `stopsOf` breaks the route at any activity without coordinates. There is never a leg across an unlocated stop.
+- **R3-003, accepted.** The owner's cache reads are not limited. The computation quota is charged only when legs are missing (or a refresh is asked) and OSRM will be called. When the quota is used up, the response returns the cached legs with `limited: true`. Guests are limited per IP for all requests.
+- **R3-004, accepted.** The schema checks that every calendar date of an option is a trip day, and that each referenced item's region matches its target day.
+- **R3-005, accepted.** The seed table now records the intended itineraries:
+  - a44 (Ross) moves to 11/11, the way back.
+  - g36 (Ronny Creek) is on 11/17.
+  - In nw-stanley-2d1n, a53 is on 11/17, and 11/18 is a `noDriver` rest day.

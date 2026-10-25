@@ -244,3 +244,46 @@ describe("option days replace day metadata", () => {
     expect(day.title).toBe("休息日");
   });
 });
+
+describe("round-3 fixes", () => {
+  it("breaks routes at an activity without coordinates", async () => {
+    const { stopsOf } = await import("@/components/useLegs");
+    const s = stopsOf([
+      { lat: -42.8, lng: 147.3, mode: "drive" },
+      { mode: "drive" },
+      { lat: -42.5, lng: 147.9, mode: "drive" },
+      { lat: -42.4, lng: 148.0, mode: "drive" },
+      { lat: -42.3, lng: 148.1, mode: "bus" },
+    ]);
+    expect(s.map((x) => x.drive)).toEqual([true, false, true, false]);
+  });
+
+  it("a noDriver option day clears driver needs from item package contexts too", async () => {
+    const { applyOp } = await import("@/domain/ops");
+    const { parseTripDoc } = await import("@/domain/schema");
+    const { effectiveDay } = await import("@/domain/effective-day");
+    const base = seedDoc() as TripDoc;
+    const pkg = base.attractionPool.find((p) => p.needsDriver)!;
+    const id = pkg.items[0].id;
+    const r0 = parseTripDoc({
+      ...base,
+      tripOptions: [{ key: "rest", group: "g", title: "x", summary: "", region: "", themes: [], chosen: false, start: "2026-11-20", days: [{ title: "休息", stay: "utas", driveHrs: 0, noDriver: true, itemIds: [id] }] }],
+    });
+    if (!r0.ok) throw new Error(JSON.stringify(r0.errors));
+    const r = applyOp(r0.doc, { op: "applyOption", key: "rest" });
+    if (!r.ok) throw new Error(r.error);
+    const day = r.doc.days.find((d) => d.date === "2026-11-20")!;
+    expect(day.items.map((i) => i.id)).toContain(id);
+    expect(effectiveDay(day).needsDriver).toBeFalsy();
+  });
+
+  it("rejects options whose dates are not all trip days or that move items across regions", async () => {
+    const { parseTripDoc } = await import("@/domain/schema");
+    const base = seedDoc() as TripDoc;
+    const sydItem = base.days.find((d) => d.seg === "syd" && d.items.length)!.items[0].id;
+    const opt = (start: string, itemIds: string[]) => ({ key: "o", group: "g", title: "x", summary: "", region: "", themes: [], chosen: false, start, days: [{ title: "a", stay: "utas", driveHrs: 0, itemIds }, { title: "b", stay: "utas", driveHrs: 0, itemIds: [] }] });
+    expect(parseTripDoc({ ...base, tripOptions: [opt("2026-11-27", [])] }).ok).toBe(false);
+    expect(parseTripDoc({ ...base, tripOptions: [opt("2026-11-12", [sydItem])] }).ok).toBe(false);
+    expect(parseTripDoc({ ...base, tripOptions: [opt("2026-11-12", [])] }).ok).toBe(true);
+  });
+});

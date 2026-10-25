@@ -177,13 +177,15 @@ export async function postRoutes(req: Request) {
     const c = missingConfig("owner").length ? null : await checkOwner();
     const owner = !!c?.ok && sameOrigin(req);
     const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || "unknown";
-    const quota = c?.ok && owner ? routeQuota(`routes:${c.owner.githubId}`, 30, false) : routeQuota(`routes-ip:${sha256(ip)}`, 120);
-    if (!(await quota)) return fail(429, "操作太頻繁，請稍後再試");
-    const r = await getLegs(points, { compute: owner, refresh: owner && b.refresh === true }).catch((e) => {
-      if (e instanceof HttpError) throw e;
-      return null; // routing service unavailable: straight lines stay
-    });
-    return json(r ?? { legs: points.slice(1).map(() => null), computed: 0, unavailable: true });
+    // Reads are limited per client; the owner's computation quota is charged only when OSRM will be called.
+    if (!owner && !(await routeQuota(`routes-ip:${sha256(ip)}`, 120))) return fail(429, "操作太頻繁，請稍後再試");
+    const hit = await getLegs(points, { compute: false });
+    const refresh = owner && b.refresh === true;
+    const missing = hit.legs.some((l) => !l);
+    if (!owner || (!missing && !refresh)) return json(hit);
+    if (!(await routeQuota(`routes:${c!.ok ? c!.owner.githubId : ""}`, 30, false))) return json({ ...hit, limited: true });
+    const r = await getLegs(points, { compute: true, refresh }).catch(() => null); // routing service unavailable: straight lines stay
+    return json(r ?? { ...hit, unavailable: true });
   } catch (e) {
     return errorResponse(e);
   }
