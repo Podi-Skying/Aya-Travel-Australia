@@ -5,13 +5,15 @@ import { useTrip } from "./TripApp";
 import { AvatarStack } from "./People";
 import { Badge, PendingButton, useHydrated } from "./ui";
 import { ShareButton } from "./Share";
-import { dayNightLabel, optionCard, type OptionCard } from "@/domain/options";
+import { PlanReel } from "./PlanReel";
+import { PhotoCredit } from "./Photos";
+import { dayNightLabel, optionCard, optionPalette, type OptionCard } from "@/domain/options";
 import { OPTION_THEMES } from "@/domain/schema";
 import { fmtDay, fmtMD, money } from "@/domain/format";
 
 /*
- * 多日行程方案 (PLAN-2026-10-26 §3, chictrip review P1): overnight trips as cards that can be
- * compared side by side; the owner picks one and it replaces those days in one undoable version.
+ * 推薦行程方案 (PLAN-2026-10-26 §3; reel in PLAN-2026-10-26-plan-reel): overnight trips as photo slices with
+ * their own colour; the owner picks one and it replaces those days in one undoable version.
  */
 
 export const THEME: Record<(typeof OPTION_THEMES)[number], string> = { aurora: "極光", bio: "藍眼淚", hike: "健行", food: "美食", wildlife: "野生動物", town: "小鎮" };
@@ -44,19 +46,22 @@ export function TripOptions() {
   const regions = [...new Set(cards.map((c) => c.option.region).filter(Boolean))];
   const themes = OPTION_THEMES.filter((t) => cards.some((c) => c.option.themes.includes(t)));
   const shown = cards.filter((c) => (!f.days || c.tripDays === f.days) && (!f.theme || c.option.themes.includes(f.theme as never)) && (!f.region || c.option.region === f.region));
-  const groups = [...new Set(shown.map((c) => c.option.group))];
   const chip = (on: boolean, label: string, onClick: () => void) => (
     <button key={label} type="button" className={`chip${on ? " on" : ""}`} aria-pressed={on} onClick={onClick}>
       {label}
     </button>
   );
 
+  const [picked, setPicked] = useState<string | null>(null);
+  const current = shown.find((c) => c.option.key === picked) ?? shown.find((c) => c.option.chosen) ?? shown[0];
+  const pal = current ? optionPalette(current.option) : null;
+
   return (
-    <>
-      <div className="card">
-        <h2>多日行程方案</h2>
+    <div className="plan-stage" style={pal ? { ["--plan-tint" as string]: pal.tint, ["--plan-deep" as string]: pal.deep } : undefined}>
+      <div className="card plan-intro">
+        <h2>推薦行程方案</h2>
         <p className="muted">
-          兩天一夜、三天兩夜的行程整理成方案，可以並排比較。{mode === "owner" ? "按「套用」會把那幾天目前的活動移回待安排，換成方案的內容；沒選的方案會保留，之後可以換回來。" : "擁有者選定的方案會標示「目前採用」。"}
+          兩天一夜、三天兩夜的行程整理成方案，點一張照片看詳細內容。{mode === "owner" ? "按「套用」會把那幾天目前的活動移回待安排，換成方案的內容；沒選的方案會保留，之後可以換回來。" : "擁有者選定的方案會標示「目前採用」。"}
         </p>
         <div className="opt-filters" role="group" aria-label="篩選方案">
           <div className="chips">
@@ -69,40 +74,35 @@ export function TripOptions() {
       </div>
       {!cards.length && <p className="section muted">還沒有方案。</p>}
       {cards.length > 0 && !shown.length && <p className="section muted">沒有符合篩選的方案。</p>}
-      {groups.map((g) => {
-        const gs = shown.filter((c) => c.option.group === g);
-        const all = cards.filter((c) => c.option.group === g).flatMap((c) => c.dates).sort();
-        return (
-          <section key={g} className="section opt-group" aria-label={`${fmtMD(all[0])}–${fmtMD(all.at(-1)!)} 的方案`}>
-            <h3>
-              {fmtMD(all[0])}–{fmtMD(all.at(-1)!)}・{gs.length} 個方案
-            </h3>
-            <div className="opt-grid">
-              {gs.map((c) => (
-                <OptionCardView key={c.option.key} c={c} />
-              ))}
-            </div>
-          </section>
-        );
-      })}
-    </>
+      {current && (
+        <>
+          <div className="section">
+            <PlanReel
+              label="推薦行程方案"
+              panelId="plan-detail"
+              active={current.option.key}
+              onSelect={setPicked}
+              slices={shown.map((c) => ({
+                key: c.option.key,
+                title: c.option.title,
+                caption: `${dayNightLabel(c)}・${c.option.region || "塔斯馬尼亞"}・${fmtMD(c.dates[0])}–${fmtMD(c.dates.at(-1)!)}`,
+                badge: c.option.chosen ? "目前採用" : undefined,
+                image: c.photo,
+                deep: optionPalette(c.option).deep,
+              }))}
+            />
+          </div>
+          <OptionDetail key={current.option.key} c={current} />
+        </>
+      )}
+    </div>
   );
 }
 
-function LineArt() {
-  // Fallback cover: one ink line of hills and sea, in the walk's hand-drawn style.
-  return (
-    <svg viewBox="0 0 320 160" aria-hidden="true" className="opt-art">
-      <path d="M0 118 C40 96 62 70 96 84 S150 40 188 62 S250 98 320 72" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-      <path d="M0 136 C30 130 60 140 90 134 S150 128 180 136 S260 142 320 132" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" opacity=".6" />
-      <circle cx="248" cy="38" r="12" fill="none" stroke="currentColor" strokeWidth="2" />
-    </svg>
-  );
-}
 
-function OptionCardView({ c }: { c: OptionCard }) {
+/** Details of the selected plan, with each stop's photo for comparison. */
+function OptionDetail({ c }: { c: OptionCard }) {
   const { doc, mode, online, runOpUndoable, ask, counts, gotoDay } = useTrip();
-  const [open, setOpen] = useState(false);
   const o = c.option;
   const ids = new Set(o.days.flatMap((d) => d.itemIds));
   // Votes follow the activity: include votes recorded on a date it has since moved away from.
@@ -110,18 +110,8 @@ function OptionCardView({ c }: { c: OptionCard }) {
   const range = `${fmtMD(c.dates[0])}–${fmtMD(c.dates.at(-1)!)}`;
   const firstIdx = doc.days.findIndex((d) => d.date === c.dates[0]);
   return (
-    <article className={`card opt-card${o.chosen ? " chosen" : ""}`}>
-      <div className="opt-cover">
-        {c.photo ? (
-          // eslint-disable-next-line @next/next/no-img-element -- hotlinked place photo
-          <img src={c.photo} alt="" loading="lazy" referrerPolicy="no-referrer" />
-        ) : (
-          <LineArt />
-        )}
-        {o.region && <span className="opt-region">{o.region}</span>}
-        {o.chosen && <span className="opt-chosen">目前採用</span>}
-      </div>
-      <h4>{o.title}</h4>
+    <article className={`card opt-card plan-detail${o.chosen ? " chosen" : ""}`} id="plan-detail" role="tabpanel" aria-labelledby={`reel-${o.key}`}>
+      <h3>{o.title}</h3>
       <p className="opt-tags">
         <Badge t={dayNightLabel(c)} c="b-line" /> {o.themes.map((t) => <Badge key={t} t={THEME[t]} c="b-info" />)}
       </p>
@@ -159,22 +149,40 @@ function OptionCardView({ c }: { c: OptionCard }) {
         <AvatarStack people={c.people} size={26} />
       </p>
       {o.summary && <p className="small muted">{o.summary}</p>}
-      <button type="button" className="btn ghost small" aria-expanded={open} onClick={() => setOpen(!open)}>
-        {open ? "收起每日內容" : "看每日內容"}
-      </button>
-      {open && (
-        <ol className="opt-days">
-          {o.days.map((d, i) => (
-            <li key={i}>
-              <strong>
-                {fmtDay(c.dates[i])} {d.title}
-              </strong>
+      <ol className="opt-days">
+        {o.days.map((d, i) => (
+          <li key={i}>
+            <h4>
+              第 {i + 1} 天・{fmtDay(c.dates[i])} {d.title}
               <span className="small muted">（開車約 {d.driveHrs} 小時）</span>
-              {c.items[i].length ? <ul>{c.items[i].map((it) => <li key={it.id}>{it.time} {it.name}</li>)}</ul> : <p className="small muted">沒有排活動</p>}
-            </li>
-          ))}
-        </ol>
-      )}
+            </h4>
+            {c.items[i].length ? (
+              <ul className="plan-stops">
+                {c.items[i].map((it) => (
+                  <li key={it.id}>
+                    {it.photo ? (
+                      <figure>
+                        {/* eslint-disable-next-line @next/next/no-img-element -- hotlinked place photo with credit */}
+                        <img src={it.photo.url} alt={it.name} loading="lazy" referrerPolicy="no-referrer" />
+                        <figcaption>
+                          <PhotoCredit photo={it.photo} />
+                        </figcaption>
+                      </figure>
+                    ) : (
+                      <div className="plan-stop-noimg" aria-hidden="true" />
+                    )}
+                    <p>
+                      <span className="small muted">{it.time}</span> {it.name}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="small muted">沒有排活動</p>
+            )}
+          </li>
+        ))}
+      </ol>
       <div className="opt-actions">
         {mode === "owner" ? (
           <PendingButton

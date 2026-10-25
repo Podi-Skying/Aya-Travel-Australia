@@ -303,3 +303,17 @@ describe("round-3 fixes", () => {
     expect(parseTripDoc({ ...base, tripOptions: [opt("2026-11-12", [])] }).ok).toBe(true);
   });
 });
+
+describe("plan reel palettes", () => {
+  it("map plans to regional colours and keep AA contrast for white-on-deep and ink-on-tint", async () => {
+    const { PALETTES, INK_PALETTE, optionPalette, contrast } = await import("@/domain/options");
+    expect(optionPalette({ title: "搖籃山＋Stanley＋Penguin 三天兩夜", region: "西北海岸" }).name).toBe("moss");
+    expect(optionPalette({ title: "只去 Stanley＋Penguin 兩天一夜", region: "西北海岸" }).name).toBe("sand");
+    expect(optionPalette({ title: "東海岸三天兩夜", region: "東海岸" }).name).toBe("sea");
+    expect(optionPalette({ title: "x", region: "" }).name).toBe("ink");
+    for (const p of [...PALETTES, INK_PALETTE]) {
+      expect(contrast(p.deep, "#ffffff"), p.name).toBeGreaterThanOrEqual(4.5);
+      expect(contrast("#292823", p.tint), p.name).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+});

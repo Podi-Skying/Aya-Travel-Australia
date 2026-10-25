@@ -747,3 +747,44 @@ details.card.day-summary > summary h3 { margin: 0; }
 .route-credit { display: block; font-size: .7rem; color: var(--ink-muted); margin-top: 2px; }
 .num-hit { display: grid !important; place-items: center; background: none; border: 0; }
 .num-hit .num-marker { display: grid; place-items: center; }
+
+/* 推薦行程方案：照片切片 reel 與方案配色（docs/PLAN-2026-10-26-plan-reel.md） */
+.plan-stage { --plan-tint: var(--bg); background: var(--plan-tint); transition: background-color .6s ease; border-radius: 20px; padding: 12px; margin: 0 -12px; }
+.plan-stage .card { background: color-mix(in srgb, var(--bg) 72%, transparent); }
+.plan-reel { display: flex; gap: 8px; height: 380px; }
+.reel-slice { position: relative; flex: 1 1 0; min-width: 56px; overflow: hidden; border: 0; padding: 0; border-radius: 16px; background: var(--deep); color: #fff; cursor: pointer; font: inherit; text-align: left;
+  transition: flex-grow .65s cubic-bezier(.34, 1.4, .64, 1), box-shadow .2s ease; }
+.reel-slice:hover:not(.on), .reel-slice:focus-visible:not(.on) { flex-grow: 2; }
+.reel-slice.on { flex-grow: 6; box-shadow: 0 0 0 3px var(--plan-deep, var(--ink)); }
+.reel-slice:focus-visible { outline: 3px solid var(--vermilion); outline-offset: 2px; }
+.reel-slice img, .reel-slice .reel-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.reel-slice .reel-art { color: rgba(255, 255, 255, .55); }
+.reel-slice::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, rgba(0, 0, 0, .7), rgba(0, 0, 0, .05) 55%); }
+.reel-spine { position: absolute; z-index: 1; left: 50%; top: 16px; transform: translateX(-50%); writing-mode: vertical-rl; font-weight: 600; font-size: .95rem; letter-spacing: .08em; max-height: calc(100% - 32px); overflow: hidden; text-shadow: 0 1px 3px rgba(0, 0, 0, .6); transition: opacity .25s ease; }
+.reel-slice.on .reel-spine { opacity: 0; }
+.reel-caption { position: absolute; z-index: 1; left: 18px; right: 18px; bottom: 16px; display: grid; gap: 4px; opacity: 0; transform: translateY(8px); transition: opacity .3s ease .15s, transform .3s ease .15s; }
+.reel-slice.on .reel-caption { opacity: 1; transform: none; }
+.reel-caption strong { font-size: 1.35rem; line-height: 1.25; }
+.reel-caption span { font-size: .9rem; opacity: .92; }
+.reel-badge { justify-self: start; background: var(--vermilion); border-radius: 999px; padding: 2px 10px; font-size: .78rem !important; opacity: 1 !important; }
+.plan-detail h3 { margin: 0; font-size: 1.3rem; }
+.plan-detail .opt-days { list-style: none; padding: 0; gap: 14px; }
+.plan-detail .opt-days h4 { margin: 0 0 6px; font-size: 1rem; }
+.plan-stops { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.plan-stops li { display: grid; gap: 4px; }
+.plan-stops figure { margin: 0; display: grid; gap: 2px; }
+.plan-stops img, .plan-stop-noimg { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 10px; background: var(--plan-deep, var(--paper-raised)); opacity: .9; }
+.plan-stops figcaption { font-size: .68rem; color: var(--ink-muted); overflow-wrap: anywhere; }
+.plan-stops p { margin: 0; font-size: .9rem; }
+@media (max-width: 720px) {
+  .plan-stage { margin: 0 -8px; padding: 8px; }
+  .plan-reel { flex-direction: column; height: auto; }
+  .reel-slice { flex: 0 0 auto; height: 64px; min-width: 0; transition: height .55s cubic-bezier(.34, 1.3, .64, 1); }
+  .reel-slice:hover:not(.on), .reel-slice:focus-visible:not(.on) { flex-grow: 0; }
+  .reel-slice.on { height: 260px; }
+  .reel-spine { writing-mode: horizontal-tb; left: 16px; right: 16px; top: 50%; transform: translateY(-50%); max-height: none; white-space: nowrap; text-overflow: ellipsis; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .plan-stage, .reel-slice, .reel-caption, .reel-spine { transition: none; }
+}
+@media (max-width: 480px) { .hero-facts { gap: 8px 20px; } .hero-facts div { padding: 0; border-left: 0; } }

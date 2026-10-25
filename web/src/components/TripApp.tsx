@@ -64,7 +64,7 @@ export function useTrip(): Ctx {
 
 const TABS = [
   { key: "days", label: "每日行程" },
-  { key: "options", label: "行程方案" },
+  { key: "options", label: "推薦行程方案" },
   { key: "map", label: "地圖與景點" },
   { key: "budget", label: "預算" },
   { key: "info", label: "資訊與警示" },

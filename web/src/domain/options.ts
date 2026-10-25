@@ -66,3 +66,33 @@ export function optionCard(doc: TripDoc, o: TripOption, N: number): OptionCard {
 }
 
 export const dayNightLabel = (c: Pick<OptionCard, "tripDays" | "nights">) => (c.nights ? `${c.tripDays}天${c.nights}夜` : `${c.tripDays}日遊`);
+
+/*
+ * Per-plan colours for the 推薦行程方案 reel (docs/PLAN-2026-10-26-plan-reel.md), derived from the
+ * paper/ink/vermilion palette: `deep` carries white text (slices without a photo), `tint` is the
+ * page background behind ink text. Both meet WCAG AA; a test checks the ratios.
+ */
+export type Palette = { name: string; deep: string; tint: string };
+export const PALETTES: (Palette & { words: string[] })[] = [
+  { name: "moss", deep: "#445a3b", tint: "#e5eadf", words: ["搖籃", "Cradle"] },
+  { name: "sand", deep: "#7a6236", tint: "#f1e9da", words: ["Stanley", "Penguin", "西北"] },
+  { name: "sea", deep: "#3d5a66", tint: "#e3eaec", words: ["東海岸", "Freycinet", "Bicheno"] },
+  { name: "forest", deep: "#2f4a3a", tint: "#dfe8e1", words: ["布魯尼", "Bruny", "Huon"] },
+  { name: "ochre", deep: "#7f5222", tint: "#f2e4d3", words: ["瑪麗亞", "Maria"] },
+];
+export const INK_PALETTE: Palette = { name: "ink", deep: "#3d3a33", tint: "#ece8df" };
+
+export function optionPalette(o: Pick<TripOption, "title" | "region">): Palette {
+  const text = `${o.title} ${o.region}`;
+  return PALETTES.find((p) => p.words.some((w) => text.includes(w))) ?? INK_PALETTE;
+}
+
+/** WCAG relative-luminance contrast ratio between two #rrggbb colours. */
+export function contrast(a: string, b: string): number {
+  const lum = (hex: string) => {
+    const [r, g, b2] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b2;
+  };
+  const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m);
+  return (x + 0.05) / (y + 0.05);
+}
