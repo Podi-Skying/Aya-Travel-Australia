@@ -2,7 +2,7 @@ import type { TripDoc } from "./schema";
 import { effectiveDay } from "./effective-day";
 
 /*
- * 途經地區 chips for the 總覽 summary card (chictrip review P1-b). Region names are public;
+ * 途經地區 chips for the top banner (chictrip review P1-b; moved from 總覽 on 2026-10-26). Region names are public;
  * each region links to the first day whose title or activities mention it.
  */
 

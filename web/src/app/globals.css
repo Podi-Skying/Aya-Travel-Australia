@@ -717,19 +717,18 @@ details.card.day-summary > summary h3 { margin: 0; }
 .opt-actions { margin-top: auto; display: flex; flex-wrap: wrap; gap: 8px; padding-top: 6px; }
 .opt-actions .btn { min-height: 44px; }
 
-/* 總覽摘要卡 (chictrip review P1-b) */
-.summary-card { display: grid; gap: 10px; }
-.summary-figures { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; margin: 0; }
-.summary-figures div { padding: 0 12px; border-left: 1px solid var(--line); min-width: 0; }
-.summary-figures div:first-child { padding-left: 0; border-left: 0; }
-.summary-figures dt { font-size: .75rem; color: var(--ink-muted); }
-.summary-figures dd { margin: 2px 0 0; font-size: 1.15rem; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.summary-when { margin: 0; color: var(--vermilion); font-weight: 500; }
-.summary-tags { margin: 0; display: flex; flex-wrap: wrap; gap: 4px; }
-.summary-regions .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
-.summary-regions .chip { min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--ink); font: inherit; font-size: .85rem; cursor: pointer; }
-.summary-regions .chip:hover { border-color: var(--ink); }
-@media (max-width: 420px) { .summary-figures dd { font-size: 1rem; } .summary-figures div { padding: 0 8px; } }
+/* 上方 banner：出遊時間、倒數、標籤、途經地區（2026-10-26，取代總覽） */
+.hero-facts { display: flex; flex-wrap: wrap; gap: 0; margin: 14px 0 10px; }
+.hero-facts div { padding: 0 16px; border-left: 1px solid var(--line); }
+.hero-facts div:first-child { padding-left: 0; border-left: 0; }
+.hero-facts dt { font-size: .75rem; color: var(--ink-muted); }
+.hero-facts dd { margin: 2px 0 0; font-size: 1.15rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.hero-facts .hero-when { color: var(--vermilion); }
+.hero-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; }
+.hero-tag { font-size: .8rem; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--ink-2); }
+.hero-regions { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+.hero-regions button { flex: 0 0 auto; min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: inherit; font-size: .85rem; cursor: pointer; }
+.hero-regions button:hover { border-color: var(--ink); }
 
 /* 地圖分頁：選一天、工具（chictrip review P1-c） */
 .places { grid-template-columns: minmax(0, 1fr) minmax(320px, 30%); }

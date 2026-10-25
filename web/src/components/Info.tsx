@@ -5,6 +5,7 @@ import { Icon } from "./Icon";
 import { Badge, PRI, STATUS, VERIFY } from "./ui";
 import { fmtDay, fmtTs } from "@/domain/format";
 import { SkyWatch } from "./SkyWatch";
+import { Checklist } from "./Checklist";
 
 export function Info() {
   const { doc, mode, alerts, lastSyncAt, offlineCopy, gotoDay } = useTrip();
@@ -17,7 +18,8 @@ export function Info() {
     ));
   return (
     <>
-      <div className="alert warn">
+      <Checklist />
+      <div className="alert warn section">
         <span className="ic">
           <Icon name="warn" label="提醒" />
         </span>

@@ -4,13 +4,13 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import type { TripDoc } from "@/domain/schema";
 import type { Op } from "@/domain/ops";
 import { alertStatus } from "@/domain/rules";
-import { fmtTs } from "@/domain/format";
+import { dayDiff, fmtDay, fmtMD, fmtTs } from "@/domain/format";
+import { regionsOf, tripTags } from "@/domain/regions";
 import { api, registerServiceWorker } from "@/client/api";
 import { keyFor, loadSnapshot, saveSnapshot, mergeVersions, type VersionMeta } from "@/client/offline";
 import { SiteHeader } from "./SiteHeader";
 import { Icon } from "./Icon";
 import { useAsk, useToast, useHobartToday, useUrlState, withTimeout, writeUrl, type ToastAction } from "./ui";
-import { Overview } from "./Overview";
 import { DaysView } from "./DaysView";
 import { PlacesMap } from "./Places";
 import { Budget } from "./Budget";
@@ -63,7 +63,6 @@ export function useTrip(): Ctx {
 }
 
 const TABS = [
-  { key: "overview", label: "總覽" },
   { key: "days", label: "每日行程" },
   { key: "options", label: "行程方案" },
   { key: "map", label: "地圖與景點" },
@@ -105,7 +104,7 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
   const [online, setOnline] = useState(true);
   const [fromCache, setFromCache] = useState(false);
   // Tab and day live in the URL (?tab=days&day=YYYY-MM-DD) so walk ↔ plan links land in place.
-  // Without them: during the trip (Australia/Hobart dates) open today's day, otherwise the overview.
+  // Without them: 每日行程 (today's day during the trip). 總覽 was removed on 2026-10-26; ?tab=overview opens 每日行程.
   const today = useHobartToday();
   const inTrip = !!today && today >= props.initial.doc.meta.start && today <= props.initial.doc.meta.end;
   const [pickedTab, setPickedTab] = useState<TabKey | null>(null);
@@ -113,10 +112,10 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
   const url = useUrlState();
   // Only tabs this mode can show (visitors have no 版本與分享 tab) (RV-01).
   // The old 待安排景點 tab now lives on the map (?tab=pool keeps working).
-  const urlTabKey = url.tab === "pool" ? "map" : url.tab;
+  const urlTabKey = url.tab === "pool" ? "map" : url.tab === "overview" ? "days" : url.tab;
   const urlTab = TABS.some((t) => t.key === urlTabKey && (mode === "owner" || !("owner" in t))) ? (urlTabKey as TabKey) : null;
   const urlDayIdx = url.day ? doc.days.findIndex((d) => d.date === url.day) : -1;
-  const tab: TabKey = pickedTab ?? urlTab ?? (urlDayIdx >= 0 || inTrip ? "days" : "overview");
+  const tab: TabKey = pickedTab ?? urlTab ?? "days";
   const todayIdx = today ? doc.days.findIndex((d) => d.date >= today) : -1;
   const currentDay = pickedDay ?? (urlDayIdx >= 0 ? urlDayIdx : inTrip && todayIdx >= 0 ? todayIdx : inTrip ? doc.days.length - 1 : 0);
   const setTab = useCallback(
@@ -394,7 +393,7 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
       </a>
       <SiteHeader base={base} current="plan" account={mode === "owner" ? "signout" : home ? "signin" : null} />
       {/* Back to the walk at the selected day (RV-03). */}
-      <Hero doc={doc} mode={mode} walkHref={`${base || "/"}#rw-day-${doc.days[currentDay]?.date ?? ""}`} />
+      <Hero doc={doc} mode={mode} gotoDay={gotoDay} walkHref={`${base || "/"}#rw-day-${doc.days[currentDay]?.date ?? ""}`} />
       {mode === "public" && (
         <div className="banner">
           {canVote ? "你正在檢視 Aya 的旅程（唯讀）。可以對活動按「我有興趣」！" : "你正在檢視 Aya 的旅程（唯讀公開版，住址與司機資訊已隱藏）。"}{" "}
@@ -432,9 +431,6 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
         {busy ? "正在儲存…" : ""}
       </p>
       <main id="main">
-        <Panel id="overview" show={tab === "overview"}>
-          <Overview />
-        </Panel>
         <Panel id="days" show={tab === "days"}>
           <DaysView active={tab === "days"} />
         </Panel>
@@ -485,13 +481,52 @@ function Panel({ id, show, children }: { id: string; show: boolean; children: Re
   );
 }
 
-function Hero({ doc, mode, walkHref }: { doc: TripDoc; mode: Mode; walkHref: string }) {
+/**
+ * Top banner (2026-10-26, replaces 總覽): title, trip dates, countdown, tags and 途經地區 chips that
+ * open the first matching day.
+ */
+function Hero({ doc, mode, walkHref, gotoDay }: { doc: TripDoc; mode: Mode; walkHref: string; gotoDay: (i: number) => void }) {
+  const t = useHobartToday();
+  const s = doc.meta.start;
+  const e = doc.meta.end;
+  const when = !t ? "" : t < s ? `距離出發還有 ${dayDiff(t, s)} 天` : t <= e ? `旅程第 ${dayDiff(s, t) + 1} 天` : "旅程已結束";
+  const regions = regionsOf(doc);
   return (
     <header className="hero" id="top">
       <div className="hero-inner">
         <p className="eyebrow">{mode === "owner" ? "行程管理・擁有者" : "行程・唯讀瀏覽"}</p>
         <h1>{doc.meta.title}</h1>
         <p className="hero-sub">{doc.meta.subtitle}</p>
+        <dl className="hero-facts">
+          <div>
+            <dt>出遊時間</dt>
+            <dd>
+              {fmtMD(s)}–{fmtMD(e)}・{doc.days.length} 天
+            </dd>
+          </div>
+          {when && (
+            <div>
+              <dt>倒數</dt>
+              <dd className="hero-when">{when}</dd>
+            </div>
+          )}
+        </dl>
+        <p className="hero-tags">
+          {tripTags(doc).map((x) => (
+            <span key={x} className="hero-tag">
+              {x}
+            </span>
+          ))}
+        </p>
+        {regions.length > 0 && (
+          <nav className="hero-regions" aria-label="途經地區">
+            {regions.map((r) => (
+              <button key={r.name} type="button" onClick={() => gotoDay(r.dayIdx)} aria-label={`${r.name}：看 ${fmtDay(doc.days[r.dayIdx].date)}`}>
+                {r.name}
+              </button>
+            ))}
+          </nav>
+        )}
         <p className="hero-links">
           <a className="hero-cta" href={walkHref}>
             <Icon name="route" /> 回到散步
