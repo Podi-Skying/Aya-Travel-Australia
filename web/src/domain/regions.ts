@@ -1,4 +1,5 @@
 import type { TripDoc } from "./schema";
+import { effectiveDay } from "./effective-day";
 
 /*
  * 途經地區 chips for the 總覽 summary card (chictrip review P1-b). Region names are public;
@@ -31,7 +32,7 @@ export function regionsOf(doc: Pick<TripDoc, "days">): { name: string; dayIdx: n
 
 export function tripTags(doc: Pick<TripDoc, "days">): string[] {
   const tags: string[] = [];
-  if (doc.days.some((d) => d.needsDriver)) tags.push("朋友開車自駕");
+  if (doc.days.some((d) => effectiveDay(d).needsDriver)) tags.push("朋友開車自駕");
   if (doc.days.some((d) => d.seg === "tas")) tags.push("塔州公車免費", "極光季（11 月仍可能）");
   return tags;
 }

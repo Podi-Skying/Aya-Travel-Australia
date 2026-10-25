@@ -637,7 +637,7 @@ export function DaysView({ active }: { active: boolean }) {
               }))}
             onAdd={editable ? (key, id) => runOp({ op: "scheduleItem", key, itemId: id, date: d.date }) : undefined}
           />
-          <p className="map-note">路線為點對點直線示意，非實際道路；實際路線與時間請以導航為準。</p>
+          <p className="map-note">開車路段若已計算過會沿實際道路畫出，其他路段是點對點直線示意；實際路線與時間請以導航為準。</p>
         </aside>
       </div>
     </div>

@@ -414,3 +414,13 @@ Added:
 - **R5-001, accepted.** `stopsOf(items, keep)` treats activities that are not drawn on the map (no position, or another region) as gaps. The selected-day map passes the full activity list.
 - **R5-002, accepted.** If getting the database fails after OSRM succeeds, the computed legs are still returned, with `cached: false`.
 - **Status.** The plan-review budget (5 rounds) is used up. These two fixes are covered by the fresh final code inspection instead of a 6th plan review.
+
+## Final inspection 1: dispositions
+
+- **R-001 and R-002 (backfill script), rejected.** The backfill is a one-off migration by project convention (back up, write, delete; see the earlier data scripts).
+  - It ran on 2026-10-26 and wrote v89 (backup `trip-v88-before-options.json`).
+  - Before the write it printed the schema, item-set and A→B→A invariants, and all of them passed on the production document.
+  - The guest document check after the write shows 3 options and the aurora link, with no private names or fields.
+- **R-003, accepted.** 「全覽」 resets the day, region and layer filters, and refits after the redraw.
+- **R-004, accepted.** The self-drive tag uses `effectiveDay(d).needsDriver`.
+- **R-005, accepted.** The day map note now says that computed drive legs follow roads and the other legs are straight lines.

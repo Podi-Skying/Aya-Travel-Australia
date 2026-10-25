@@ -175,9 +175,12 @@ export function PlacesMap({ active }: { active: boolean }) {
     }, 60);
     return () => clearTimeout(id);
   }, [selDate, active]);
+  // 全覽: every scheduled day of every region; the redraw then fits the whole trip.
   const fitAll = () => {
-    pickDay(null);
-    if (allBounds.current) map.current?.fitBounds(allBounds.current.pad(0.1), { animate: !reduce });
+    setTodayMode(false);
+    fitKey.current = "";
+    patch({ mday: null, seg: "all", days: true });
+    if (!f.mday && f.seg === "all" && f.days && allBounds.current) map.current?.fitBounds(allBounds.current.pad(0.1), { animate: !reduce });
   };
   const locate = () => {
     if (!("geolocation" in navigator)) return setMeMsg("這個瀏覽器不支援定位");
