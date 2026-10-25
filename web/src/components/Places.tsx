@@ -179,8 +179,8 @@ export function PlacesMap({ active }: { active: boolean }) {
   const fitAll = () => {
     setTodayMode(false);
     fitKey.current = "";
-    patch({ mday: null, seg: "all", days: true });
-    if (!f.mday && f.seg === "all" && f.days && allBounds.current) map.current?.fitBounds(allBounds.current.pad(0.1), { animate: !reduce });
+    patch({ mday: null, seg: "all", days: true, pool: true, cat: "all", place: null });
+    if (!f.mday && f.seg === "all" && f.days && f.pool && f.cat === "all" && !f.place && allBounds.current) map.current?.fitBounds(allBounds.current.pad(0.1), { animate: !reduce });
   };
   const locate = () => {
     if (!("geolocation" in navigator)) return setMeMsg("這個瀏覽器不支援定位");
@@ -259,12 +259,11 @@ export function PlacesMap({ active }: { active: boolean }) {
         const red = cssVar("--vermilion", "#b83a2e");
         const popup = (d: ReturnType<typeof effectiveDay>, i: Item, idx: number) =>
           `<div class="stop-pop">${i.photo ? `<img src="${esc(i.photo.url)}" alt="" referrerpolicy="no-referrer" loading="lazy">` : ""}<div><div class="d">${fmtDay(d.date)}・${esc(d.title)}</div><strong>${esc(i.name)}</strong><a href="#" data-goto="${idx}">查看當天行程 →</a>${i.photo ? `<div class="src">圖片來源：${esc(i.photo.site)}</div>` : ""}</div></div>`;
-        if (f.days || selDate)
+        if (f.days)
           doc.days.forEach((raw, idx) => {
             if (f.seg !== "all" && raw.seg !== f.seg) return;
             const d = effectiveDay(raw);
             const sel = d.date === selDate;
-            if (!sel && !f.days) return;
             const here = (i: { lat?: number; lng?: number }) => i.lat != null && i.lng != null && i.lat > -40 === (d.seg === "syd");
             const pts = d.items.filter(here).map((i) => [i.lat!, i.lng!] as [number, number]);
             if (sel) {

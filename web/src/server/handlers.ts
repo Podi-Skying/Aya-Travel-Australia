@@ -171,6 +171,9 @@ const ROUTE_BYTES = 4_000;
 /** Road legs: the owner computes missing legs, everyone else reads the cache only. */
 export async function postRoutes(req: Request) {
   try {
+    // Same-origin JSON only, checked before any quota is charged (share-link viewers are same-origin).
+    if (!sameOrigin(req)) return fail(403, "來源不符");
+    if (!(req.headers.get("content-type") ?? "").startsWith("application/json")) return fail(415, "需要 JSON");
     const b = (await readJson(req, ROUTE_BYTES)) as { points?: unknown; refresh?: unknown };
     const points = validPoints(b.points);
     if (!points) return fail(400, `需要 2–${MAX_POINTS} 個座標`);

@@ -23,3 +23,16 @@ Requirements and the first version of a private travel planner for the real Sydn
 
 ## Guardrail
 The first-version architecture is decided in ADR 0001. Changing the framework, database, hosting provider, or AI provider needs a new ADR. Live-data providers are still undecided.
+
+## Research cache
+
+Before searching the web again for prices, drive times or sources, check the database cache. Store new findings there too.
+
+```bash
+cd web
+npm run cache -- list
+npm run cache -- get fuel tas-u91
+npm run cache -- put <kind> <key> '<json>' --source "<where>"
+```
+
+Road legs are kept in `route_cache`. They are computed once, when the owner views a driving day.
