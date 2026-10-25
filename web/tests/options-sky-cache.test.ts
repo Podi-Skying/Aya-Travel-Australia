@@ -258,7 +258,7 @@ describe("round-3 fixes", () => {
     expect(s.map((x) => x.drive)).toEqual([true, false, true, false]);
   });
 
-  it("a noDriver option day clears driver needs from item package contexts too", async () => {
+  it("a noDriver option day refuses activities that need a driver", async () => {
     const { applyOp } = await import("@/domain/ops");
     const { parseTripDoc } = await import("@/domain/schema");
     const { effectiveDay } = await import("@/domain/effective-day");
@@ -270,11 +270,17 @@ describe("round-3 fixes", () => {
       tripOptions: [{ key: "rest", group: "g", title: "x", summary: "", region: "", themes: [], chosen: false, start: "2026-11-20", days: [{ title: "休息", stay: "utas", driveHrs: 0, noDriver: true, itemIds: [id] }] }],
     });
     if (!r0.ok) throw new Error(JSON.stringify(r0.errors));
+    // Driver metadata is never erased; a rest day with a driver activity is refused instead.
     const r = applyOp(r0.doc, { op: "applyOption", key: "rest" });
-    if (!r.ok) throw new Error(r.error);
-    const day = r.doc.days.find((d) => d.date === "2026-11-20")!;
-    expect(day.items.map((i) => i.id)).toContain(id);
-    expect(effectiveDay(day).needsDriver).toBeFalsy();
+    expect(r.ok).toBe(false);
+    void effectiveDay;
+  });
+
+  it("returns validation errors (not a crash) for a malformed option start", async () => {
+    const { parseTripDoc } = await import("@/domain/schema");
+    const base = seedDoc() as TripDoc;
+    const r = parseTripDoc({ ...base, tripOptions: [{ key: "o", group: "g", title: "x", summary: "", region: "", themes: [], chosen: false, start: "not-a-date", days: [{ title: "a", stay: "utas", driveHrs: 0, itemIds: [] }] }] });
+    expect(r.ok).toBe(false);
   });
 
   it("rejects options whose dates are not all trip days or that move items across regions", async () => {

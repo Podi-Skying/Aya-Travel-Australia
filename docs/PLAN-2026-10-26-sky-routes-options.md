@@ -186,7 +186,7 @@ tripOptions: {
 1. For each option day i, date = start + i.
 2. On each target date, every item except confirmed items and flights moves back to the pool, following the `unscheduleItem` rules (its origin package, or `removed-<seg>`).
 3. Each referenced item is taken out of wherever it is (the pool or another day), with the same rules as `scheduleItem`. It then goes onto its option day, sorted by time.
-4. The option day replaces the day's metadata. `title`, `stay` and `driveHrs` come from the option. `costs`, `transfer`, `alt`, `ferry` and `hike` are reset (the option's activities carry their own costs). `needsDriver` is kept, unless the option day sets `noDriver: true`; then `needsDriver` and `driverConfirmation` are removed (e.g. a rest day in Hobart).
+4. The option day replaces the day's metadata. `title`, `stay` and `driveHrs` come from the option. `costs`, `transfer`, `alt`, `ferry` and `hike` are reset (the option's activities carry their own costs). `needsDriver` is kept, unless the option day sets `noDriver: true`. Then `needsDriver` and `driverConfirmation` are removed (e.g. a rest day in Hobart). Package metadata on activities is never erased, so the option is refused when such a day still needs a driver through its activities (R4-001).
 5. In the group, `chosen = true` for this option and false for the others.
 6. One op means one version. The client uses `runOpUndoable`, so the toast offers undo.
 7. Fails with a 400 error naming the item if a referenced item is `confirmed` on another date. A confirmed item never moves.
@@ -392,7 +392,7 @@ Added:
 
 ## Revision 3: dispositions of Codex round-3 findings
 
-- **R3-001, accepted.** On a `noDriver` option day, the driver need is also removed from attached packages and from the item package contexts.
+- **R3-001, accepted, then superseded by R4-001.** See Revision 4.
 - **R3-002, accepted.** `stopsOf` breaks the route at any activity without coordinates. There is never a leg across an unlocated stop.
 - **R3-003, accepted.** The owner's cache reads are not limited. The computation quota is charged only when legs are missing (or a refresh is asked) and OSRM will be called. When the quota is used up, the response returns the cached legs with `limited: true`. Guests are limited per IP for all requests.
 - **R3-004, accepted.** The schema checks that every calendar date of an option is a trip day, and that each referenced item's region matches its target day.
@@ -400,3 +400,11 @@ Added:
   - a44 (Ross) moves to 11/11, the way back.
   - g36 (Ronny Creek) is on 11/17.
   - In nw-stanley-2d1n, a53 is on 11/17, and 11/18 is a `noDriver` rest day.
+
+## Revision 4: dispositions of Codex round-4 findings
+
+- **R4-001, accepted, with a narrower fix.**
+  - `noDriver` removes only the day's own driver need and confirmation. Package metadata stays intact, so it travels back to the pool correctly.
+  - If the day still needs a driver through its activities (attached packages or package contexts), `applyOption` refuses with a 400 error.
+  - A rest day has no such activities in the seed.
+- **R4-002, accepted.** Option dates are computed only when `start` is a real date, so a malformed start gives a validation error, not a crash.

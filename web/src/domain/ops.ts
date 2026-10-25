@@ -226,11 +226,10 @@ function applyOption(doc: TripDoc, key: string): OpResult {
     for (const k of ["costs", "transfer", "alt", "ferry", "hike"] as const) delete day[k];
     dropOrphanAttachments(day);
     if (od.noDriver) {
-      // Every source of a driver need goes: the day's own, attached packages and item contexts.
       delete day.needsDriver;
       delete day.driverConfirmation;
-      for (const a of day.attached ?? []) delete a.needsDriver;
-      for (const it of day.items) if (it.packageContext) delete it.packageContext.needsDriver;
+      // Package metadata is kept intact (it travels back to the pool), so a rest day cannot hold driver activities.
+      if (effectiveDay(day).needsDriver) return err(400, `「${od.title}」不需要司機，但方案裡有需要開車的景點`);
     }
     day.open = !day.items.length;
   }

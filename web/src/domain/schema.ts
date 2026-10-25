@@ -298,7 +298,7 @@ export const tripDocSchema = z
         chosenGroups.add(o.group);
       }
       // Every calendar date of the option must be a trip day, and items must stay in their region.
-      const targets = o.days.map((_, i) => doc.days.find((d) => d.date === new Date(Date.parse(o.start + "T00:00:00Z") + i * 86_400_000).toISOString().slice(0, 10)));
+      const targets = o.days.map((_, i) => !isRealDate(o.start) ? undefined : doc.days.find((d) => d.date === new Date(Date.parse(o.start + "T00:00:00Z") + i * 86_400_000).toISOString().slice(0, 10)));
       if (targets.some((t) => !t)) ctx.addIssue({ code: "custom", message: `行程方案 ${o.key} 的日期超出旅程`, path: ["tripOptions", oi, "start"] });
       const ids = new Set<string>();
       o.days.forEach((d, di) => {
