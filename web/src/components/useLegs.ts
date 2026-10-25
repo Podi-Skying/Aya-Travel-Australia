@@ -74,14 +74,15 @@ export const legLabel = (l: Leg) => {
 };
 
 /**
- * Stops of a day with coordinates; `drive` marks a stop reached by car directly from the previous
- * located stop. An activity without coordinates in between breaks the route (no leg across it).
+ * Stops of a day with coordinates (and passing `keep`); `drive` marks a stop reached by car directly
+ * from the previous stop. Any skipped activity in between breaks the route (no leg across it).
  */
-export function stopsOf(items: { lat?: number; lng?: number; mode: string }[]): Stop[] {
+export function stopsOf<T extends { lat?: number; lng?: number; mode: string }>(items: T[], keep: (i: T) => boolean = () => true): Stop[] {
   const out: Stop[] = [];
   let gap = false;
   for (const i of items) {
-    if (i.lat == null || i.lng == null) {
+    // Activities without a position, or not drawn on this map, break the route like a gap.
+    if (i.lat == null || i.lng == null || !keep(i)) {
       gap = true;
       continue;
     }

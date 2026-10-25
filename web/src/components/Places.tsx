@@ -147,7 +147,7 @@ export function PlacesMap({ active }: { active: boolean }) {
   const selDate = !hydrated ? null : (f.mday ?? (todayMode && inTrip ? today : null));
   const selIdx = selDate ? doc.days.findIndex((d) => d.date === selDate) : -1;
   const selDay = selIdx >= 0 ? effectiveDay(doc.days[selIdx]) : null;
-  const selStops = selDay ? stopsOf(selDay.items.filter((i) => i.lat != null && i.lat > -40 === (selDay.seg === "syd"))) : null;
+  const selStops = selDay ? stopsOf(selDay.items, (i) => i.lat! > -40 === (selDay.seg === "syd")) : null;
   const legs = useLegs(selStops);
   // Road totals only when every drive pair has a cached leg (non-drive pairs are never routed).
   const drivePairs = selStops ? selStops.slice(1).map((s) => s.drive) : [];

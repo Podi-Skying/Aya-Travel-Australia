@@ -408,3 +408,9 @@ Added:
   - If the day still needs a driver through its activities (attached packages or package contexts), `applyOption` refuses with a 400 error.
   - A rest day has no such activities in the seed.
 - **R4-002, accepted.** Option dates are computed only when `start` is a real date, so a malformed start gives a validation error, not a crash.
+
+## Revision 5: dispositions of Codex round-5 findings (the last plan-review round)
+
+- **R5-001, accepted.** `stopsOf(items, keep)` treats activities that are not drawn on the map (no position, or another region) as gaps. The selected-day map passes the full activity list.
+- **R5-002, accepted.** If getting the database fails after OSRM succeeds, the computed legs are still returned, with `cached: false`.
+- **Status.** The plan-review budget (5 rounds) is used up. These two fixes are covered by the fresh final code inspection instead of a 6th plan review.

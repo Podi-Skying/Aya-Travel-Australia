@@ -88,17 +88,17 @@ export async function getLegs(raw: Pt[], opts: { compute: boolean; refresh?: boo
   const need = opts.refresh ? points.slice(1).some((b, i) => !same(points[i], b)) : legs.some((l) => !l);
   if (!opts.compute || !need) return { legs, computed: 0 };
   const fresh = await osrm(points, opts.fetch ?? (fetch as unknown as Fetch));
-  const db = await getDb();
+  const db = await getDb().catch(() => null);
   const now = new Date();
   let computed = 0;
-  let cached = true;
+  let cached = !!db;
   for (let i = 0; i < fresh.length; i++) {
     const [a, b] = [points[i], points[i + 1]];
     if (same(a, b) || (!opts.refresh && legs[i])) continue;
     const row = { fromLat: a[0], fromLng: a[1], toLat: b[0], toLng: b[1], mode, ...fresh[i], computedAt: now };
-    // A failed write (e.g. before the migration) still returns the computed leg.
+    // A failed write or no database (e.g. before the migration) still returns the computed leg.
     await db
-      .insert(routeCache)
+      ?.insert(routeCache)
       .values(row)
       .onConflictDoUpdate({
         target: [routeCache.fromLat, routeCache.fromLng, routeCache.toLat, routeCache.toLng, routeCache.mode],

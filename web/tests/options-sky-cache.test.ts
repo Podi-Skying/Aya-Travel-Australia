@@ -256,6 +256,16 @@ describe("round-3 fixes", () => {
       { lat: -42.3, lng: 148.1, mode: "bus" },
     ]);
     expect(s.map((x) => x.drive)).toEqual([true, false, true, false]);
+    // A stop excluded from the map (other region) also breaks the route.
+    const t = stopsOf(
+      [
+        { lat: -42.8, lng: 147.3, mode: "drive" },
+        { lat: -33.8, lng: 151.2, mode: "drive" },
+        { lat: -42.5, lng: 147.9, mode: "drive" },
+      ],
+      (i) => i.lat < -40,
+    );
+    expect(t.map((x) => x.drive)).toEqual([true, false]);
   });
 
   it("a noDriver option day refuses activities that need a driver", async () => {
