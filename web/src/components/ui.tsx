@@ -79,6 +79,10 @@ export function writeUrl(next: { tab: string; day?: string }) {
   history.replaceState(history.state, "", `${location.pathname}?${q.toString()}${location.hash}`);
   dispatchEvent(new Event(URL_EVENT));
 }
+/** False during server rendering and hydration, true afterwards: URL-derived UI waits for it. */
+export function useHydrated(): boolean {
+  return useSyncExternalStore(noSubscribe, () => true, () => false);
+}
 /** Today's date in the viewer's time zone; null during server rendering. */
 export function useToday(): string | null {
   return useSyncExternalStore(noSubscribe, () => {

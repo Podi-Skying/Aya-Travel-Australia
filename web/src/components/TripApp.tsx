@@ -1,10 +1,10 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import type { TripDoc } from "@/domain/schema";
 import type { Op } from "@/domain/ops";
 import { alertStatus } from "@/domain/rules";
-import { dayDiff, fmtMD, fmtTs } from "@/domain/format";
+import { fmtTs } from "@/domain/format";
 import { api, registerServiceWorker } from "@/client/api";
 import { keyFor, loadSnapshot, saveSnapshot, mergeVersions, type VersionMeta } from "@/client/offline";
 import { SiteHeader } from "./SiteHeader";
@@ -15,6 +15,7 @@ import { DaysView } from "./DaysView";
 import { PlacesMap } from "./Places";
 import { Budget } from "./Budget";
 import { Info } from "./Info";
+import { TripOptions } from "./TripOptions";
 import { Manage } from "./Manage";
 
 /*
@@ -64,6 +65,7 @@ export function useTrip(): Ctx {
 const TABS = [
   { key: "overview", label: "總覽" },
   { key: "days", label: "每日行程" },
+  { key: "options", label: "行程方案" },
   { key: "map", label: "地圖與景點" },
   { key: "budget", label: "預算" },
   { key: "info", label: "資訊與警示" },
@@ -436,6 +438,9 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
         <Panel id="days" show={tab === "days"}>
           <DaysView active={tab === "days"} />
         </Panel>
+        <Panel id="options" show={tab === "options"}>
+          <TripOptions />
+        </Panel>
         <Panel id="map" show={tab === "map"}>
           <PlacesMap active={tab === "map"} />
         </Panel>
@@ -481,36 +486,12 @@ function Panel({ id, show, children }: { id: string; show: boolean; children: Re
 }
 
 function Hero({ doc, mode, walkHref }: { doc: TripDoc; mode: Mode; walkHref: string }) {
-  const segOrder = useMemo(() => {
-    const out: string[] = [];
-    doc.days.forEach((d) => {
-      if (!out.includes(d.seg)) out.push(d.seg);
-    });
-    return out;
-  }, [doc.days]);
-  const t = useHobartToday();
-  const s = doc.meta.start;
-  const e = doc.meta.end;
-  const when = !t ? "" : t < s ? `距離出發還有 ${dayDiff(t, s)} 天` : t <= e ? `旅程第 ${dayDiff(s, t) + 1} 天` : "旅程已結束";
   return (
     <header className="hero" id="top">
       <div className="hero-inner">
         <p className="eyebrow">{mode === "owner" ? "行程管理・擁有者" : "行程・唯讀瀏覽"}</p>
         <h1>{doc.meta.title}</h1>
         <p className="hero-sub">{doc.meta.subtitle}</p>
-        <div className="hero-meta">
-          <span className="chip-hero">
-            <Icon name="calendar" /> {fmtMD(doc.meta.start)} – {fmtMD(doc.meta.end)}・{doc.days.length} 天
-          </span>
-          <span className="chip-hero">
-            <Icon name="pin" /> {segOrder.map((k) => `${doc.segments[k]?.name ?? k}（${doc.segments[k]?.range ?? ""}）`).join(" → ")}
-          </span>
-          {when && (
-            <span className="chip-hero">
-              <Icon name="clock" /> {when}
-            </span>
-          )}
-        </div>
         <p className="hero-links">
           <a className="hero-cta" href={walkHref}>
             <Icon name="route" /> 回到散步

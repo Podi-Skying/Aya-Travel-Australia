@@ -4,6 +4,7 @@ import { useTrip } from "./TripApp";
 import { Icon } from "./Icon";
 import { Badge, PRI, STATUS, VERIFY } from "./ui";
 import { fmtDay, fmtTs } from "@/domain/format";
+import { SkyWatch } from "./SkyWatch";
 
 export function Info() {
   const { doc, mode, alerts, lastSyncAt, offlineCopy, gotoDay } = useTrip();
@@ -21,7 +22,7 @@ export function Info() {
           <Icon name="warn" label="提醒" />
         </span>
         <p>
-          <strong>目前沒有即時資料連線。</strong>
+          <strong>道路、國家公園與天氣警示沒有即時連線。</strong>
           以下為官方來源連結，出發前與每天出門前請手動查看道路、國家公園與天氣警示。網站不會把舊資料當成最新資訊。
         </p>
       </div>
@@ -38,9 +39,10 @@ export function Info() {
               </li>
             ))}
           </ul>
-          <p className="muted small">外部即時警示：未連線（第一版沒有自動查詢），請用上面的官方連結確認。</p>
+          <p className="muted small">道路與國家公園警示沒有自動查詢，請用上面的官方連結確認。極光指數有即時資料（見下方「極光與藍眼淚」）。</p>
         </div>
       </div>
+      <SkyWatch />
       <div className="card section">
         <h3>最後已知的規劃提醒</h3>
         <p className="muted small">

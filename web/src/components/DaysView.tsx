@@ -16,10 +16,13 @@ import { checks, feasibility } from "@/domain/rules";
 import { basis, dayTotal, lineAmount, stayOf } from "@/domain/budget";
 import { fmtDay, mins, money } from "@/domain/format";
 import type { Item } from "@/domain/schema";
+import { legLabel, stopsOf, useLegs, type Leg } from "./useLegs";
 
-function Legs({ travel }: { travel: Item["travel"] }) {
+function Legs({ travel, road }: { travel: Item["travel"]; road?: Leg | null }) {
   const parts = Object.entries(travel ?? {}).filter(([, v]) => (v ?? 0) > 0) as [string, number][];
-  if (!parts.length) return null;
+  // The cached road leg (OSRM, stored in the database) is shown as computed, never re-estimated here.
+  const roadRow = road && road.durationS > 0 ? <span className="leg-road">開車 {legLabel(road)}（道路計算）</span> : null;
+  if (!parts.length) return roadRow ? <li className="leg">{roadRow}</li> : null;
   const total = parts.reduce((a, [, v]) => a + v, 0);
   return (
     <li className="leg">
@@ -29,6 +32,7 @@ function Legs({ travel }: { travel: Item["travel"] }) {
         </span>
       ))}
       <span>・約 {mins(total)}（估計）</span>
+      {roadRow}
     </li>
   );
 }
@@ -154,6 +158,13 @@ export function DaysView({ active }: { active: boolean }) {
   const nearby = nearbyPlaces(doc, d.date, 12);
   const dayPhotos: DayPhoto[] = d.items.flatMap((i) => (i.photo ? [{ id: i.id, name: i.name, photo: i.photo }] : []));
   // Everyone who takes part in at least one of the day's activities (Kai + Aya when the day is empty).
+  // Road legs between consecutive stops with coordinates, on driving days (chictrip review P2-a).
+  const located = d.items.map((i, k) => ({ i, k })).filter(({ i }) => i.lat != null && i.lng != null);
+  const roadLegs = useLegs(stopsOf(d.items));
+  const roadBefore = (k: number) => {
+    const pos = located.findIndex((x) => x.k === k);
+    return pos > 0 ? (roadLegs?.[pos - 1] ?? null) : null;
+  };
   const dayPeople: Person[] = PEOPLE.filter((p) => (raw.items.length ? raw.items.some((i) => peopleOf(i, raw).includes(p)) : peopleOf({}, raw).includes(p)));
   // The day's headline picture: its first major stop with a photo, else any photo.
   const dayHero = d.items.find((i) => i.photo && i.major) ?? d.items.find((i) => i.photo);
@@ -391,7 +402,7 @@ export function DaysView({ active }: { active: boolean }) {
                 const cnt = countOf(i.id);
                 return (
                   <FragmentItem key={i.id}>
-                    <Legs travel={i.travel} />
+                    <Legs travel={i.travel} road={roadBefore(k)} />
                     <li className={`act ${focusId === i.id ? "active" : ""}`}>
                       <div className={`pin ${d.seg}`} aria-hidden="true">
                         {k + 1}

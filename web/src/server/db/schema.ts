@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, index, integer, jsonb, pgTable, primaryKey, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, doublePrecision, index, integer, jsonb, pgTable, primaryKey, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 
 /* PLAN.md 4.3. Versions are append-only snapshots of the whole trip document. */
 
@@ -72,4 +72,39 @@ export const rateLimits = pgTable(
     tripId: uuid("trip_id").references(() => trips.id, { onDelete: "cascade" }),
   },
   (t) => [primaryKey({ columns: [t.key, t.windowStart] })],
+);
+
+/*
+ * Caches (PLAN-2026-10-26 §2). Not tied to a trip: coordinates are already public in guest
+ * documents, and lookups are about places, not people. Rows are reused instead of recomputed.
+ */
+export const routeCache = pgTable(
+  "route_cache",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    fromLat: doublePrecision("from_lat").notNull(),
+    fromLng: doublePrecision("from_lng").notNull(),
+    toLat: doublePrecision("to_lat").notNull(),
+    toLng: doublePrecision("to_lng").notNull(),
+    mode: text("mode").notNull(),
+    distanceM: integer("distance_m").notNull(),
+    durationS: integer("duration_s").notNull(),
+    geometry: jsonb("geometry").notNull(),
+    source: text("source").notNull(),
+    computedAt: timestamp("computed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [unique("route_cache_pair").on(t.fromLat, t.fromLng, t.toLat, t.toLng, t.mode)],
+);
+
+export const lookupCache = pgTable(
+  "lookup_cache",
+  {
+    kind: text("kind").notNull(),
+    key: text("key").notNull(),
+    value: jsonb("value").notNull(),
+    source: text("source").notNull(),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+  },
+  (t) => [primaryKey({ columns: [t.kind, t.key] })],
 );

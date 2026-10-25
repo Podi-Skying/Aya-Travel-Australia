@@ -1,4 +1,4 @@
-import { CATEGORIES, DEFAULT_PEOPLE, PEOPLE, MODES, PRIORITIES, COST_STATUS, COST_UNITS, COST_CATS, TIME_RE, validWindow } from "./schema";
+import { CATEGORIES, DEFAULT_PEOPLE, PEOPLE, MODES, PRIORITIES, COST_STATUS, COST_UNITS, COST_CATS, SKY_KINDS, TIME_RE, isRealDate, validWindow } from "./schema";
 import type { Cost, Day, Item, Package, TripDoc } from "./schema";
 import { effectiveDay } from "./effective-day";
 import { fmtDay } from "./format";
@@ -28,6 +28,11 @@ export type Op =
   | { op: "setStatus"; date: string; itemId: string; status: "" | "confirmed" | "pending" }
   | { op: "clearDay"; date: string }
   | { op: "setPeople"; date: string; itemId: string; people: string[] }
+  | { op: "addSkyLink"; kind: string; label: string; url: string; newId: string }
+  | { op: "removeSkyLink"; id: string }
+  | { op: "addSkyPost"; kind: string; text: string; date: string; url?: string; photoUrl?: string; newId: string }
+  | { op: "removeSkyPost"; id: string }
+  | { op: "applyOption"; key: string }
   | { op: "snapshot"; summary: string };
 
 export type ItemFields = {
@@ -149,8 +154,92 @@ export function clearDaySplit(items: Item[]): { move: Item[]; keep: Item[] } {
   return { move: items.filter((i) => !keep(i)), keep: items.filter(keep) };
 }
 
+function httpsUrl(u: string | undefined): string | null | undefined {
+  const v = u?.trim();
+  if (!v) return undefined;
+  try {
+    return new URL(v).protocol === "https:" && v.length <= 500 ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+/** A package's shared costs and driver needs stay on a day only while one of its activities does. */
+function dropOrphanAttachments(day: Day) {
+  if (!day.attached) return;
+  day.attached = day.attached.filter((a) => day.items.some((i) => i.originPackage === a.key));
+  if (!day.attached.length) delete day.attached;
+}
+
+/** Where an item currently is: on a day, or in a pool package. */
+function locate(doc: TripDoc, id: string): { date: string } | { key: string } | null {
+  for (const d of doc.days) if (d.items.some((i) => i.id === id)) return { date: d.date };
+  for (const p of doc.attractionPool) if (p.items.some((i) => i.id === id)) return { key: p.key };
+  return null;
+}
+
+const addDays = (date: string, n: number) => new Date(Date.parse(date + "T00:00:00Z") + n * 86_400_000).toISOString().slice(0, 10);
+
+/**
+ * 採用方案: the option's dates get exactly its activities. Everything else on those dates goes back
+ * to the pool as 「移回待安排」 does, except confirmed bookings and flights, which never move.
+ */
+function applyOption(doc: TripDoc, key: string): OpResult {
+  const o = doc.tripOptions.find((x) => x.key === key);
+  if (!o) return err(404, "找不到行程方案");
+  const dates = o.days.map((_, i) => addDays(o.start, i));
+  if (dates.some((d) => !findDay(doc, d))) return err(400, "方案日期超出旅程");
+  let cur = doc;
+  const step = (op: Op): string | null => {
+    const r = applyOp(cur, op);
+    if (!r.ok) return r.error;
+    cur = r.doc;
+    return null;
+  };
+  for (const date of dates) {
+    const day = findDay(cur, date)!;
+    for (const it of day.items) {
+      if (it.status === "confirmed" || it.mode === "flight") continue;
+      const e = step({ op: "unscheduleItem", date, itemId: it.id });
+      if (e) return err(400, e);
+    }
+  }
+  for (const [i, od] of o.days.entries()) {
+    const date = dates[i];
+    for (const id of od.itemIds) {
+      const at = locate(cur, id);
+      if (!at) return err(400, `方案引用的活動 ${id} 不存在`);
+      if ("date" in at) {
+        if (at.date === date) continue;
+        const e = step({ op: "moveItem", date: at.date, itemId: id, toDate: date });
+        if (e) return err(400, e);
+      } else {
+        const e = step({ op: "scheduleItem", key: at.key, itemId: id, date });
+        if (e) return err(400, e);
+      }
+    }
+    // The option describes the whole day: its activities carry their own costs, and old flags go.
+    const day = findDay(cur, date)!;
+    day.title = od.title;
+    day.stay = od.stay;
+    day.driveHrs = od.driveHrs;
+    for (const k of ["costs", "transfer", "alt", "ferry", "hike"] as const) delete day[k];
+    dropOrphanAttachments(day);
+    if (od.noDriver) {
+      delete day.needsDriver;
+      delete day.driverConfirmation;
+    }
+    day.open = !day.items.length;
+  }
+  for (const x of cur.tripOptions) if (x.group === o.group) x.chosen = x.key === o.key;
+  return { ok: true, doc: cur, summary: `採用方案「${o.title}」（${fmtDay(dates[0])}–${fmtDay(dates.at(-1)!)}）` };
+}
+
 export function applyOp(input: TripDoc, op: Op): OpResult {
   const doc = clone(input);
+  // Documents saved before these fields existed (and unparsed fixtures) lack the defaults.
+  doc.skyWatch ??= { links: [], posts: [] };
+  doc.tripOptions ??= [];
   switch (op.op) {
     case "setPriority": {
       const d = findDay(doc, op.date);
@@ -245,7 +334,10 @@ export function applyOp(input: TripDoc, op: Op): OpResult {
       // FR-04: a Must-do activity is never removed without an explicit confirmation naming it.
       if (it.pri === "must" && op.confirmMustName !== it.name) return err(400, `「${it.name}」是必去活動，需要明確確認才能移除`);
       d.items = d.items.filter((x) => x !== it);
+      dropOrphanAttachments(d);
       if (!d.items.length) d.open = true;
+      // Options must not point at a deleted activity.
+      for (const o of doc.tripOptions) for (const od of o.days) od.itemIds = od.itemIds.filter((x) => x !== it.id);
       return { ok: true, doc, summary: `${fmtDay(d.date)} 移除「${it.name}」` };
     }
     case "schedulePackage": {
@@ -375,6 +467,42 @@ export function applyOp(input: TripDoc, op: Op): OpResult {
       }
       return { ok: true, doc: cur, summary: `${fmtDay(d.date)} 清空：${move.length} 個活動移回待安排${keep.length ? `，保留 ${keep.length} 個` : ""}` };
     }
+    case "addSkyLink": {
+      if (!(SKY_KINDS as readonly string[]).includes(op.kind)) return err(400, "類型不正確");
+      const label = op.label.trim();
+      if (!label || label.length > 60) return err(400, "名稱需為 1–60 字");
+      const url = httpsUrl(op.url);
+      if (!url) return err(400, "網址需為 https 開頭");
+      if (doc.skyWatch.links.length >= 10) return err(400, "最多 10 個連結");
+      doc.skyWatch.links.push({ id: op.newId, kind: op.kind as "aurora" | "bio", label, url });
+      return { ok: true, doc, summary: `新增社團連結「${label}」` };
+    }
+    case "removeSkyLink": {
+      const l = doc.skyWatch.links.find((x) => x.id === op.id);
+      if (!l) return err(404, "找不到連結");
+      doc.skyWatch.links = doc.skyWatch.links.filter((x) => x !== l);
+      return { ok: true, doc, summary: `移除社團連結「${l.label}」` };
+    }
+    case "addSkyPost": {
+      if (!(SKY_KINDS as readonly string[]).includes(op.kind)) return err(400, "類型不正確");
+      const text = op.text.trim();
+      if (!text || text.length > 500) return err(400, "內容需為 1–500 字");
+      if (!isRealDate(op.date)) return err(400, "日期不正確");
+      const url = httpsUrl(op.url);
+      const photoUrl = httpsUrl(op.photoUrl);
+      if (url === null || photoUrl === null) return err(400, "網址需為 https 開頭");
+      if (doc.skyWatch.posts.length >= 100) return err(400, "最多 100 則，請先移除舊的");
+      doc.skyWatch.posts.push(strip({ id: op.newId, kind: op.kind as "aurora" | "bio", text, date: op.date, url, photoUrl }));
+      return { ok: true, doc, summary: `新增${op.kind === "aurora" ? "極光" : "藍眼淚"}消息（${op.date}）` };
+    }
+    case "removeSkyPost": {
+      const p = doc.skyWatch.posts.find((x) => x.id === op.id);
+      if (!p) return err(404, "找不到消息");
+      doc.skyWatch.posts = doc.skyWatch.posts.filter((x) => x !== p);
+      return { ok: true, doc, summary: `移除 ${p.date} 的${p.kind === "aurora" ? "極光" : "藍眼淚"}消息` };
+    }
+    case "applyOption":
+      return applyOption(doc, op.key);
     case "snapshot": {
       const s = op.summary.trim();
       if (!s || s.length > 60) return err(400, "版本說明需為 1–60 字");

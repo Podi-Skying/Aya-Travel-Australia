@@ -6,6 +6,7 @@ import type * as Leaflet from "leaflet";
 import { PRI, useReducedMotion } from "./ui";
 import type { EffectiveDay } from "@/domain/effective-day";
 import { iconSvg } from "./Icon";
+import { ROUTE_CREDIT, stopsOf, useLegs } from "./useLegs";
 
 /*
  * Leaflet is loaded only in the browser. If it or the tiles fail, the itinerary
@@ -31,6 +32,11 @@ export function tiles(L: L) {
 
 export function segColor(seg: string) {
   return getComputedStyle(document.documentElement).getPropertyValue(seg === "syd" ? "--syd" : "--tas").trim() || "#1f7a6d";
+}
+
+/** Design tokens for map lines (paper/ink/one vermilion, chictrip review: only the selected day is red). */
+export function cssVar(name: string, fallback: string) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 }
 
 export function esc(s: string) {
@@ -71,7 +77,14 @@ export function DayMap({
     nearbyRef.current = nearby;
     addRef.current = onAdd;
   });
-  const sig = `${day.date}|${day.seg}|${day.items.map((i) => `${i.id}:${i.lat}:${i.lng}:${i.time}:${i.name}:${i.pri}`).join(",")}|${nearby.map((n) => [n.id, n.key, n.lat, n.lng, n.name, n.sub, n.photo ?? "", n.icon ?? ""].join("~")).join(",")}|${onAdd ? 1 : 0}`;
+  // Road legs from the route cache (drive legs only); straight segments otherwise.
+  const legs = useLegs(stopsOf(day.items));
+  const legsRef = useRef(legs);
+  useEffect(() => {
+    legsRef.current = legs;
+  });
+  const legsKey = legs ? legs.map((l) => (l ? l.durationS : "-")).join(",") : "";
+  const sig = `${legsKey}|${day.date}|${day.seg}|${day.items.map((i) => `${i.id}:${i.lat}:${i.lng}:${i.time}:${i.name}:${i.pri}`).join(",")}|${nearby.map((n) => [n.id, n.key, n.lat, n.lng, n.name, n.sub, n.photo ?? "", n.icon ?? ""].join("~")).join(",")}|${onAdd ? 1 : 0}`;
 
   useEffect(() => {
     if (!active || !box.current) return;
@@ -102,7 +115,8 @@ export function DayMap({
           if (i.lat == null || i.lng == null) return;
           pts.push([i.lat, i.lng]);
           const m = L.marker([i.lat, i.lng], {
-            icon: L.divIcon({ className: `num-marker ${day.seg}`, html: String(k + 1), iconSize: [26, 26] }),
+            // 44px hit area around the 28px numbered pin.
+            icon: L.divIcon({ className: "num-hit", html: `<span class="num-marker sel-day ${day.seg}">${k + 1}</span>`, iconSize: [44, 44] }),
             keyboard: true,
             title: i.name,
           })
@@ -110,7 +124,13 @@ export function DayMap({
             .bindPopup(`<strong>${esc(i.time)} ${esc(i.name)}</strong><br>${esc(i.en ?? "")}<br>${PRI[i.pri].t}`);
           markers.current.set(i.id, m);
         });
-        if (pts.length > 1) L.polyline(pts, { color: segColor(day.seg), weight: 4, opacity: 0.85, className: "route-anim" }).addTo(layer.current).bringToBack();
+        const path: [number, number][] = [];
+        pts.forEach((p, k) => {
+          const leg = k ? legsRef.current?.[k - 1] : null;
+          if (leg?.geometry.length) path.push(...leg.geometry);
+          else path.push(p);
+        });
+        if (path.length > 1) L.polyline(path, { color: cssVar("--vermilion", "#b83a2e"), weight: 4, opacity: 0.9, className: legsRef.current?.some(Boolean) ? "" : "route-anim" }).addTo(layer.current).bringToBack();
         nearbyRef.current.forEach((n) => {
           const add = addRef.current ? `<button type="button" class="btn small" data-add-key="${esc(n.key)}" data-add-id="${esc(n.id)}">加入這天</button>` : "";
           // 44px hit area around a 26px ring.
@@ -153,14 +173,17 @@ export function DayMap({
   );
 
   return (
-    <div className="map day-map" role="region" aria-label="當日路線地圖" ref={box}>
-      {failed && (
-        <div className="map-fallback">
-          地圖無法載入（可能離線）。
-          <br />
-          行程內容不受影響。
-        </div>
-      )}
-    </div>
+    <>
+      <div className="map day-map" role="region" aria-label="當日路線地圖" ref={box}>
+        {failed && (
+          <div className="map-fallback">
+            地圖無法載入（可能離線）。
+            <br />
+            行程內容不受影響。
+          </div>
+        )}
+      </div>
+      {legs?.some((l) => l && l.source !== "same-place") && <p className="route-credit">{ROUTE_CREDIT}</p>}
+    </>
   );
 }

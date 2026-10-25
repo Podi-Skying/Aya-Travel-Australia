@@ -225,3 +225,23 @@ export async function myVotes(token: string, body: unknown) {
     .where(and(eq(interestVotes.tripId, link.tripId), eq(interestVotes.voterHash, voterHash(voterKey))));
   return rows;
 }
+
+/**
+ * Route requests per 10 minutes: owner computations (30) so a bug cannot hammer the routing service,
+ * and cache reads by anyone else (120, keyed by a hash of the client IP).
+ */
+export async function routeQuota(key: string, max: number, failOpen = true): Promise<boolean> {
+  const db = await getDb();
+  const window = new Date(Math.floor(Date.now() / 600_000) * 600_000);
+  try {
+    const r = await db
+      .insert(rateLimits)
+      .values({ key, windowStart: window, count: 1 })
+      .onConflictDoUpdate({ target: [rateLimits.key, rateLimits.windowStart], set: { count: sql`${rateLimits.count} + 1` } })
+      .returning({ count: rateLimits.count });
+    return r[0].count <= max;
+  } catch {
+    // Cache reads may go on without the limiter; computations (which call OSRM) may not.
+    return failOpen;
+  }
+}

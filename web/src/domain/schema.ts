@@ -162,6 +162,43 @@ export const packageSchema = z.object({
   suggestion: z.object({ date: dateStr.optional(), reason: shortText(300) }).optional(),
 });
 
+/* 極光與藍眼淚 (PLAN-2026-10-26 §1): owner-curated links and posts, shown to guests too. */
+export const SKY_KINDS = ["aurora", "bio"] as const;
+const httpsUrl = z.url({ protocol: /^https$/ }).max(500);
+export const skyWatchSchema = z.object({
+  links: z.array(z.object({ id: shortText(20), kind: z.enum(SKY_KINDS), label: z.string().trim().min(1).max(60), url: httpsUrl })).max(10),
+  posts: z
+    .array(
+      z.object({
+        id: shortText(20),
+        kind: z.enum(SKY_KINDS),
+        url: httpsUrl.optional(),
+        text: z.string().trim().min(1).max(500),
+        date: dateStr,
+        photoUrl: httpsUrl.optional(),
+      }),
+    )
+    .max(100),
+});
+
+/* Multi-day trip options (PLAN-2026-10-26 §3, §4 P1-a). Days refer to existing item ids. */
+export const OPTION_THEMES = ["aurora", "bio", "hike", "food", "wildlife", "town"] as const;
+export const tripOptionSchema = z.object({
+  key: z.string().regex(/^[a-z0-9-]{1,40}$/),
+  group: z.string().regex(/^[a-z0-9-]{1,40}$/),
+  title: z.string().trim().min(1).max(60),
+  summary: shortText(300),
+  region: shortText(20),
+  themes: z.array(z.enum(OPTION_THEMES)).max(OPTION_THEMES.length),
+  photoUrl: httpsUrl.optional(),
+  chosen: z.boolean(),
+  start: dateStr,
+  days: z
+    .array(z.object({ title: z.string().trim().min(1).max(60), stay: shortText(40), driveHrs: z.number().min(0).max(12), noDriver: z.boolean().optional(), itemIds: z.array(z.string()).max(12) }))
+    .min(1)
+    .max(4),
+});
+
 export const tripDocSchema = z
   .object({
     meta: z.object({
@@ -208,6 +245,8 @@ export const tripDocSchema = z
     alertsSources: z.array(z.object({ name: shortText(120), url: z.url({ protocol: /^https?$/ }), kind: shortText(40) })).max(50),
     days: z.array(daySchema).min(1).max(120),
     attractionPool: z.array(packageSchema).max(60).default([]),
+    skyWatch: skyWatchSchema.default({ links: [], posts: [] }),
+    tripOptions: z.array(tripOptionSchema).max(12).default([]),
     journey: z
       .object({
         chapters: z.array(z.object({ key: shortText(40), title: shortText(80), itemIds: z.array(z.string()).max(30) })).max(12),
@@ -247,6 +286,29 @@ export const tripDocSchema = z
       if (!doc.segments[p.seg]) ctx.addIssue({ code: "custom", message: `未知的目的地 ${p.seg}`, path: ["attractionPool", pi, "seg"] });
       p.items.forEach((it, ii) => note(it.id, `待安排「${p.key}」`, ["attractionPool", pi, "items", ii, "id"]));
     });
+    // Options point at items that exist, stay inside the trip, and pick at most one per group.
+    const optKeys = new Set<string>();
+    const chosenGroups = new Set<string>();
+    doc.tripOptions.forEach((o, oi) => {
+      if (optKeys.has(o.key)) ctx.addIssue({ code: "custom", message: `行程方案 ${o.key} 重複`, path: ["tripOptions", oi, "key"] });
+      optKeys.add(o.key);
+      if (o.chosen) {
+        if (chosenGroups.has(o.group)) ctx.addIssue({ code: "custom", message: `方案組 ${o.group} 有兩個採用中的方案`, path: ["tripOptions", oi, "chosen"] });
+        chosenGroups.add(o.group);
+      }
+      const start = doc.days.findIndex((d) => d.date === o.start);
+      if (start < 0 || start + o.days.length > doc.days.length)
+        ctx.addIssue({ code: "custom", message: `行程方案 ${o.key} 的日期超出旅程`, path: ["tripOptions", oi, "start"] });
+      const ids = new Set<string>();
+      o.days.forEach((d, di) => {
+        if (!doc.stays[d.stay]) ctx.addIssue({ code: "custom", message: `未知的住宿 ${d.stay}`, path: ["tripOptions", oi, "days", di, "stay"] });
+        d.itemIds.forEach((id, ii) => {
+          if (!seen.has(id)) ctx.addIssue({ code: "custom", message: `行程方案 ${o.key} 引用不存在的活動 ${id}`, path: ["tripOptions", oi, "days", di, "itemIds", ii] });
+          if (ids.has(id)) ctx.addIssue({ code: "custom", message: `行程方案 ${o.key} 重複引用活動 ${id}`, path: ["tripOptions", oi, "days", di, "itemIds", ii] });
+          ids.add(id);
+        });
+      });
+    });
     const keys = new Set<string>();
     doc.attractionPool.forEach((p, pi) => {
       if (keys.has(p.key)) ctx.addIssue({ code: "custom", message: `景點組 ${p.key} 重複`, path: ["attractionPool", pi, "key"] });
@@ -262,6 +324,8 @@ export type Attachment = z.infer<typeof attachmentSchema>;
 export type Package = z.infer<typeof packageSchema>;
 export type PackageContext = z.infer<typeof packageContextSchema>;
 export type TripDoc = z.infer<typeof tripDocSchema>;
+export type SkyWatch = z.infer<typeof skyWatchSchema>;
+export type TripOption = z.infer<typeof tripOptionSchema>;
 
 export type ParseResult = { ok: true; doc: TripDoc } | { ok: false; errors: { path: string; message: string }[] };
 

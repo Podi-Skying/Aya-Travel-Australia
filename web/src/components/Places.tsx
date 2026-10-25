@@ -4,13 +4,14 @@ import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as
 import type * as Leaflet from "leaflet";
 import { useTrip } from "./TripApp";
 import { Icon, iconSvg } from "./Icon";
-import { PendingButton, useReducedMotion } from "./ui";
-import { esc, loadLeaflet, segColor, tiles } from "./MapViews";
+import { PendingButton, useHobartToday, useHydrated, useReducedMotion } from "./ui";
+import { cssVar, esc, loadLeaflet, tiles } from "./MapViews";
+import { ROUTE_CREDIT, stopsOf, useLegs, type Pt } from "./useLegs";
 import { PhotoCredit } from "./Photos";
 import { project, rubber, spring } from "./motion";
 import { Pool } from "./Pool";
 import { effectiveDay } from "@/domain/effective-day";
-import { fmtDay } from "@/domain/format";
+import { fmtDay, fmtMD } from "@/domain/format";
 import type { Category, Item, Package, TripDoc } from "@/domain/schema";
 
 /*
@@ -90,12 +91,12 @@ export function suggestDay(doc: TripDoc, place: Place): { date: string; km: numb
   return best;
 }
 
-/* ---- URL state: ?tab=map&mapLayers=days,pool&mapSeg=tas&mapCat=food&place=g12 ---- */
-type Filters = { days: boolean; pool: boolean; seg: string; cat: string; place: string | null };
+/* ---- URL state: ?tab=map&mapLayers=days,pool&mapSeg=tas&mapCat=food&place=g12&mday=2026-11-09 ---- */
+type Filters = { days: boolean; pool: boolean; seg: string; cat: string; place: string | null; mday: string | null };
 function readUrl(): Filters {
   const q = typeof location === "undefined" ? new URLSearchParams() : new URLSearchParams(location.search);
   const ls = (q.get("mapLayers") ?? "days,pool").split(",");
-  return { days: ls.includes("days"), pool: ls.includes("pool"), seg: q.get("mapSeg") ?? "all", cat: q.get("mapCat") ?? "all", place: q.get("place") };
+  return { days: ls.includes("days"), pool: ls.includes("pool"), seg: q.get("mapSeg") ?? "all", cat: q.get("mapCat") ?? "all", place: q.get("place"), mday: q.get("mday") };
 }
 function writeUrl(f: Filters) {
   const q = new URLSearchParams(location.search);
@@ -106,6 +107,7 @@ function writeUrl(f: Filters) {
   set("mapSeg", f.seg, "all");
   set("mapCat", f.cat, "all");
   set("place", f.place, null);
+  set("mday", f.mday, null);
   q.delete("mapGroup");
   history.replaceState(history.state, "", `${location.pathname}?${q.toString()}${location.hash}`);
 }
@@ -137,6 +139,60 @@ export function PlacesMap({ active }: { active: boolean }) {
   const [failed, setFailed] = useState(false);
   const editable = mode === "owner" && online;
   const patch = (x: Partial<Filters>) => setF((o) => ({ ...o, ...x }));
+  // chictrip review P1-c: one selected day in vermilion; 「只看今天」 is on by default during the trip.
+  const today = useHobartToday();
+  const [todayMode, setTodayMode] = useState(true);
+  const inTrip = !!today && doc.days.some((d) => d.date === today);
+  const hydrated = useHydrated();
+  const selDate = !hydrated ? null : (f.mday ?? (todayMode && inTrip ? today : null));
+  const selIdx = selDate ? doc.days.findIndex((d) => d.date === selDate) : -1;
+  const selDay = selIdx >= 0 ? effectiveDay(doc.days[selIdx]) : null;
+  const selStops = selDay ? stopsOf(selDay.items.filter((i) => i.lat != null && i.lat > -40 === (selDay.seg === "syd"))) : null;
+  const legs = useLegs(selStops);
+  // Road totals only when every drive pair has a cached leg (non-drive pairs are never routed).
+  const drivePairs = selStops ? selStops.slice(1).map((s) => s.drive) : [];
+  const roadTotal =
+    legs && drivePairs.some(Boolean) && drivePairs.every((dr, k) => !dr || legs[k])
+      ? legs.reduce((a, l, k) => (drivePairs[k] && l ? { m: a.m + l.distanceM, s: a.s + l.durationS } : a), { m: 0, s: 0 })
+      : null;
+  const legsKey = legs ? legs.map((l) => (l ? l.durationS : "-")).join(",") : "";
+  const [me, setMe] = useState<Pt | null>(null);
+  const [meMsg, setMeMsg] = useState("");
+  const pickDay = (date: string | null) => {
+    setTodayMode(false);
+    patch({ mday: date });
+  };
+  // Keep the selected day's chip visible in the horizontal strip.
+  useEffect(() => {
+    if (!active) return;
+    // Measure after layout: the panel may have just become visible.
+    const id = setTimeout(() => {
+      const strip = wrap.current?.querySelector<HTMLElement>(".day-strip");
+      const on = strip?.querySelector<HTMLElement>(".chip.on");
+      if (!strip || !on || !strip.clientWidth) return;
+      const d = on.getBoundingClientRect().left - strip.getBoundingClientRect().left;
+      strip.scrollLeft += d - (strip.clientWidth - on.clientWidth) / 2;
+    }, 60);
+    return () => clearTimeout(id);
+  }, [selDate, active]);
+  const fitAll = () => {
+    pickDay(null);
+    if (allBounds.current) map.current?.fitBounds(allBounds.current.pad(0.1), { animate: !reduce });
+  };
+  const locate = () => {
+    if (!("geolocation" in navigator)) return setMeMsg("這個瀏覽器不支援定位");
+    setMeMsg("定位中…");
+    // Asked only on this click; the position stays in this page and is never sent anywhere.
+    navigator.geolocation.getCurrentPosition(
+      (p) => {
+        goMe.current = true;
+        setMe([p.coords.latitude, p.coords.longitude]);
+        setMeMsg("");
+      },
+      () => setMeMsg("沒有取得位置（可能未允許定位）"),
+      { enableHighAccuracy: false, timeout: 10_000, maximumAge: 60_000 },
+    );
+  };
 
   useEffect(() => writeUrl(f), [f]);
 
@@ -166,6 +222,10 @@ export function PlacesMap({ active }: { active: boolean }) {
     handlers.current.gotoDay = gotoDay;
   });
   const pinsKey = shown.map((x) => x.i.id).join(",") + `|${f.place}`;
+  // The map refits when the view changes (day, region, layers, first load), not on data-only redraws.
+  const fitKey = useRef("");
+  const allBounds = useRef<Leaflet.LatLngBounds | null>(null);
+  const goMe = useRef(false);
 
   useEffect(() => {
     if (!active || !box.current) return;
@@ -191,24 +251,51 @@ export function PlacesMap({ active }: { active: boolean }) {
         poolLayer.current?.remove();
         poolLayer.current = L.layerGroup().addTo(m);
         const all: [number, number][] = [];
-        if (f.days)
+        const selPtsHere: [number, number][] = [];
+        const ink = cssVar("--ink", "#292823");
+        const red = cssVar("--vermilion", "#b83a2e");
+        const popup = (d: ReturnType<typeof effectiveDay>, i: Item, idx: number) =>
+          `<div class="stop-pop">${i.photo ? `<img src="${esc(i.photo.url)}" alt="" referrerpolicy="no-referrer" loading="lazy">` : ""}<div><div class="d">${fmtDay(d.date)}・${esc(d.title)}</div><strong>${esc(i.name)}</strong><a href="#" data-goto="${idx}">查看當天行程 →</a>${i.photo ? `<div class="src">圖片來源：${esc(i.photo.site)}</div>` : ""}</div></div>`;
+        if (f.days || selDate)
           doc.days.forEach((raw, idx) => {
             if (f.seg !== "all" && raw.seg !== f.seg) return;
             const d = effectiveDay(raw);
-            const here = (i: { lat?: number }) => i.lat != null && i.lat > -40 === (d.seg === "syd");
+            const sel = d.date === selDate;
+            if (!sel && !f.days) return;
+            const here = (i: { lat?: number; lng?: number }) => i.lat != null && i.lng != null && i.lat > -40 === (d.seg === "syd");
             const pts = d.items.filter(here).map((i) => [i.lat!, i.lng!] as [number, number]);
-            if (pts.length > 1) L.polyline(pts, { color: segColor(d.seg), weight: 3, opacity: 0.7 }).addTo(dayLayer.current!);
+            if (sel) {
+              // Road geometry from the route cache where it exists, straight segments otherwise.
+              const path: [number, number][] = [];
+              pts.forEach((p, k) => {
+                if (k === 0) return void path.push(p);
+                const leg = legs?.[k - 1];
+                if (leg?.geometry.length) path.push(...leg.geometry);
+                else path.push(p);
+              });
+              if (path.length > 1) L.polyline(path, { color: red, weight: 4, opacity: 0.9 }).addTo(dayLayer.current!);
+              d.items.forEach((i, k) => {
+                if (!here(i)) return;
+                selPtsHere.push([i.lat!, i.lng!]);
+                L.marker([i.lat!, i.lng!], { icon: L.divIcon({ className: "num-hit", html: `<span class="num-marker sel-day">${k + 1}</span>`, iconSize: [44, 44] }), keyboard: true, title: `${k + 1}. ${i.name}`, zIndexOffset: 500 })
+                  .addTo(dayLayer.current!)
+                  .bindPopup(popup(d, i, idx), { maxWidth: 300, minWidth: 240 });
+              });
+              return;
+            }
+            // Other days: faded ink, dashed, small dots, no labels.
+            if (pts.length > 1) L.polyline(pts, { color: ink, weight: 2, opacity: selDate ? 0.25 : 0.45, dashArray: "4 6" }).addTo(dayLayer.current!);
             d.items.forEach((i) => {
               if (!here(i)) return;
               all.push([i.lat!, i.lng!]);
-              L.circleMarker([i.lat!, i.lng!], { radius: i.pri === "must" ? 7 : 5, color: "#fff", weight: 2, fillColor: segColor(d.seg), fillOpacity: 1 })
+              L.circleMarker([i.lat!, i.lng!], { radius: i.pri === "must" ? 5 : 4, color: "#fff", weight: 1.5, fillColor: ink, fillOpacity: selDate ? 0.45 : 0.8 })
                 .addTo(dayLayer.current!)
-                .bindPopup(
-                  `<div class="stop-pop">${i.photo ? `<img src="${esc(i.photo.url)}" alt="" referrerpolicy="no-referrer" loading="lazy">` : ""}<div><div class="d">${fmtDay(d.date)}・${esc(d.title)}</div><strong>${esc(i.name)}</strong><a href="#" data-goto="${idx}">查看當天行程 →</a>${i.photo ? `<div class="src">圖片來源：${esc(i.photo.site)}</div>` : ""}</div></div>`,
-                  { maxWidth: 300, minWidth: 240 },
-                );
+                .bindPopup(popup(d, i, idx), { maxWidth: 300, minWidth: 240 });
             });
           });
+        all.push(...selPtsHere);
+        allBounds.current = all.length ? L.latLngBounds(all) : null;
+        if (me) L.circleMarker(me, { radius: 7, color: "#fff", weight: 2, fillColor: "#2f6fdf", fillOpacity: 1 }).addTo(dayLayer.current!).bindTooltip("你的位置");
         const pins = shown.filter(({ i }) => i.lat != null && i.lng != null);
         pins.forEach(({ i }) => all.push([i.lat!, i.lng!]));
         const draw = () => {
@@ -251,8 +338,15 @@ export function PlacesMap({ active }: { active: boolean }) {
         m.on("zoomend", draw);
         m.invalidateSize();
         const sel = selected?.i;
+        const view = `${selDate}|${f.seg}|${f.days}`;
+        const refit = fitKey.current !== view;
+        fitKey.current = view;
         if (sel?.lat != null && sel.lng != null) m.flyTo([sel.lat, sel.lng], Math.max(m.getZoom(), 12), { animate: !reduce, duration: 0.8 });
-        else if (all.length) m.fitBounds(L.latLngBounds(all).pad(0.1), { animate: false });
+        else if (goMe.current && me) {
+          goMe.current = false;
+          m.setView(me, Math.max(m.getZoom(), 12), { animate: !reduce });
+        } else if (refit && selPtsHere.length) m.fitBounds(L.latLngBounds(selPtsHere).pad(0.25), { animate: !reduce, maxZoom: 13 });
+        else if (refit && all.length) m.fitBounds(L.latLngBounds(all).pad(0.1), { animate: !reduce });
         draw();
         setBounds(m.getBounds());
       })
@@ -262,7 +356,7 @@ export function PlacesMap({ active }: { active: boolean }) {
     };
     // pinsKey captures the filtered places; selected is part of it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, doc.days, f.days, f.seg, pinsKey, reduce, narrow]);
+  }, [active, doc.days, f.days, f.seg, pinsKey, reduce, narrow, selDate, legsKey, me]);
 
   useEffect(
     () => () => {
@@ -375,6 +469,29 @@ export function PlacesMap({ active }: { active: boolean }) {
       <div className="places-map map" ref={box} role="region" aria-label="地圖：已排行程與待安排景點">
         {failed && <div className="map-fallback">地圖無法載入（可能離線）。右側清單仍可使用。</div>}
       </div>
+      <div className="map-tools" role="toolbar" aria-label="地圖工具">
+        <button type="button" className="map-tool" onClick={fitAll}>
+          全覽
+        </button>
+        {inTrip && (
+          <button
+            type="button"
+            className={`map-tool${selDate === today ? " on" : ""}`}
+            aria-pressed={selDate === today}
+            onClick={() => (selDate === today ? pickDay(null) : pickDay(today))}
+          >
+            只看今天
+          </button>
+        )}
+        <button type="button" className="map-tool" onClick={locate}>
+          我的位置
+        </button>
+        {meMsg && (
+          <span className="map-tool-msg" role="status">
+            {meMsg}
+          </span>
+        )}
+      </div>
       <aside className={`places-panel detent-${detent}`} ref={sheet} aria-label="待安排景點">
         <div className="sheet-head" onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
           {narrow && (
@@ -400,6 +517,43 @@ export function PlacesMap({ active }: { active: boolean }) {
           </label>
         </div>
         <div className="sheet-body">
+          <div className="day-strip" role="group" aria-label="選一天">
+            <button type="button" className={`chip${!selDate ? " on" : ""}`} aria-pressed={!selDate} onClick={() => pickDay(null)}>
+              全部
+            </button>
+            {doc.days.map((d) => (
+              <button
+                key={d.date}
+                type="button"
+                className={`chip${d.date === selDate ? " on" : ""}${d.items.length ? "" : " open"}`}
+                aria-pressed={d.date === selDate}
+                aria-label={`${fmtDay(d.date)} ${d.title}`}
+                onClick={() => pickDay(d.date === selDate ? null : d.date)}
+              >
+                {fmtMD(d.date)}
+              </button>
+            ))}
+          </div>
+          {selDay && (
+            <p className="day-strip-sum small">
+              <strong>{fmtDay(selDay.date)}</strong> {selDay.title}
+              {roadTotal && roadTotal.s > 0 && (
+                <span className="muted">
+                  ・開車路段約 {Math.round(roadTotal.m / 1000)} 公里、{Math.round((roadTotal.s / 3600) * 10) / 10} 小時（道路計算）
+                </span>
+              )}{" "}
+              <a
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  gotoDay(selIdx);
+                }}
+              >
+                查看當天行程 →
+              </a>
+              {legs?.some((l) => l && l.source !== "same-place") && <span className="route-credit">{ROUTE_CREDIT}</span>}
+            </p>
+          )}
           {selected && (
             <PlaceCard
               key={selected.i.id}

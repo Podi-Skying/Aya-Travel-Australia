@@ -40,7 +40,7 @@ function scrub(value: unknown, names: string[], photos: boolean): unknown {
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(value)) {
       if (k === "driverConfirmation" || k === "address" || k === "ownerNote") continue;
-      if (k === "photo" && !photos) continue;
+      if ((k === "photo" || k === "photoUrl") && !photos) continue;
       if (k === "needsDriver") {
         if (typeof v === "string" && v) out[k] = PUBLIC_DRIVER_LABEL;
         continue;

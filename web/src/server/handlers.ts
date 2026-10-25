@@ -1,9 +1,12 @@
 import { randomUUID } from "node:crypto";
-import { errorResponse, fail, HttpError, json, ownerRoute, readJson } from "./http";
+import { errorResponse, fail, HttpError, json, ownerRoute, readJson, sameOrigin } from "./http";
+import { checkOwner } from "./owner";
+import { getLegs, MAX_POINTS, validPoints } from "./routes";
+import { getKpOutlook } from "./sky";
 import { missingConfig } from "./config";
 import { getPublicHomeTrip, publicHomeEnabled } from "./public-home";
 import { applyOwnerOp, deleteTrip, getCurrentTrip, importDoc, listVersions, restoreVersion } from "./trips";
-import { createShareLink, deactivateShareLinks, getPublicTrip, interestCounts, myVotes, shareStatus, submitVote, withdrawVote } from "./sharing";
+import { routeQuota, sha256, createShareLink, deactivateShareLinks, getPublicTrip, interestCounts, myVotes, shareStatus, submitVote, withdrawVote } from "./sharing";
 import { alertStatus } from "@/domain/rules";
 import { todayStr } from "@/domain/format";
 import type { Op } from "@/domain/ops";
@@ -26,7 +29,8 @@ export const getTrip = ownerRoute(async (_req, owner) => {
 
 const OPS = new Set<Op["op"]>([
   "setPriority", "toggleVerify", "confirmDriver", "clearDriver", "setPartySize", "setParticipants",
-  "editItem", "addItem", "removeItem", "schedulePackage", "scheduleItem", "unscheduleItem", "moveItem", "setStatus", "clearDay", "setPeople", "snapshot",
+  "editItem", "addItem", "removeItem", "schedulePackage", "scheduleItem", "unscheduleItem", "moveItem", "setStatus", "clearDay", "setPeople",
+  "addSkyLink", "removeSkyLink", "addSkyPost", "removeSkyPost", "applyOption", "snapshot",
 ]);
 
 export const postOp = ownerRoute(async (req, owner) => {
@@ -35,7 +39,7 @@ export const postOp = ownerRoute(async (req, owner) => {
   const op = b.op;
   if (!op || typeof op.op !== "string" || !OPS.has(op.op as Op["op"])) return fail(400, "未知的操作");
   // Server-assigned values: the date for "verified" and ids for new items.
-  const full = { ...op, ...(op.op === "toggleVerify" ? { today: todayStr() } : {}), ...(op.op === "addItem" ? { newId: "u" + randomUUID().slice(0, 12) } : {}) } as Op;
+  const full = { ...op, ...(op.op === "toggleVerify" ? { today: todayStr() } : {}), ...(op.op === "addItem" || op.op === "addSkyLink" || op.op === "addSkyPost" ? { newId: "u" + randomUUID().slice(0, 12) } : {}) } as Op;
   const r = await applyOwnerOp(owner, base, full);
   return json(r);
 });
@@ -146,6 +150,40 @@ export async function postMyVotes(req: Request, ctx: Ctx) {
   try {
     const { token } = await ctx.params;
     return json({ votes: await myVotes(token, await readJson(req, VOTE_BYTES)) });
+  } catch (e) {
+    return errorResponse(e);
+  }
+}
+
+/* ---------- caches (PLAN-2026-10-26 §1–2) ---------- */
+
+/** Aurora outlook for everyone; the NOAA feed is fetched at most once per TTL. */
+export async function getSky() {
+  try {
+    return json(await getKpOutlook(), 200, { "cache-control": "public, s-maxage=600, stale-while-revalidate=3600" });
+  } catch (e) {
+    return errorResponse(e);
+  }
+}
+
+const ROUTE_BYTES = 4_000;
+
+/** Road legs: the owner computes missing legs, everyone else reads the cache only. */
+export async function postRoutes(req: Request) {
+  try {
+    const b = (await readJson(req, ROUTE_BYTES)) as { points?: unknown; refresh?: unknown };
+    const points = validPoints(b.points);
+    if (!points) return fail(400, `需要 2–${MAX_POINTS} 個座標`);
+    const c = missingConfig("owner").length ? null : await checkOwner();
+    const owner = !!c?.ok && sameOrigin(req);
+    const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || "unknown";
+    const quota = c?.ok && owner ? routeQuota(`routes:${c.owner.githubId}`, 30, false) : routeQuota(`routes-ip:${sha256(ip)}`, 120);
+    if (!(await quota)) return fail(429, "操作太頻繁，請稍後再試");
+    const r = await getLegs(points, { compute: owner, refresh: owner && b.refresh === true }).catch((e) => {
+      if (e instanceof HttpError) throw e;
+      return null; // routing service unavailable: straight lines stay
+    });
+    return json(r ?? { legs: points.slice(1).map(() => null), computed: 0, unavailable: true });
   } catch (e) {
     return errorResponse(e);
   }

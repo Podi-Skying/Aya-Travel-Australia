@@ -7,7 +7,9 @@ import type { Item } from "@/domain/schema";
 import { effectiveDay } from "@/domain/effective-day";
 import { checks } from "@/domain/rules";
 import { budgetLines, stayOf, sum } from "@/domain/budget";
-import { fmtDay, fmtMD, money } from "@/domain/format";
+import { dayDiff, fmtDay, fmtMD, money } from "@/domain/format";
+import { regionsOf, tripTags } from "@/domain/regions";
+import { useHobartToday } from "./ui";
 
 export function Overview() {
   const { doc, mode, gotoDay } = useTrip();
@@ -47,7 +49,8 @@ export function Overview() {
 
   return (
     <>
-      <div className="grid cols-4">
+      <SummaryCard />
+      <div className="grid cols-4 section">
         <div className="card stat">
           <div className="num">{doc.days.length}</div>
           <div className="lbl">旅程天數</div>
@@ -224,5 +227,58 @@ function MustCard({ item, date, onOpen }: { item: Item; date: string; onOpen: ()
         </span>
       </button>
     </li>
+  );
+}
+
+/** chictrip review P1-b: 天數｜日期｜目的地, tags and 途經地區 chips that open the first matching day. */
+function SummaryCard() {
+  const { doc, gotoDay } = useTrip();
+  const t = useHobartToday();
+  const s = doc.meta.start;
+  const e = doc.meta.end;
+  const when = !t ? "" : t < s ? `距離出發還有 ${dayDiff(t, s)} 天` : t <= e ? `旅程第 ${dayDiff(s, t) + 1} 天` : "旅程已結束";
+  const segs: string[] = [];
+  doc.days.forEach((d) => {
+    const n = doc.segments[d.seg]?.name ?? d.seg;
+    if (!segs.includes(n)) segs.push(n);
+  });
+  const regions = regionsOf(doc);
+  return (
+    <section className="card summary-card" aria-label="旅程摘要">
+      <dl className="summary-figures">
+        <div>
+          <dt>行程</dt>
+          <dd>{doc.days.length} 天</dd>
+        </div>
+        <div>
+          <dt>出遊時間</dt>
+          <dd>
+            {fmtMD(s)}–{fmtMD(e)}
+          </dd>
+        </div>
+        <div>
+          <dt>目的地</dt>
+          <dd>{segs.join("・")}</dd>
+        </div>
+      </dl>
+      {when && <p className="summary-when">{when}</p>}
+      <p className="summary-tags">
+        {tripTags(doc).map((x) => (
+          <Badge key={x} t={x} c="b-line" />
+        ))}
+      </p>
+      {regions.length > 0 && (
+        <div className="summary-regions">
+          <span className="small muted">途經地區</span>
+          <div className="chips">
+            {regions.map((r) => (
+              <button key={r.name} type="button" className="chip" onClick={() => gotoDay(r.dayIdx)} aria-label={`${r.name}：看 ${fmtDay(doc.days[r.dayIdx].date)}`}>
+                {r.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </section>
   );
 }

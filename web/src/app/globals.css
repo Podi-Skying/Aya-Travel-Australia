@@ -676,3 +676,75 @@ details.card.day-summary > summary h3 { margin: 0; }
 .people-toggle .person.on { border-color: var(--ink); color: var(--ink); }
 .people-toggle .person.on img { opacity: 1; filter: none; }
 .people-toggle .person:disabled { cursor: default; }
+
+/* 極光與藍眼淚 (PLAN-2026-10-26 §1) */
+.sky-watch h4 { margin: 18px 0 6px; font-size: .95rem; }
+.sky-links, .sky-posts, .sky-kp { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.sky-links li { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.sky-links a { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; }
+.sky-post { display: grid; grid-template-columns: auto 1fr; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+.sky-post img { width: 96px; height: 96px; object-fit: cover; border-radius: 10px; }
+.sky-post p { margin: 2px 0; }
+.sky-post:not(:has(img)) { grid-template-columns: 1fr; }
+.sky-nights { width: 100%; border-collapse: collapse; font-size: .85rem; margin-top: 8px; }
+.sky-nights th, .sky-nights td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.sky-nights caption { text-align: left; caption-side: top; padding-bottom: 4px; }
+.table-wrap { overflow-x: auto; }
+
+/* 多日行程方案 (PLAN-2026-10-26 §3, chictrip P1) */
+.opt-filters .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; }
+.opt-filters .chip { display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--ink-2); font: inherit; font-size: .85rem; cursor: pointer; }
+.opt-filters .chip.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.opt-group h3 { margin: 0 0 10px; }
+.opt-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
+.opt-card { display: flex; flex-direction: column; gap: 8px; margin: 0; }
+.opt-card.chosen { box-shadow: 0 0 0 2px var(--vermilion); }
+.opt-card h4 { margin: 4px 0 0; font-size: 1.1rem; }
+.opt-cover { position: relative; aspect-ratio: 2 / 1; border-radius: 12px; overflow: hidden; background: var(--paper-raised); color: var(--ink-2); }
+.opt-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.opt-art { width: 100%; height: 100%; }
+.opt-region { position: absolute; left: 10px; bottom: 10px; padding: 3px 10px; border-radius: 999px; background: var(--bg); color: var(--ink); font-size: .8rem; border: 1px solid var(--line); }
+.opt-chosen { position: absolute; right: 10px; top: 10px; padding: 3px 10px; border-radius: 999px; background: var(--vermilion); color: #fff; font-size: .8rem; }
+.opt-tags { margin: 0; display: flex; flex-wrap: wrap; gap: 4px; }
+.opt-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin: 0; }
+.opt-facts div { display: grid; gap: 2px; }
+.opt-facts dt { font-size: .75rem; color: var(--ink-muted); }
+.opt-facts dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+.opt-stays { margin: 0; padding-left: 18px; }
+.opt-people { margin: 0; }
+.opt-days { margin: 0; padding-left: 20px; display: grid; gap: 8px; }
+.opt-days ul { margin: 4px 0 0; padding-left: 18px; }
+.opt-actions { margin-top: auto; display: flex; flex-wrap: wrap; gap: 8px; padding-top: 6px; }
+.opt-actions .btn { min-height: 44px; }
+
+/* 總覽摘要卡 (chictrip review P1-b) */
+.summary-card { display: grid; gap: 10px; }
+.summary-figures { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; margin: 0; }
+.summary-figures div { padding: 0 12px; border-left: 1px solid var(--line); min-width: 0; }
+.summary-figures div:first-child { padding-left: 0; border-left: 0; }
+.summary-figures dt { font-size: .75rem; color: var(--ink-muted); }
+.summary-figures dd { margin: 2px 0 0; font-size: 1.15rem; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.summary-when { margin: 0; color: var(--vermilion); font-weight: 500; }
+.summary-tags { margin: 0; display: flex; flex-wrap: wrap; gap: 4px; }
+.summary-regions .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.summary-regions .chip { min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--ink); font: inherit; font-size: .85rem; cursor: pointer; }
+.summary-regions .chip:hover { border-color: var(--ink); }
+@media (max-width: 420px) { .summary-figures dd { font-size: 1rem; } .summary-figures div { padding: 0 8px; } }
+
+/* 地圖分頁：選一天、工具（chictrip review P1-c） */
+.places { grid-template-columns: minmax(0, 1fr) minmax(320px, 30%); }
+.map-tools { position: absolute; top: 12px; left: 56px; z-index: 500; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; pointer-events: none; }
+.map-tool { pointer-events: auto; min-height: 44px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: inherit; font-size: .85rem; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,.12); }
+.map-tool.on { background: var(--vermilion); border-color: var(--vermilion); color: #fff; }
+.map-tool-msg { pointer-events: auto; background: var(--bg); border-radius: 8px; padding: 4px 8px; font-size: .8rem; }
+.day-strip { display: flex; gap: 6px; overflow-x: auto; padding: 2px 0 8px; scrollbar-width: thin; }
+.day-strip .chip { flex: 0 0 auto; min-height: 44px; }
+.day-strip .chip.on { background: var(--vermilion); border-color: var(--vermilion); color: #fff; }
+.day-strip .chip.open:not(.on) { color: var(--ink-muted); border-style: dashed; }
+.day-strip-sum { margin: 0 0 8px; }
+.num-marker.sel-day { background: var(--vermilion) !important; width: 28px !important; height: 28px !important; }
+@media (max-width: 720px) { .map-tools { left: 12px; top: calc(12px + env(safe-area-inset-top)); } }
+.leg-road { color: var(--ink); font-weight: 500; }
+.route-credit { display: block; font-size: .7rem; color: var(--ink-muted); margin-top: 2px; }
+.num-hit { display: grid !important; place-items: center; background: none; border: 0; }
+.num-hit .num-marker { display: grid; place-items: center; }
