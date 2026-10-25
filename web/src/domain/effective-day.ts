@@ -2,7 +2,7 @@ import type { Cost, Day, Item, TripDoc } from "./schema";
 
 /*
  * effectiveDay applies attached package contributions and single-item package
- * contexts to a day (PLAN.md 4.9). Budget, rules, map and journey code all work
+ * contexts to a day (PLAN.md 4.9). Budget, rules and map code all work
  * on effective days. A day without attachments or contexts is returned with the
  * same values, so the legacy parity test is unaffected.
  */

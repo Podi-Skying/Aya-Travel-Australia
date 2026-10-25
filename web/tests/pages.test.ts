@@ -14,7 +14,6 @@ vi.mock("@/server/trips", () => ({ getCurrentTrip }));
 vi.mock("next/navigation", () => ({ redirect }));
 vi.mock("@/server/public-home", () => ({ getPublicHomeTrip }));
 vi.mock("@/components/TripApp", () => ({ TripApp: () => null }));
-vi.mock("@/components/journey/JourneyView", () => ({ JourneyView: () => null }));
 vi.mock("@/components/walk/WalkView", () => ({ WalkView: () => null }));
 
 beforeEach(() => {
@@ -28,7 +27,6 @@ beforeEach(() => {
 const pages = [
   ["/", () => import("@/app/page")],
   ["/plan", () => import("@/app/plan/page")],
-  ["/journey", () => import("@/app/journey/page")],
 ] as const;
 
 describe("owner pages", () => {

@@ -3,10 +3,10 @@
 import { signIn, signOut } from "next-auth/react";
 
 /*
- * Shared top navigation for every page (docs/DESIGN.md「共用導覽」): logo, 散步, 行程, 3D,
+ * Shared top navigation for every page (docs/DESIGN.md「共用導覽」): logo, 散步, 行程,
  * then 登入/登出. Share pages pass their /s/{token} base so the token is kept.
  */
-export type Section = "walk" | "plan" | "journey";
+export type Section = "walk" | "plan";
 
 export function SiteHeader({
   base = "",
@@ -22,7 +22,6 @@ export function SiteHeader({
   const links: { key: Section; label: string; href: string }[] = [
     { key: "walk", label: "散步", href: base || "/" },
     { key: "plan", label: "行程", href: `${base}/plan` },
-    { key: "journey", label: "3D", href: `${base}/journey` },
   ];
   return (
     <header className={`site-header ${variant}`}>

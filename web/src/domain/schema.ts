@@ -247,6 +247,7 @@ export const tripDocSchema = z
     attractionPool: z.array(packageSchema).max(60).default([]),
     skyWatch: skyWatchSchema.default({ links: [], posts: [] }),
     tripOptions: z.array(tripOptionSchema).max(12).default([]),
+    /** Chapters of the removed 3D page (2026-10-26); kept so stored documents still parse. */
     journey: z
       .object({
         chapters: z.array(z.object({ key: shortText(40), title: shortText(80), itemIds: z.array(z.string()).max(30) })).max(12),

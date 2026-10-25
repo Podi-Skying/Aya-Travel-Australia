@@ -633,7 +633,7 @@ export function startWalk(root: HTMLElement, days: WalkDay[], opts: { planHref: 
   addEventListener("wheel", onWheel, { passive: true });
   addEventListener("wheel", cancelJump, { passive: true });
   addEventListener("touchstart", cancelJump, { passive: true });
-  // Proximity snap to landmarks only while the walk is mounted (not on /plan or /journey).
+  // Proximity snap to landmarks only while the walk is mounted (not on /plan).
   document.documentElement.classList.add("rw-snap");
   addEventListener("resize", onResize);
   const onMotion = () => {

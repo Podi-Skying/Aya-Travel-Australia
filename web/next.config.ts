@@ -5,6 +5,13 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_BUILD_ID: process.env.VERCEL_GIT_COMMIT_SHA ?? `local-${Date.now()}`,
   },
   serverExternalPackages: ["@electric-sql/pglite"],
+  // The 3D /journey page was removed on 2026-10-26 (recoverable from git history before that date).
+  async redirects() {
+    return [
+      { source: "/journey", destination: "/plan", permanent: false },
+      { source: "/s/:token/journey", destination: "/s/:token/plan", permanent: false },
+    ];
+  },
   async headers() {
     return [
       { source: "/sw.js", headers: [{ key: "Cache-Control", value: "no-cache" }, { key: "Service-Worker-Allowed", value: "/" }] },

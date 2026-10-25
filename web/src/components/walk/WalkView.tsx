@@ -10,7 +10,7 @@ import { fmtTs } from "@/domain/format";
 
 /*
  * Home page: the hand-drawn route walk (prototypes/route-walk/index.html, DESIGN.md).
- * Always receives the redacted public document. Links lead to the planner and the 3D page.
+ * Always receives the redacted public document. Links lead to the planner.
  */
 export function WalkView({
   doc: initialDoc,
