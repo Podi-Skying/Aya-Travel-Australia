@@ -1,4 +1,4 @@
-import type { Item, Person, TripDoc, TripOption } from "./schema";
+import type { Item, Person, Photo, TripDoc, TripOption } from "./schema";
 import { DEFAULT_PEOPLE, PEOPLE } from "./schema";
 import { applyOp } from "./ops";
 import { budgetLines, stayOf, sum } from "./budget";
@@ -23,7 +23,8 @@ export type OptionCard = {
   cost: number | null;
   items: Item[][];
   people: Person[];
-  photo?: string;
+  /** Cover photo with its source (an option's own URL is credited to its site). */
+  photo?: Photo;
 };
 
 export const optionDates = (o: TripOption) => o.days.map((_, i) => new Date(Date.parse(o.start + "T00:00:00Z") + i * 86_400_000).toISOString().slice(0, 10));
@@ -61,7 +62,7 @@ export function optionCard(doc: TripDoc, o: TripOption, N: number): OptionCard {
     cost,
     items,
     people: PEOPLE.filter((p) => ppl.has(p)),
-    photo: o.photoUrl ?? items.flat().find((i) => i.photo)?.photo?.url,
+    photo: o.photoUrl ? { url: o.photoUrl, page: o.photoUrl, site: new URL(o.photoUrl).hostname.replace(/^www\./, ""), kind: "custom" } : items.flat().find((i) => i.photo)?.photo,
   };
 }
 

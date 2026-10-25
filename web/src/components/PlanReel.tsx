@@ -14,14 +14,29 @@ export type ReelSlice = {
   title: string;
   /** Short line under the title on the open slice, e.g. 「3天2夜・東海岸・11/9–11/11」. */
   caption: string;
-  /** Badge on the open slice, e.g. 「目前採用」. */
+  /** Status shown on the slice whether open or not, e.g. 「目前採用」. */
   badge?: string;
   image?: string;
   /** Fill colour behind white text when there is no photo (AA with white). */
   deep: string;
 };
 
-export function PlanReel({ slices, active, onSelect, label, panelId }: { slices: ReelSlice[]; active: string; onSelect: (key: string) => void; label: string; panelId: string }) {
+export function PlanReel({
+  slices,
+  active,
+  onSelect,
+  label,
+  panelId,
+  orientation = "horizontal",
+}: {
+  slices: ReelSlice[];
+  active: string;
+  onSelect: (key: string) => void;
+  label: string;
+  panelId: string;
+  /** Phones show a vertical stack; screen readers are told which (arrow keys work both ways). */
+  orientation?: "horizontal" | "vertical";
+}) {
   const refs = useRef(new Map<string, HTMLButtonElement>());
   const keys = slices.map((s) => s.key);
   const onKey = (e: KeyboardEvent, key: string) => {
@@ -34,7 +49,7 @@ export function PlanReel({ slices, active, onSelect, label, panelId }: { slices:
     refs.current.get(k)?.focus();
   };
   return (
-    <div className="plan-reel" role="tablist" aria-label={label}>
+    <div className="plan-reel" role="tablist" aria-label={label} aria-orientation={orientation}>
       {slices.map((s) => {
         const on = s.key === active;
         return (
@@ -64,8 +79,10 @@ export function PlanReel({ slices, active, onSelect, label, panelId }: { slices:
                 <path d="M0 136 C30 130 60 140 90 134 S150 128 180 136 S260 142 320 132" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" opacity=".6" />
               </svg>
             )}
+            {s.badge && !on && <span className="reel-flag" aria-hidden="true" />}
             <span className="reel-spine" aria-hidden={on}>
               {s.title}
+              {s.badge && !on ? `（${s.badge}）` : ""}
             </span>
             <span className="reel-caption" aria-hidden={!on}>
               {s.badge && <span className="reel-badge">{s.badge}</span>}

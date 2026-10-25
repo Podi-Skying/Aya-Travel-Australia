@@ -74,3 +74,11 @@ Builder: Claude. Plan review and inspection: Codex.
 
 - Unit tests: palette contrast, and `optionPalette` keyword mapping.
 - Manual: a local guest preview (PGlite copy of v89) at desktop and 375px, then a production check.
+
+## Revision 1: Codex review dispositions
+
+- **PLANREEL-001, accepted.** Option A is **provisional**. It ships as the substitute until Kai answers A or B. If Kai picks B, `PlanReel` is swapped for the official component behind the same props, and this plan is updated.
+- **PLANREEL-002, accepted.** `aria-orientation` follows the 720px breakpoint (via `matchMedia`). The arrow keys already work both ways.
+- **PLANREEL-003, accepted.** Collapsed titles sit on a solid `rgba(0,0,0,.72)` backing. White text on that backing, even over a white photo, is above 9:1.
+- **PLANREEL-004, accepted.** The cover is a `Photo` object. An option's own URL is credited to its site, and the reel shows 「封面照片：<credit>」 under it.
+- **PLANREEL-005, accepted.** Chosen status shows on every slice, open or not: a vermilion dot, plus 「（目前採用）」 in the spine text. The viewing selection is separate from the stored `chosen` flags.

@@ -760,7 +760,11 @@ details.card.day-summary > summary h3 { margin: 0; }
 .reel-slice img, .reel-slice .reel-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .reel-slice .reel-art { color: rgba(255, 255, 255, .55); }
 .reel-slice::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, rgba(0, 0, 0, .7), rgba(0, 0, 0, .05) 55%); }
-.reel-spine { position: absolute; z-index: 1; left: 50%; top: 16px; transform: translateX(-50%); writing-mode: vertical-rl; font-weight: 600; font-size: .95rem; letter-spacing: .08em; max-height: calc(100% - 32px); overflow: hidden; text-shadow: 0 1px 3px rgba(0, 0, 0, .6); transition: opacity .25s ease; }
+.reel-spine { position: absolute; z-index: 1; left: 50%; top: 16px; transform: translateX(-50%); writing-mode: vertical-rl; font-weight: 600; font-size: .95rem; letter-spacing: .08em; max-height: calc(100% - 32px); overflow: hidden; transition: opacity .25s ease;
+  /* Solid backing so the title stays readable over any photo (AA: white on rgba(0,0,0,.72) over white ≥ 9:1). */
+  background: rgba(0, 0, 0, .72); padding: 8px 4px; border-radius: 8px; }
+.reel-flag { position: absolute; z-index: 1; right: 6px; bottom: 8px; width: 12px; height: 12px; border-radius: 50%; background: var(--vermilion); box-shadow: 0 0 0 2px #fff; }
+.reel-credit { margin: 6px 0 0; font-size: .75rem; color: var(--ink-muted); }
 .reel-slice.on .reel-spine { opacity: 0; }
 .reel-caption { position: absolute; z-index: 1; left: 18px; right: 18px; bottom: 16px; display: grid; gap: 4px; opacity: 0; transform: translateY(8px); transition: opacity .3s ease .15s, transform .3s ease .15s; }
 .reel-slice.on .reel-caption { opacity: 1; transform: none; }
@@ -782,7 +786,7 @@ details.card.day-summary > summary h3 { margin: 0; }
   .reel-slice { flex: 0 0 auto; height: 64px; min-width: 0; transition: height .55s cubic-bezier(.34, 1.3, .64, 1); }
   .reel-slice:hover:not(.on), .reel-slice:focus-visible:not(.on) { flex-grow: 0; }
   .reel-slice.on { height: 260px; }
-  .reel-spine { writing-mode: horizontal-tb; left: 16px; right: 16px; top: 50%; transform: translateY(-50%); max-height: none; white-space: nowrap; text-overflow: ellipsis; }
+  .reel-spine { writing-mode: horizontal-tb; left: 12px; right: auto; max-width: calc(100% - 40px); top: 50%; transform: translateY(-50%); max-height: none; white-space: nowrap; text-overflow: ellipsis; padding: 4px 10px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .plan-stage, .reel-slice, .reel-caption, .reel-spine { transition: none; }

@@ -4,6 +4,20 @@ import { useEffect, useMemo, useState } from "react";
 import { useTrip } from "./TripApp";
 import { AvatarStack } from "./People";
 import { Badge, PendingButton, useHydrated } from "./ui";
+import { useSyncExternalStore } from "react";
+
+/** Matches the reel's CSS breakpoint so its tablist orientation is announced correctly. */
+function useNarrow(): boolean {
+  return useSyncExternalStore(
+    (cb) => {
+      const mq = matchMedia("(max-width: 720px)");
+      mq.addEventListener("change", cb);
+      return () => mq.removeEventListener("change", cb);
+    },
+    () => matchMedia("(max-width: 720px)").matches,
+    () => false,
+  );
+}
 import { ShareButton } from "./Share";
 import { PlanReel } from "./PlanReel";
 import { PhotoCredit } from "./Photos";
@@ -53,6 +67,7 @@ export function TripOptions() {
   );
 
   const [picked, setPicked] = useState<string | null>(null);
+  const narrow = useNarrow();
   const current = shown.find((c) => c.option.key === picked) ?? shown.find((c) => c.option.chosen) ?? shown[0];
   const pal = current ? optionPalette(current.option) : null;
 
@@ -78,6 +93,7 @@ export function TripOptions() {
         <>
           <div className="section">
             <PlanReel
+              orientation={narrow ? "vertical" : "horizontal"}
               label="推薦行程方案"
               panelId="plan-detail"
               active={current.option.key}
@@ -87,11 +103,16 @@ export function TripOptions() {
                 title: c.option.title,
                 caption: `${dayNightLabel(c)}・${c.option.region || "塔斯馬尼亞"}・${fmtMD(c.dates[0])}–${fmtMD(c.dates.at(-1)!)}`,
                 badge: c.option.chosen ? "目前採用" : undefined,
-                image: c.photo,
+                image: c.photo?.url,
                 deep: optionPalette(c.option).deep,
               }))}
             />
           </div>
+          {current.photo && (
+            <p className="reel-credit">
+              封面照片：<PhotoCredit photo={current.photo} />
+            </p>
+          )}
           <OptionDetail key={current.option.key} c={current} />
         </>
       )}
