@@ -21,7 +21,6 @@ function useNarrow(): boolean {
 }
 import { ShareButton } from "./Share";
 import { PlanReel } from "./PlanReel";
-import { PhotoCredit } from "./Photos";
 import { GooglePhoto } from "./GooglePhoto";
 import { Carousel, PlaceGallery } from "./PlaceGallery";
 import { galleryPhotos } from "@/domain/gallery";
@@ -74,11 +73,6 @@ export function TripOptions() {
               }))}
             />
           </div>
-          {current.photo && (
-            <p className="reel-credit">
-              封面照片 <PhotoCredit photo={current.photo} />
-            </p>
-          )}
           <OptionDetail key={current.option.key} c={current} />
         </>
       )}
@@ -170,23 +164,21 @@ function OptionDetail({ c }: { c: OptionCard }) {
               <ul className="plan-stops">
                 {c.items[i].map((it) => (
                   <li key={it.id}>
-                    {it.photo && !broken.has(it.photo.url) ? (
-                      <figure>
-                        {/* eslint-disable-next-line @next/next/no-img-element -- hotlinked place photo with credit */}
-                        <img src={it.photo.url} alt={it.name} loading="lazy" referrerPolicy="no-referrer" onError={() => setBroken((b) => new Set(b).add(it.photo!.url))} />
-                        <figcaption>
-                          <PhotoCredit photo={it.photo} />
-                        </figcaption>
-                      </figure>
-                    ) : mode === "owner" || token ? (
-                      <GooglePhoto item={it} alt={it.name} />
-                    ) : (
-                      <div className="plan-stop-noimg" aria-hidden="true" />
-                    )}
+                    <PlaceGallery
+                      item={it}
+                      thumb={
+                        it.photo && !broken.has(it.photo.url) ? (
+                          // eslint-disable-next-line @next/next/no-img-element -- hotlinked place photo; credit shows in the gallery
+                          <img src={it.photo.url} alt={it.name} loading="lazy" referrerPolicy="no-referrer" onError={() => setBroken((b) => new Set(b).add(it.photo!.url))} />
+                        ) : mode === "owner" || token ? (
+                          <GooglePhoto item={it} alt={it.name} bare fallback={<span className="pg-placeholder" aria-hidden="true" />} />
+                        ) : null
+                      }
+                      fallback={<div className="plan-stop-noimg" aria-hidden="true" />}
+                    />
                     <p>
                       <span className="small muted">{it.time}</span> {it.name}
                     </p>
-                    <PlaceGallery item={it} />
                   </li>
                 ))}
               </ul>

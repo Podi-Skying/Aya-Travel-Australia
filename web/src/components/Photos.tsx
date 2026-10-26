@@ -8,8 +8,8 @@ import { project, rubber, spring } from "./motion";
 import type { Photo } from "@/domain/schema";
 
 /*
- * Attraction photos (DESIGN.md「景點照片」). Photos are hotlinked from the page they were found on and
- * always carry a visible source link. The viewer opens from the tapped thumbnail and returns to it,
+ * Attraction photos (DESIGN.md「景點照片」). Photos are hotlinked from the page they were found on; their
+ * source shows as plain text (no link icons since 2026-10-26) and the page URL stays in the data. The viewer opens from the tapped thumbnail and returns to it,
  * tracks drags 1:1, projects momentum to choose the slide and settles with a critically damped spring.
  */
 
@@ -26,50 +26,28 @@ function srcSet(p: Photo): string | undefined {
     .join(", ");
 }
 
-/** Photo source as a small link icon (Kai, 2026-10-26); the site shows on hover and to screen readers. */
-export function PhotoCredit({ photo }: { photo: Photo }) {
-  const what = [photo.site, photo.credit, photo.license].filter(Boolean).join("・");
-  return (
-    <a className="credit-link" href={photo.page} target="_blank" rel="noopener noreferrer" aria-label={`圖片來源：${what}`} title={what}>
-      <Icon name="link" size={16} />
-    </a>
-  );
-}
+/** Plain-text source for a photo (Kai 2026-10-26: no link icons); the page URL stays in the data. */
+export const creditText = (photo: Photo) => [photo.site, photo.credit, photo.license].filter(Boolean).join("・");
 
-export function ActPhoto({ id, name, photo, onOpen, caption = true }: { id: string; name: string; photo: Photo; onOpen: () => void; caption?: boolean }) {
+/** Activity thumbnail image (the gallery button around it is PlaceGallery). */
+export function ActPhotoImg({ id, name, photo }: { id: string; name: string; photo: Photo }) {
   const [state, setState] = useState<"loading" | "ok" | "error">("loading");
-  const ratio = photo.w && photo.h ? `${photo.w} / ${photo.h}` : "3 / 2";
+  if (state === "error") return <span className="pg-placeholder" aria-hidden="true" />;
   return (
-    <figure className="act-photo">
-      {state === "error" ? (
-        <div className="ph ph-error" style={{ aspectRatio: "3 / 1" }}>
-          <Icon name="image" size={20} /> 照片載入不了（可能離線或來源網站擋住）
-        </div>
-      ) : (
-        <button type="button" className={`ph ${state === "ok" ? "is-loaded" : ""}`} style={{ aspectRatio: ratio }} onClick={onOpen} aria-label={`放大看照片：${name}`}>
-          {/* eslint-disable-next-line @next/next/no-img-element -- hotlinked from many hosts; next/image would re-host them */}
-          <img
-            src={photo.url}
-            srcSet={srcSet(photo)}
-            sizes="(max-width: 720px) 100vw, 560px"
-            alt={name}
-            loading="lazy"
-            decoding="async"
-            referrerPolicy="no-referrer"
-            data-photo-id={id}
-            width={photo.w}
-            height={photo.h}
-            onLoad={() => setState("ok")}
-            onError={() => setState("error")}
-          />
-        </button>
-      )}
-      {caption && (
-        <figcaption>
-          <PhotoCredit photo={photo} />
-        </figcaption>
-      )}
-    </figure>
+    // eslint-disable-next-line @next/next/no-img-element -- hotlinked from many hosts; next/image would re-host them
+    <img
+      className={`act-img${state === "ok" ? " is-loaded" : ""}`}
+      src={photo.url}
+      srcSet={srcSet(photo)}
+      sizes="160px"
+      alt={name}
+      loading="lazy"
+      decoding="async"
+      referrerPolicy="no-referrer"
+      data-photo-id={id}
+      onLoad={() => setState("ok")}
+      onError={() => setState("error")}
+    />
   );
 }
 
@@ -283,9 +261,7 @@ export function PhotoViewer({ photos, start, onClose }: { photos: DayPhoto[]; st
       )}
       <p className="viewer-caption">
         <strong>{p.name}</strong>
-        <span>
-          <PhotoCredit photo={p.photo} />
-        </span>
+        <span>{creditText(p.photo)}</span>
       </p>
     </div>,
     document.body,

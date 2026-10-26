@@ -10,7 +10,7 @@ import { AvatarStack, PeopleToggle, peopleOf } from "./People";
 import { PEOPLE, type Person } from "@/domain/schema";
 import { DayCalendar } from "./DayCalendar";
 import { CATEGORY_META, distanceLabel, nearbyPlaces, type NearbyPlace } from "./Places";
-import { ActPhoto, PhotoCredit, PhotoViewer, mapsPhotoLink, type DayPhoto } from "./Photos";
+import { ActPhotoImg, PhotoViewer, mapsPhotoLink, type DayPhoto } from "./Photos";
 import { DayMap } from "./MapViews";
 import { effectiveDay, isTentative } from "@/domain/effective-day";
 import { checks, feasibility } from "@/domain/rules";
@@ -464,10 +464,11 @@ export function DaysView({ active }: { active: boolean }) {
                               {i.cost && i.cost.status !== "unknown" && <span>{money(lineAmount(i.cost, N))}</span>}
                             </div>
                           </div>
-                          {i.photo && i.id !== dayHero?.id && (
-                            <ActPhoto id={i.id} name={i.name} photo={i.photo} caption={false} onOpen={() => setViewer(dayPhotos.findIndex((p) => p.id === i.id))} />
-                          )}
-                          {!i.photo && (owner || token) && i.lat != null && <GooglePhoto item={i} alt={i.name} className="act-gphoto" />}
+                          {i.photo && i.id !== dayHero?.id ? (
+                            <PlaceGallery item={i} className="act-thumb" thumb={<ActPhotoImg id={i.id} name={i.name} photo={i.photo} />} />
+                          ) : !i.photo && (owner || token) && i.lat != null ? (
+                            <PlaceGallery item={i} className="act-thumb" thumb={<GooglePhoto item={i} alt={i.name} bare fallback={<span className="pg-placeholder" aria-hidden="true" />} />} />
+                          ) : null}
                         </div>
                         {i.note && <ActNote text={i.note} />}
                         {i.ownerNote && (
@@ -497,11 +498,6 @@ export function DaysView({ active }: { active: boolean }) {
                                 {i.cost.note ? `・${i.cost.note}` : ""}
                               </li>
                             )}
-                            {i.photo && (
-                              <li>
-                                <PhotoCredit photo={i.photo} />
-                              </li>
-                            )}
                             {!i.photo && (i.src || i.originPackage) && i.mode !== "flight" && (
                               <li>
                                 <a href={mapsPhotoLink(i.en || i.name)} target="_blank" rel="noopener noreferrer">
@@ -515,7 +511,6 @@ export function DaysView({ active }: { active: boolean }) {
                               </li>
                             )}
                           </ul>
-                          <PlaceGallery item={i} />
                         </details>
                         <div className="tools">
                           <button className="btn ghost small" type="button" onClick={() => setFocusId(i.id)}>

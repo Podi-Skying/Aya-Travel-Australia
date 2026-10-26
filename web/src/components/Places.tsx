@@ -8,7 +8,6 @@ import { Icon, iconSvg } from "./Icon";
 import { PendingButton, useHobartToday, useHydrated, useReducedMotion } from "./ui";
 import { cssVar, esc, loadLeaflet, tiles } from "./MapViews";
 import { computeLegs, routeCredit, stopsOf, useLegs, type Pt } from "./useLegs";
-import { PhotoCredit } from "./Photos";
 import { PlaceGallery } from "./PlaceGallery";
 import { project, rubber, spring } from "./motion";
 import { Pool } from "./Pool";
@@ -261,7 +260,7 @@ export function PlacesMap({ active }: { active: boolean }) {
         const ink = cssVar("--ink", "#292823");
         const red = cssVar("--vermilion", "#b83a2e");
         const popup = (d: ReturnType<typeof effectiveDay>, i: Item, idx: number) =>
-          `<div class="stop-pop">${i.photo ? `<img src="${esc(i.photo.url)}" alt="" referrerpolicy="no-referrer" loading="lazy">` : ""}<div><div class="d">${fmtDay(d.date)}・${esc(dayTitle(d))}</div><strong>${esc(i.name)}</strong><a href="#" data-goto="${idx}">查看當天行程 →</a>${i.photo ? `<a class="src credit-link" href="${esc(i.photo.page)}" target="_blank" rel="noopener noreferrer" aria-label="圖片來源：${esc(i.photo.site)}" title="${esc(i.photo.site)}">${iconSvg("link")}</a>` : ""}</div></div>`;
+          `<div class="stop-pop">${i.photo ? `<img src="${esc(i.photo.url)}" alt="" referrerpolicy="no-referrer" loading="lazy">` : ""}<div><div class="d">${fmtDay(d.date)}・${esc(dayTitle(d))}</div><strong>${esc(i.name)}</strong><a href="#" data-goto="${idx}">查看當天行程 →</a>${i.photo ? `<span class="src small muted">${esc(i.photo.site)}</span>` : ""}</div></div>`;
         if (f.days)
           doc.days.forEach((raw, idx) => {
             if (f.seg !== "all" && raw.seg !== f.seg) return;
@@ -730,18 +729,18 @@ function PlaceCard({
       <button type="button" className="close" ref={closeRef} onClick={onClose} aria-label="關閉景點卡片">
         <Icon name="close" size={18} />
       </button>
-      {i.photo && (
-        <figure>
-          {/* eslint-disable-next-line @next/next/no-img-element -- hotlinked photo, see Photos.tsx */}
-          <img src={i.photo.url} alt={i.name} referrerPolicy="no-referrer" loading="lazy" />
-          <figcaption>
-            <PhotoCredit photo={i.photo} />
-          </figcaption>
-        </figure>
-      )}
+      <PlaceGallery
+        item={i}
+        className="place-card-photo"
+        thumb={
+          i.photo ? (
+            // eslint-disable-next-line @next/next/no-img-element -- hotlinked photo; credit shows in the gallery
+            <img src={i.photo.url} alt={i.name} referrerPolicy="no-referrer" loading="lazy" />
+          ) : undefined
+        }
+      />
       <h3>{i.name}</h3>
       {i.en && <div className="en">{i.en}</div>}
-      <PlaceGallery item={i} />
       <p className="tags">
         {meta && (
           <span className="tag">
