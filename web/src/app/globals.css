@@ -768,7 +768,6 @@ details.card.day-summary > summary h3 { margin: 0; }
 .reel-spine { position: absolute; z-index: 1; left: 50%; top: 16px; transform: translateX(-50%); writing-mode: vertical-rl; font-weight: 600; font-size: .95rem; letter-spacing: .08em; max-height: calc(100% - 32px); overflow: hidden; transition: opacity .25s var(--ease);
   /* Solid backing so the title stays readable over any photo (AA: white on rgba(0,0,0,.72) over white ≥ 9:1). */
   background: rgba(0, 0, 0, .72); padding: 8px 4px; border-radius: 8px; }
-.reel-flag { position: absolute; z-index: 1; right: 6px; bottom: 8px; width: 12px; height: 12px; border-radius: 50%; background: var(--vermilion); box-shadow: 0 0 0 2px #fff; }
 .reel-credit { margin: 6px 0 0; font-size: .75rem; color: var(--ink-muted); }
 .reel-slice.on .reel-spine { opacity: 0; }
 .reel-caption { position: absolute; z-index: 1; left: 18px; right: 18px; bottom: 16px; display: grid; gap: 4px; opacity: 0; transform: translateY(8px); transition: opacity .3s var(--ease) .15s, transform .3s var(--ease) .15s; }

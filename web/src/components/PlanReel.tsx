@@ -84,7 +84,6 @@ export function PlanReel({
                 <path d="M0 136 C30 130 60 140 90 134 S150 128 180 136 S260 142 320 132" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" opacity=".6" />
               </svg>
             )}
-            {s.badge && !on && <span className="reel-flag" aria-hidden="true" />}
             <span className="reel-spine" aria-hidden={on}>
               {s.title}
               {s.badge && !on ? `（${s.badge}）` : ""}
