@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useTrip } from "./TripApp";
 import { AvatarStack } from "./People";
 import { Badge, PendingButton, useReducedMotion } from "./ui";
@@ -20,7 +20,12 @@ function useNarrow(): boolean {
 }
 import { ShareButton } from "./Share";
 import { PlanReel } from "./PlanReel";
-import { PlaceGallery } from "./PlaceGallery";
+import { PlaceGallery, cardSrc } from "./PlaceGallery";
+import { Icon } from "./Icon";
+import { legLabel, routeStops, useLegs, type Leg } from "./useLegs";
+import { stayPin, type StayPin } from "@/domain/home-pins";
+import { homeStayKey } from "@/domain/stay";
+import type { Item } from "@/domain/schema";
 import { dayNightLabel, optionCard, optionPalette, type OptionCard } from "@/domain/options";
 import { OPTION_THEMES } from "@/domain/schema";
 import { fmtDay, fmtMD, money } from "@/domain/format";
@@ -151,17 +156,7 @@ function OptionDetail({ c, jump }: { c: OptionCard; jump: number }) {
               <span className="small muted">（開車約 {d.driveHrs} 小時）</span>
             </h4>
             {c.items[i].length ? (
-              <ul className="plan-stops">
-                {c.items[i].map((it) => (
-                  <li key={it.id}>
-                    {/* Only the main stops carry photos (Kai 2026-10-27: less clutter). */}
-                    {it.major && <PlaceGallery item={it} />}
-                    <p>
-                      <span className="small muted">{it.time}</span> {it.name}
-                    </p>
-                  </li>
-                ))}
-              </ul>
+              <PlanDayTimeline items={c.items[i]} start={i ? stayPin(doc, o.days[i - 1].stay) : (homeStayKey(doc) ? stayPin(doc, homeStayKey(doc)!) : null)} end={stayPin(doc, d.stay)} />
             ) : (
               <p className="small muted">沒有排活動</p>
             )}
@@ -199,4 +194,66 @@ function OptionDetail({ c, jump }: { c: OptionCard; jump: number }) {
       </div>
     </article>
   );
+}
+
+/**
+ * One plan day as a vertical timeline (Kai 2026-10-27, apple-design): fixed time column, title, a small
+ * thumbnail only for main sights (tap opens the photos with their credits below the row), and muted
+ * driving rows between stops from the stored road legs.
+ */
+function PlanDayTimeline({ items, start, end }: { items: Item[]; start: StayPin | null; end: StayPin | null }) {
+  const [open, setOpen] = useState<string | null>(null);
+  const route = routeStops(items, { start, end });
+  const legs = useLegs(route);
+  const legInto = (id: string) => {
+    const k = route.findIndex((r) => r.itemId === id);
+    return k > 0 && route[k].drive ? (legs?.[k - 1] ?? null) : null;
+  };
+  const back = route.at(-1)?.kind === "end" && route.at(-1)!.drive ? (legs?.[route.length - 2] ?? null) : null;
+  const driveRow = (l: Leg | null, key: string) =>
+    l && l.durationS > 0 ? (
+      <li key={key} className="pt-leg" aria-label={`開車 ${legLabel(l)}`}>
+        <span className="pt-time" />
+        <span className="pt-leg-t">
+          <Icon name="car" size={14} /> {legLabel(l)}
+        </span>
+      </li>
+    ) : null;
+  return (
+    <ol className="plan-timeline">
+      {items.map((it) => {
+        // Main sights with a photo of their own get a thumbnail; everything else stays a clean text row.
+        const thumb = it.major && !!(it.photo || it.gallery?.length);
+        return (
+          <Fragment key={it.id}>
+            {driveRow(legInto(it.id), `leg-${it.id}`)}
+            <li className={`pt-stop${it.major ? " is-major" : ""}`}>
+              <span className="pt-time">{it.time}</span>
+              <span className="pt-title">{it.name}</span>
+              {thumb && (
+                <button type="button" className="pt-thumb" aria-expanded={open === it.id} aria-label={`看 ${it.name} 的照片`} onClick={() => setOpen(open === it.id ? null : it.id)}>
+                  <PlanThumb item={it} />
+                </button>
+              )}
+              {open === it.id && (
+                <div className="pt-photos">
+                  <PlaceGallery item={it} />
+                </div>
+              )}
+            </li>
+          </Fragment>
+        );
+      })}
+      {driveRow(back, "leg-back")}
+    </ol>
+  );
+}
+
+/** The main sight's first photo as a small square (no credit here; it shows when the photos open). */
+function PlanThumb({ item }: { item: Item }) {
+  const p = item.photo ?? item.gallery?.[0];
+  return p ? (
+    // eslint-disable-next-line @next/next/no-img-element -- photos from several hosts
+    <img src={cardSrc(p.url)} alt="" loading="lazy" referrerPolicy="no-referrer" style={p.pos ? { objectPosition: p.pos } : undefined} />
+  ) : null;
 }
