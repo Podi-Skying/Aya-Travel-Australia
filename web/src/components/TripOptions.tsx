@@ -71,6 +71,7 @@ export function TripOptions() {
                 caption: `${dayNightLabel(c)}・${c.option.region || "塔斯馬尼亞"}・${fmtMD(c.dates[0])}–${fmtMD(c.dates.at(-1)!)}`,
                 badge: c.option.chosen ? "目前採用" : undefined,
                 image: c.photo?.url,
+                imagePos: c.photo?.pos,
                 deep: optionPalette(c.option).deep,
               }))}
             />
@@ -153,7 +154,8 @@ function OptionDetail({ c, jump }: { c: OptionCard; jump: number }) {
               <ul className="plan-stops">
                 {c.items[i].map((it) => (
                   <li key={it.id}>
-                    <PlaceGallery item={it} />
+                    {/* Only the main stops carry photos (Kai 2026-10-27: less clutter). */}
+                    {it.major && <PlaceGallery item={it} />}
                     <p>
                       <span className="small muted">{it.time}</span> {it.name}
                     </p>

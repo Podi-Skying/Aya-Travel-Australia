@@ -17,6 +17,8 @@ export type ReelSlice = {
   /** Status shown on the slice whether open or not, e.g. 「目前採用」. */
   badge?: string;
   image?: string;
+  /** CSS object-position for the photo (keep the subject in frame when cropped). */
+  imagePos?: string;
   /** Fill colour behind white text when there is no photo (AA with white). */
   deep: string;
 };
@@ -75,7 +77,7 @@ export function PlanReel({
           >
             {s.image && !failed.has(s.image) ? (
               // eslint-disable-next-line @next/next/no-img-element -- hotlinked place photo with credit below
-              <img src={s.image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed((f) => new Set(f).add(s.image!))} />
+              <img src={s.image} alt="" loading="lazy" referrerPolicy="no-referrer" style={s.imagePos ? { objectPosition: s.imagePos } : undefined} onError={() => setFailed((f) => new Set(f).add(s.image!))} />
             ) : (
               <svg viewBox="0 0 320 160" aria-hidden="true" className="reel-art" preserveAspectRatio="xMidYMid slice">
                 <path d="M0 118 C40 96 62 70 96 84 S150 40 188 62 S250 98 320 72" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />

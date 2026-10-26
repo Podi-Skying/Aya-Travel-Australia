@@ -227,6 +227,7 @@ function PlaceGalleryInner({ item, className = "", empty = "hide" }: { item: Ite
           draggable={false}
           decoding="async"
           loading="lazy"
+          style={p.pos ? { objectPosition: p.pos } : undefined}
           onLoad={() => setLoaded((s) => new Set(s).add(p.src))}
           ref={(el) => {
             // A request that never answers counts as failed after 20 s, so no card stays loading.

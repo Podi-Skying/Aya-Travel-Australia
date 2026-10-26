@@ -62,6 +62,8 @@ export const photoSchema = z.object({
   kind: z.enum(PHOTO_KINDS),
   credit: shortText(200).optional(),
   license: shortText(60).optional(),
+  /** Which part to keep when the photo is cropped (CSS object-position), e.g. "50% 18%" to keep a head in frame. */
+  pos: z.string().regex(/^\d{1,3}% \d{1,3}%$/).optional(),
 });
 
 /* Who takes part (DESIGN.md「參加的人」). Absent = the day's people, and a day without people = Kai + Aya. */

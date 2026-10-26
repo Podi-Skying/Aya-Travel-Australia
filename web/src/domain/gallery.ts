@@ -7,7 +7,7 @@ import type { Item, Photo } from "./schema";
  */
 
 export type GoogleShot = { photoUri: string; attributions: { name: string; uri?: string }[]; mapsUri: string };
-export type GalleryPhoto = { src: string; alt: string; title: string; subtitle?: string; credit: { label: string; href: string; authors?: { name: string; uri?: string }[] } };
+export type GalleryPhoto = { src: string; alt: string; title: string; subtitle?: string; pos?: string; credit: { label: string; href: string; authors?: { name: string; uri?: string }[] } };
 
 export function galleryPhotos(item: Pick<Item, "name" | "photo" | "gallery">, commons: Photo[] = [], google: GoogleShot[] = []): GalleryPhoto[] {
   const out: GalleryPhoto[] = [];
@@ -18,7 +18,7 @@ export function galleryPhotos(item: Pick<Item, "name" | "photo" | "gallery">, co
     out.push(g);
   };
   for (const p of [item.photo, ...(item.gallery ?? []), ...commons].filter((x): x is Photo => !!x))
-    add({ src: p.url, alt: item.name, title: item.name, subtitle: p.credit ? `${p.credit}${p.license ? `・${p.license}` : ""}` : p.site, credit: { label: [p.site, p.credit, p.license].filter(Boolean).join("・"), href: p.page } });
+    add({ src: p.url, pos: p.pos, alt: item.name, title: item.name, subtitle: p.credit ? `${p.credit}${p.license ? `・${p.license}` : ""}` : p.site, credit: { label: [p.site, p.credit, p.license].filter(Boolean).join("・"), href: p.page } });
   for (const g of google)
     add({ src: g.photoUri, alt: item.name, title: item.name, subtitle: g.attributions.map((a) => a.name).join("、") || "Google 地圖", credit: { label: "Google 地圖", href: g.mapsUri, authors: g.attributions } });
   return out;
