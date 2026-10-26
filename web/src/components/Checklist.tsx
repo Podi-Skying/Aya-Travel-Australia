@@ -5,6 +5,7 @@ import { useTrip } from "./TripApp";
 import { Badge } from "./ui";
 import { effectiveDay } from "@/domain/effective-day";
 import { stayOf } from "@/domain/budget";
+import { nightStay } from "@/domain/stay";
 import { fmtDay, fmtMD } from "@/domain/format";
 
 /*
@@ -15,8 +16,8 @@ export function Checklist() {
   const eff = doc.days.map(effectiveDay);
   const pendingDriver = eff.filter((d) => d.needsDriver && !d.driverOk);
   const openDays = doc.days.filter((d) => !d.items.length);
-  const paid = doc.days.filter((d) => stayOf(doc, d.stay).nightly > 0 && stayOf(doc, d.stay).status !== "confirmed");
-  const paidAreas = [...new Set(paid.map((d) => stayOf(doc, d.stay).area))];
+  const paid = doc.days.filter((d) => stayOf(doc, nightStay(doc, d)).nightly > 0 && stayOf(doc, nightStay(doc, d)).status !== "confirmed");
+  const paidAreas = [...new Set(paid.map((d) => stayOf(doc, nightStay(doc, d)).area))];
   const flights = doc.days.flatMap((d) => d.items.filter((i) => i.mode === "flight" && i.cost?.status !== "confirmed").map((i) => `${fmtMD(d.date)} ${i.name}`));
   const poolCount = doc.attractionPool.reduce((a, p) => a + p.items.length, 0);
 

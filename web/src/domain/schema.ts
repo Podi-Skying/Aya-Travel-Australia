@@ -245,6 +245,11 @@ export const tripDocSchema = z
         nightly: z.number().min(0).max(100000),
         status: z.enum(COST_STATUS),
         note: shortText(300),
+        /** The home base (UTAS Hobart Apartments): every Tasmania night unless a multi-day trip says otherwise. */
+        home: z.boolean().optional(),
+        /** Owner-only position; share links get it rounded to ~300 m, public visitors not at all (privacy.ts). */
+        lat: z.number().min(-90).max(90).optional(),
+        lng: z.number().min(-180).max(180).optional(),
       }),
     ),
     alertsSources: z.array(z.object({ name: shortText(120), url: z.url({ protocol: /^https?$/ }), kind: shortText(40) })).max(50),

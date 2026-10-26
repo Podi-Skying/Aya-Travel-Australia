@@ -63,8 +63,47 @@ export function toPublicDoc(doc: TripDoc, opts: { photos?: boolean } = {}) {
   const names = [...Object.keys(doc.drivers), ...Object.values(doc.peopleNames ?? {})].filter(Boolean).sort((a, b) => b.length - a.length);
   const scrubbed = scrub({ ...doc, drivers: {}, peopleNames: {} }, names, !!opts.photos) as TripDoc & { drivers: Record<string, never> };
   scrubbed.days = scrubbed.days.map((d) => (okByDate.get(d.date) ? { ...d, publicDriverOk: true } : d));
-  assertPublicSafe(scrubbed, doc);
-  return scrubbed;
+  // Where they sleep is effectively Kai's residence: share links get the position rounded to ~300 m;
+  // public visitors get no position, and the home base is shown only as 「住處」.
+  const fuzz = (n: number) => Math.round(n / 0.003) * 0.003;
+  for (const st of Object.values(scrubbed.stays) as { name: string; area: string; home?: boolean; lat?: number; lng?: number }[]) {
+    if (opts.photos && st.lat != null && st.lng != null) {
+      st.lat = Math.round(fuzz(st.lat) * 1e4) / 1e4;
+      st.lng = Math.round(fuzz(st.lng) * 1e4) / 1e4;
+    } else {
+      delete st.lat;
+      delete st.lng;
+      if (st.home) {
+        st.name = "住處";
+        st.area = "荷巴特";
+      }
+    }
+  }
+  // Public visitors also do not see the home base's name in activity text (e.g. 「前往 UTAS 公寓入住」).
+  const homeName = (Object.values(doc.stays) as { name: string; home?: boolean }[]).find((x) => x.home)?.name;
+  let out = !opts.photos && homeName ? (renameHome(scrubbed, homeName) as typeof scrubbed) : scrubbed;
+  // …nor its internal key (e.g. "utas"), which would name it too.
+  const homeKey = Object.entries(doc.stays).find(([, x]) => (x as { home?: boolean }).home)?.[0];
+  if (!opts.photos && homeKey && homeKey !== "home") {
+    const { [homeKey]: homeStay, ...rest } = out.stays;
+    const re = (k: string) => (k === homeKey ? "home" : k);
+    out = {
+      ...out,
+      stays: { ...rest, home: homeStay },
+      days: out.days.map((d) => ({ ...d, stay: re(d.stay) })),
+      tripOptions: (out.tripOptions ?? []).map((o) => ({ ...o, days: o.days.map((od) => ({ ...od, stay: re(od.stay) })) })),
+    };
+  }
+  assertPublicSafe(out, doc);
+  return out;
+}
+
+/** Replaces the home base's name (and its short 「UTAS」 forms) with 「住處」 in every string. */
+function renameHome(value: unknown, name: string): unknown {
+  const words = [name, "UTAS 公寓", "UTAS Hobart", "UTAS"].sort((a, b) => b.length - a.length);
+  const walk = (v: unknown): unknown =>
+    typeof v === "string" ? words.reduce((acc, w) => acc.split(w).join("住處"), v) : Array.isArray(v) ? v.map(walk) : v && typeof v === "object" ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, walk(x)])) : v;
+  return walk(value);
 }
 
 export type PublicDoc = ReturnType<typeof toPublicDoc>;

@@ -13,6 +13,7 @@ import { PlaceGallery } from "./PlaceGallery";
 import { project, rubber, spring } from "./motion";
 import { Pool } from "./Pool";
 import { effectiveDay } from "@/domain/effective-day";
+import { dayEnds, HOUSE_SVG, stayPins } from "@/domain/home-pins";
 import { fmtDay, fmtMD } from "@/domain/format";
 import type { Category, Item, Package, TripDoc } from "@/domain/schema";
 
@@ -298,6 +299,18 @@ export function PlacesMap({ active }: { active: boolean }) {
             });
           });
         all.push(...selPtsHere);
+        // Where they sleep: always visible, larger than activity pins; the selected day starts and ends there.
+        const homePins = stayPins(doc).filter((p) => f.seg === "all" || (p.lat > -40) === (f.seg === "syd"));
+        for (const p of homePins)
+          L.marker([p.lat, p.lng], { icon: L.divIcon({ className: "home-hit", html: `<span class="home-pin${p.home ? " base" : ""}">${HOUSE_SVG}</span>`, iconSize: [44, 44] }), keyboard: true, title: p.home ? "住處" : `住宿：${p.name}`, zIndexOffset: 800 })
+            .addTo(dayLayer.current!)
+            .bindPopup(`<strong>${p.home ? "住處" : "住宿"}</strong><br>${esc(p.name === "住處" ? (doc.stays[p.key]?.name ?? "住處") : p.name)}`);
+        if (selDay && selPtsHere.length) {
+          const { start, end } = dayEnds(doc, selDay.date);
+          const red = cssVar("--vermilion", "#b83a2e");
+          if (start) L.polyline([[start.lat, start.lng], selPtsHere[0]], { color: red, weight: 2, opacity: 0.6, dashArray: "2 6" }).addTo(dayLayer.current!);
+          if (end) L.polyline([selPtsHere.at(-1)!, [end.lat, end.lng]], { color: red, weight: 2, opacity: 0.6, dashArray: "2 6" }).addTo(dayLayer.current!);
+        }
         allBounds.current = all.length ? L.latLngBounds(all) : null;
         if (me) L.circleMarker(me, { radius: 7, color: "#fff", weight: 2, fillColor: "#2f6fdf", fillOpacity: 1 }).addTo(dayLayer.current!).bindTooltip("你的位置");
         const pins = shown.filter(({ i }) => i.lat != null && i.lng != null);
@@ -593,6 +606,9 @@ export function PlacesMap({ active }: { active: boolean }) {
             <button type="button" className={`chip ${f.pool ? "on" : ""}`} aria-pressed={f.pool} onClick={() => patch({ pool: !f.pool })}>
               <i className="lg-pool" aria-hidden="true" /> 待安排
             </button>
+            <span className="chip lg-only" aria-hidden="true">
+              <i className="lg-home" /> 住處
+            </span>
           </div>
           <button type="button" className={`chip filter-toggle${f.cat !== "all" || inView ? " on" : ""}`} aria-expanded={showFilters} onClick={() => setShowFilters(!showFilters)}>
             篩選{f.cat !== "all" ? `：${CATEGORY_META[f.cat as Category]?.t ?? "未分類"}` : ""}
@@ -657,7 +673,7 @@ export function PlacesMap({ active }: { active: boolean }) {
             ))
           )}
           {noCoords.length > 0 && <p className="muted small">沒有座標、地圖上沒畫出來：{noCoords.map((pl) => pl.i.name).join("、")}</p>}
-          <p className="muted small">實心點是已排行程（點一下可跳到當天），空心紅圈是待安排景點；數字圓圈是聚在一起的景點，點一下會放大。</p>
+          <p className="muted small">實心點是已排行程（點一下可跳到當天），空心紅圈是待安排景點；數字圓圈是聚在一起的景點，點一下會放大；朱紅房子是住處（每晚住的地方）。</p>
           <details className="map-alt">
             <summary>依分組檢視（可整組排入）</summary>
             <Pool />

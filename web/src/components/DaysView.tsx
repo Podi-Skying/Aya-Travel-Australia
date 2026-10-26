@@ -18,6 +18,7 @@ import { basis, dayTotal, lineAmount, stayOf } from "@/domain/budget";
 import { fmtDay, mins, money } from "@/domain/format";
 import type { Item } from "@/domain/schema";
 import { computeLegs, legLabel, stopsOf, useLegs, type Leg } from "./useLegs";
+import { nightStay } from "@/domain/stay";
 import { GooglePhoto } from "./GooglePhoto";
 import { PlaceGallery } from "./PlaceGallery";
 
@@ -152,7 +153,8 @@ export function DaysView({ active }: { active: boolean }) {
   const raw = doc.days[currentDay];
   const d = effectiveDay(raw);
   const N = doc.partySize;
-  const st = stayOf(doc, d.stay);
+  const night = nightStay(doc, raw);
+  const st = stayOf(doc, night);
   const cs = checks(doc, d, { showWindow: owner });
   const fe = VERIFY[feasibility(doc, d)];
   const warnN = cs.filter((c) => c.lv === "warn").length;
@@ -356,7 +358,7 @@ export function DaysView({ active }: { active: boolean }) {
             </div>
             <div className="fact">
               <div className="k">今晚住宿</div>
-              <div className="v">{d.stay === "none" ? "不住宿" : st.area || st.name}</div>
+              <div className="v">{night === "none" ? "不住宿" : st.area || st.name}</div>
             </div>
           </div>
           {editable && clearDaySplit(raw.items).move.length > 0 && (
@@ -376,7 +378,7 @@ export function DaysView({ active }: { active: boolean }) {
                 {d.ferry ? "・有渡輪" : ""}
                 {d.hike ? "・有步道" : ""}
               </li>
-              {st.name && d.stay !== "none" && (
+              {st.name && night !== "none" && (
                 <li>
                   <Icon name="home" size={16} /> {st.name}
                   {owner && st.address ? `・地址：${st.address}` : "・確切地址已隱藏"}

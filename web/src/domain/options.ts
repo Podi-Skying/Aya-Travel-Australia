@@ -9,7 +9,8 @@ import { budgetLines, stayOf, sum } from "./budget";
  * owner-covered driver costs and stays are counted exactly as they would be after choosing it.
  */
 
-export const HOME_STAYS = new Set(["utas", "none"]);
+/** Nights at the home base (or none) are not away nights. */
+const isHomeStay = (doc: Pick<TripDoc, "stays">, k: string) => k === "none" || !!(doc.stays[k] as { home?: boolean } | undefined)?.home;
 
 export type OptionCard = {
   option: TripOption;
@@ -39,7 +40,7 @@ export function optionCard(doc: TripDoc, o: TripOption, N: number): OptionCard {
   const dates = optionDates(o);
   const stays = new Map<string, { key: string; name: string; nightly: number; nights: number }>();
   for (const d of o.days) {
-    if (HOME_STAYS.has(d.stay)) continue;
+    if (isHomeStay(doc, d.stay)) continue;
     const st = stayOf(doc, d.stay);
     const cur = stays.get(d.stay) ?? { key: d.stay, name: st.name, nightly: st.nightly, nights: 0 };
     cur.nights++;
