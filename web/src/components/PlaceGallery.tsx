@@ -1,103 +1,108 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { isLogistics } from "@/domain/day-title";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { useTrip } from "./TripApp";
 import { Icon } from "./Icon";
 import { commonsFor, googleFor } from "@/client/photos";
-import {
-  galleryPhotos,
-  type GalleryPhoto,
-  type GoogleShot,
-} from "@/domain/gallery";
+import { galleryPhotos, type GalleryPhoto, type GoogleShot } from "@/domain/gallery";
+import { isLogistics } from "@/domain/day-title";
 import type { Item, Photo } from "@/domain/schema";
-import Stack from "./stack/Stack";
 
 /*
- * Photo gallery for an activity (docs/PLAN-2026-10-26-galleries.md): React Bits Stack (replaced the
- * FlexCarousel on 2026-10-26, Kai's choice) in a sheet opened from the place's photo. Credits are plain text;
- * Google photos keep their authors' links and a Google Maps link, as Google requires.
+ * A place's photos, switched in place (Kai 2026-10-26: no pop-up). Tap or click shows the next photo with a
+ * short crossfade, a swipe goes forward or back, arrow keys work when focused; 「2 / 9」 counts them. The
+ * current photo's credit sits under the card as plain text (Google photos keep their author and Maps links,
+ * as Google requires). While photos load, a drawn camera pulses; a place with none shows its category icon.
  */
 
-/**
- * Stack of photo cards (React Bits Stack, fan layout, 230×230): click, Enter or Space sends the front
- * card to the back. The counter and the credit follow the front card.
- */
-export function Carousel({ photos, label }: { photos: GalleryPhoto[]; label: string }) {
-  // Keyed by the sources so the counter resets with the Stack when the list changes.
-  return <PhotoStack key={photos.map((p) => p.src).join("|")} photos={photos} label={label} />;
-}
+const CAT_ICON: Record<string, string> = {
+  nature: "cat-nature",
+  beach: "cat-beach",
+  lookout: "cat-lookout",
+  wildlife: "cat-wildlife",
+  food: "cat-food",
+  market: "cat-market",
+  town: "cat-town",
+  history: "cat-history",
+  art: "cat-art",
+  activity: "cat-activity",
+};
 
-function PhotoStack({ photos, label }: { photos: GalleryPhoto[]; label: string }) {
-  const [top, setTop] = useState(0);
-  const front = photos[top] ?? photos[0];
+/** Commons serves fixed thumbnail widths; 500 px is plenty for a card. */
+export const cardSrc = (src: string) => src.replace(/(upload\.wikimedia\.org\/.+\/thumb\/.+\/)\d+px-([^/]+)$/, "$1500px-$2");
+
+/** Loading: a drawn camera that pulses (static under reduced motion). */
+export function LoadingTile({ label = "載入照片中" }: { label?: string }) {
   return (
-    <div className="gallery">
-      <div className="gallery-stack" role="group" aria-label={`${label}：按一下、Enter 或空白鍵換下一張`}>
-        <Stack
-          layout="fan"
-          sendToBackOnClick
-          onChange={setTop}
-          cards={photos.map((p) => (
-            // eslint-disable-next-line @next/next/no-img-element -- photos from several hosts
-            <img key={p.src} src={p.src} alt={p.alt} draggable={false} referrerPolicy="no-referrer" />
-          ))}
-        />
-      </div>
-      <p className="gallery-meta">
-        <span aria-live="polite">
-          {Math.min(top + 1, photos.length)} / {photos.length}
-        </span>
-        {front?.credit.authors ? (
-          // Google requires the authors' names with their profile links and a way to see the photo on Google Maps.
-          <span className="small">
-            {front.credit.authors.length
-              ? front.credit.authors.map((a, k) => (
-                  <span key={k}>
-                    {k ? "、" : ""}
-                    {a.uri ? (
-                      <a href={a.uri} target="_blank" rel="noopener noreferrer">
-                        {a.name}
-                      </a>
-                    ) : (
-                      a.name
-                    )}
-                  </span>
-                ))
-              : "Google 使用者"}
-            ・
-            <a href={front.credit.href} target="_blank" rel="noopener noreferrer">
-              Google 地圖
-            </a>
-          </span>
-        ) : front ? (
-          // Other photos: the author and licence as plain text (no link, Kai 2026-10-26).
-          <span className="small muted">{front.credit.label}</span>
-        ) : null}
-      </p>
-    </div>
+    <span className="ph-tile is-loading" role="status" aria-label={label}>
+      <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true">
+        <path className="cam" d="M4 8h3l1.5-2h7L17 8h3v11H4z M12 17a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </span>
   );
 }
 
+/** No photo at all: the place's category icon and name on a tint. */
+export function EmptyTile({ item }: { item: Pick<Item, "name" | "cat"> }) {
+  return (
+    <span className="ph-tile is-empty" aria-hidden="true">
+      <Icon name={(item.cat && CAT_ICON[item.cat]) || "pin"} size={28} />
+      <span className="n">{item.name}</span>
+    </span>
+  );
+}
+
+function Credit({ p }: { p: GalleryPhoto }) {
+  if (p.credit.authors)
+    // Google requires the authors' names with their profile links and a way to see the photo on Google Maps.
+    return (
+      <span className="pg-credit">
+        {p.credit.authors.length
+          ? p.credit.authors.map((a, k) => (
+              <span key={k}>
+                {k ? "、" : ""}
+                {a.uri ? (
+                  <a href={a.uri} target="_blank" rel="noopener noreferrer">
+                    {a.name}
+                  </a>
+                ) : (
+                  a.name
+                )}
+              </span>
+            ))
+          : "Google 使用者"}
+        ・
+        <a href={p.credit.href} target="_blank" rel="noopener noreferrer">
+          Google 地圖
+        </a>
+      </span>
+    );
+  return <span className="pg-credit">{p.credit.label}</span>;
+}
+
 /**
- * The place's photo is the gallery button (Kai 2026-10-26: no separate 「看照片」 button). Clicking it opens
- * the Stack in a sheet. A count chip shows how many photos wait; with no photos at all the thumbnail is
- * plain (or `fallback` shows when there is no thumbnail either).
+ * Photos of one place in its card. Cached Commons photos load once the card is on screen; Google photos
+ * (billed) load on screen only when the place has no other photo, else when the viewer reaches the last one.
+ * `empty="hide"` renders nothing for a place without photos (每日行程 rows stay text-only).
  */
-export function PlaceGallery({ item, thumb, fallback = null, className = "" }: { item: Item; thumb?: ReactNode; fallback?: ReactNode; className?: string }) {
+export function PlaceGallery({ item, className = "", empty = "tile" }: { item: Item; className?: string; empty?: "tile" | "hide" }) {
   const { mode, token } = useTrip();
-  const [open, setOpen] = useState(false);
-  const [commons, setCommons] = useState<{ id: string; list: Photo[] } | null>(null);
-  const [google, setGoogle] = useState<{ id: string; list: GoogleShot[] } | null>(null);
-  const boxRef = useRef<HTMLSpanElement>(null);
-  const dialogRef = useRef<HTMLDialogElement>(null);
   const privateView = mode === "owner" || !!token;
   const googleOk = privateView && item.lat != null && !isLogistics(item) && !item.name.startsWith("住宿：");
-  // Name and position are part of the key: a renamed or moved activity asks the server again.
   const ref = `${item.id}|${item.name}|${item.lat}|${item.lng}`;
   const r = useMemo(() => ({ id: item.id, name: item.name, lat: item.lat, lng: item.lng }), [item.id, item.name, item.lat, item.lng]);
+  const [commons, setCommons] = useState<{ id: string; list: Photo[] } | null>(null);
+  const [google, setGoogle] = useState<{ id: string; list: GoogleShot[] } | null>(null);
+  const [wantGoogle, setWantGoogle] = useState(false);
+  const [idx, setIdx] = useState(0);
+  const [dir, setDir] = useState<1 | -1>(1);
+  const boxRef = useRef<HTMLDivElement>(null);
+  const swipe = useRef<{ x: number; y: number; used: boolean } | null>(null);
 
-  // Cached Commons lists cost nothing outside the site, so they load once the thumbnail is on screen (for the count).
+  const own = galleryPhotos(item, undefined, undefined).length;
+  const c = commons?.id === ref ? commons.list : undefined;
+  const g = google?.id === ref ? google.list : undefined;
+
   useEffect(() => {
     const el = boxRef.current;
     if (!privateView || !el) return;
@@ -105,65 +110,110 @@ export function PlaceGallery({ item, thumb, fallback = null, className = "" }: {
     const io = new IntersectionObserver((es) => {
       if (!es.some((e) => e.isIntersecting)) return;
       io.disconnect();
-      void commonsFor(r, token).then((list) => live && setCommons({ id: ref, list }));
+      void commonsFor(r, token).then((list) => {
+        if (!live) return;
+        setCommons({ id: ref, list });
+        if (!own && !list.length) setWantGoogle(true);
+      });
     });
     io.observe(el);
     return () => {
       live = false;
       io.disconnect();
     };
-  }, [privateView, ref, r, token]);
-  // Google photos are billed, so they load only when the gallery opens (Commons too, if not loaded yet).
+  }, [privateView, ref, r, token, own]);
   useEffect(() => {
-    if (!open) return;
+    if (!wantGoogle || !googleOk) return;
     let live = true;
-    if (privateView) void commonsFor(r, token).then((list) => live && setCommons({ id: ref, list }));
-    if (googleOk) void googleFor(r, token).then((list) => live && setGoogle({ id: ref, list }));
+    void googleFor(r, token).then((list) => live && setGoogle({ id: ref, list }));
     return () => {
       live = false;
     };
-  }, [open, googleOk, privateView, ref, r, token]);
-  useEffect(() => {
-    const d = dialogRef.current;
-    if (open && d && !d.open) d.showModal();
-  }, [open]);
+  }, [wantGoogle, googleOk, ref, r, token]);
 
-  const c = commons?.id === ref ? commons.list : undefined;
-  const g = google?.id === ref ? google.list : undefined;
-  const known = galleryPhotos(item, c, undefined).length;
-  const interactive = known > 0 || googleOk;
-  if (!thumb && !interactive) return <>{fallback}</>;
-  if (!interactive) return <span ref={boxRef} className={`pg-thumb is-static ${className}`}>{thumb}</span>;
-  const ready = c !== undefined || !privateView ? (googleOk ? g !== undefined : true) : false;
   const photos = galleryPhotos(item, c, g);
+  const commonsPending = privateView && c === undefined;
+  const googlePending = googleOk && wantGoogle && g === undefined;
+  const more = googleOk && g === undefined && !wantGoogle; // Google may add photos at the end
+  const cur = photos.length ? Math.min(idx, photos.length - 1) : 0;
+  const p = photos[cur];
+
+  // Preload the next photo so the switch is instant.
+  useEffect(() => {
+    const next = photos[(cur + 1) % Math.max(1, photos.length)];
+    if (next && photos.length > 1) {
+      const im = new Image();
+      im.referrerPolicy = "no-referrer";
+      im.src = cardSrc(next.src);
+    }
+  }, [cur, photos]);
+
+  if (!p) {
+    if ((commonsPending && !own) || googlePending) return <div ref={boxRef} className={`pg-card ${className}`}><LoadingTile /></div>;
+    return empty === "hide" ? <div ref={boxRef} className="pg-probe" /> : <div ref={boxRef} className={`pg-card ${className}`}><EmptyTile item={item} /></div>;
+  }
+
+  const total = photos.length;
+  const go = (step: 1 | -1) => {
+    setDir(step);
+    if (step === 1 && cur === total - 1 && more) {
+      setWantGoogle(true); // reaching the end asks Google for more, once; the next tap moves on
+      return;
+    }
+    setIdx((cur + step + total) % total);
+  };
+  const onKey = (e: KeyboardEvent) => {
+    const step = ({ ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 } as Record<string, 1 | -1>)[e.key];
+    if (!step || total + (more ? 1 : 0) < 2) return;
+    e.preventDefault();
+    go(step);
+  };
+  const onDown = (e: ReactPointerEvent) => {
+    swipe.current = { x: e.clientX, y: e.clientY, used: false };
+  };
+  const onUp = (e: ReactPointerEvent) => {
+    const s = swipe.current;
+    if (!s) return;
+    const dx = e.clientX - s.x;
+    if (Math.abs(dx) > 36 && Math.abs(dx) > Math.abs(e.clientY - s.y)) {
+      s.used = true;
+      go(dx < 0 ? 1 : -1);
+    }
+  };
+  const multi = total > 1 || more;
   return (
-    <>
-      <button type="button" className={`pg-thumb ${className}`} aria-label={`看 ${item.name} 的照片`} aria-haspopup="dialog" onClick={() => setOpen(true)}>
-        <span ref={boxRef} className="pg-media">
-          {thumb ?? <span className="pg-placeholder" aria-hidden="true" />}
-        </span>
-        <span className="pg-chip" aria-hidden="true">
-          <Icon name="image" size={12} /> {known || ""}
-          {googleOk ? "+" : ""}
-        </span>
-      </button>
-      {open && (
-        <dialog ref={dialogRef} className="pg-sheet" aria-label={`${item.name} 的照片`} onClose={() => setOpen(false)} onClick={(e) => e.target === e.currentTarget && dialogRef.current?.close()}>
-          <div className="pg-sheet-body">
-            <header>
-              <strong>{item.name}</strong>
-              <button type="button" className="btn ghost small" onClick={() => dialogRef.current?.close()} aria-label="關閉照片">
-                <Icon name="close" size={18} />
-              </button>
-            </header>
-            {ready ? (
-              photos.length ? <Carousel photos={photos} label={`${item.name} 的照片`} /> : <p className="small muted">這個景點還沒有照片。</p>
-            ) : (
-              <div className="pg-loading" role="status" aria-label="載入照片中" />
-            )}
-          </div>
-        </dialog>
-      )}
-    </>
+    <figure ref={boxRef as never} className={`pg-card ${className}`}>
+      <div
+        className={`pg-frame${multi ? " is-multi" : ""}`}
+        role={multi ? "button" : undefined}
+        tabIndex={multi ? 0 : undefined}
+        aria-label={multi ? `${item.name} 的照片，第 ${cur + 1} 張，共 ${total}${more ? " 張以上" : " 張"}；按一下、左右滑或用方向鍵換照片` : undefined}
+        onClick={() => {
+          if (swipe.current?.used) {
+            swipe.current = null;
+            return;
+          }
+          if (multi) go(1);
+        }}
+        onKeyDown={onKey}
+        onPointerDown={onDown}
+        onPointerUp={onUp}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element -- photos from several hosts */}
+        <img key={p.src} className={`pg-img in-${dir > 0 ? "next" : "prev"}`} src={cardSrc(p.src)} alt={p.alt} referrerPolicy="no-referrer" draggable={false} decoding="async" />
+        {multi && (
+          <span className="pg-chip" aria-hidden="true">
+            <Icon name="image" size={12} /> {cur + 1} / {total}
+            {more ? "+" : ""}
+          </span>
+        )}
+        {googlePending && <span className="pg-more" aria-hidden="true" />}
+      </div>
+      <figcaption>
+        <Credit p={p} />
+      </figcaption>
+    </figure>
   );
 }
+
+export type { GalleryPhoto };

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { tripShots } from "@/components/DriftGallery";
+import { sameImage, tripShots } from "@/components/DriftGallery";
 import type { Item, Photo } from "@/domain/schema";
 
 /* 畫廊 photo list (2026-10-26) */
@@ -16,4 +16,14 @@ describe("drift gallery", () => {
     expect(shots.map((s) => s.src)).toEqual(["/x.webp", "/y.webp", "https://upload.wikimedia.org/a/b/500px-F.jpg"]);
     expect(shots[0]).toMatchObject({ name: "Wineglass Bay", date: "2026-11-09", dayIndex: 0 });
   });
+
+  it("treats sizes and copies of one image as the same photo", () => {
+    const a = "https://upload.wikimedia.org/wikipedia/commons/thumb/6/64/Ile_des_Phoques.jpg/1920px-Ile_des_Phoques.jpg";
+    const b = "https://upload.wikimedia.org/wikipedia/commons/6/64/Ile_des_Phoques.jpg";
+    expect(sameImage(a)).toBe(sameImage(b));
+    expect(sameImage("/api/media/x/01.webp?token=abc")).toBe(sameImage("/api/media/x/01.webp"));
+    const days = [{ date: "2026-11-09", items: [mk("a", "Seals", ph(a, "commons")), mk("b", "Seals again", ph(b, "commons"))] }];
+    expect(tripShots(days, [], {})).toHaveLength(1);
+  });
 });
+

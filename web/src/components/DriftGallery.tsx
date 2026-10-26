@@ -18,22 +18,32 @@ import type { Item, Photo } from "@/domain/schema";
 
 export type Shot = { key: string; src: string; name: string; date?: string; dayIndex?: number; credit: string };
 
-const PLANES = 36;
+const MAX_PLANES = 36;
 const GAP = 260; // depth between planes (px)
-const DEPTH = PLANES * GAP;
 const FRICTION = 2.2; // velocity decay per second (exponential)
 
 /** Commons thumbnails come in fixed widths; 500 px is plenty for a drifting card. */
 const small = (p: Photo) => (p.kind === "commons" ? p.url.replace(/\/(\d+)px-([^/]+)$/, "/500px-$2") : p.url);
 const credit = (p: Photo) => [p.site, p.credit, p.license].filter(Boolean).join("・");
 
+/**
+ * One key per image whatever its size or source: Commons thumbnails and originals reduce to the file name,
+ * other URLs drop their query and fragment (Kai 2026-10-26: no identical photos twice).
+ */
+export function sameImage(url: string): string {
+  const commons = /upload\.wikimedia\.org\/wikipedia\/commons\/(?:thumb\/)?[0-9a-f]\/[0-9a-f]{2}\/([^/?#]+)/i.exec(url);
+  if (commons) return "commons:" + decodeURIComponent(commons[1]).toLowerCase();
+  return url.replace(/[?#].*$/, "");
+}
+
 /** Every photo of the trip's places, once each: own photo, gallery, then cached Commons photos. */
 export function tripShots(days: { date: string; items: Item[] }[], pool: { items: Item[] }[], commons: Record<string, Photo[]>): Shot[] {
   const seen = new Set<string>();
   const out: Shot[] = [];
   const add = (i: Item, p: Photo, date?: string, dayIndex?: number) => {
-    if (seen.has(p.url)) return;
-    seen.add(p.url);
+    const k = sameImage(p.url);
+    if (seen.has(k)) return;
+    seen.add(k);
     out.push({ key: `${i.id}:${out.length}`, src: small(p), name: i.name, date, dayIndex, credit: credit(p) });
   };
   const each = (i: Item, date?: string, dayIndex?: number) => {
@@ -132,11 +142,15 @@ function Field({ shots, active, onPick }: { shots: Shot[]; active: boolean; onPi
   const cam = useRef(0);
   const vel = useRef(0);
   const shotsRef = useRef(shots);
+  // Never more planes than distinct photos, so one photo is never on screen twice.
+  const planeCount = Math.min(MAX_PLANES, shots.length);
+  const planesRef = useRef(planeCount);
   const shown = useRef<number[]>([]);
   useEffect(() => {
     shotsRef.current = shots;
+    planesRef.current = planeCount;
     shown.current = [];
-  }, [shots]);
+  }, [shots, planeCount]);
 
   useEffect(() => {
     const box = boxRef.current;
@@ -153,6 +167,8 @@ function Field({ shots, active, onPick }: { shots: Shot[]; active: boolean; onPi
       const w = box.clientWidth;
       const h = box.clientHeight;
       const list = shotsRef.current;
+      const PLANES = planesRef.current;
+      const DEPTH = PLANES * GAP;
       for (let i = 0; i < PLANES; i++) {
         const el = planes.current[i];
         if (!el) continue;
@@ -257,7 +273,7 @@ function Field({ shots, active, onPick }: { shots: Shot[]; active: boolean; onPi
       }}
     >
       <div className="drift-stage">
-        {Array.from({ length: PLANES }, (_, i) => (
+        {Array.from({ length: planeCount }, (_, i) => (
           <button
             key={i}
             type="button"

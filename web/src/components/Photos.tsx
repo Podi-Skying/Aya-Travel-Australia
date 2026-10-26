@@ -15,41 +15,8 @@ import type { Photo } from "@/domain/schema";
 
 export type DayPhoto = { id: string; name: string; photo: Photo };
 
-// Wikimedia only serves its standard thumbnail steps; other widths return HTTP 400.
-const COMMONS_WIDTHS = [500, 960, 1280, 1920];
-
-/** Commons thumbnails come in any width, so phones can take a smaller file. */
-function srcSet(p: Photo): string | undefined {
-  if (p.kind !== "commons" || !/\/thumb\/.+\/\d+px-[^/]+$/.test(p.url)) return undefined;
-  return COMMONS_WIDTHS.filter((w) => !p.w || w <= p.w)
-    .map((w) => `${p.url.replace(/\/\d+px-([^/]+)$/, `/${w}px-$1`)} ${w}w`)
-    .join(", ");
-}
-
 /** Plain-text source for a photo (Kai 2026-10-26: no link icons); the page URL stays in the data. */
 export const creditText = (photo: Photo) => [photo.site, photo.credit, photo.license].filter(Boolean).join("・");
-
-/** Activity thumbnail image (the gallery button around it is PlaceGallery). */
-export function ActPhotoImg({ id, name, photo }: { id: string; name: string; photo: Photo }) {
-  const [state, setState] = useState<"loading" | "ok" | "error">("loading");
-  if (state === "error") return <span className="pg-placeholder" aria-hidden="true" />;
-  return (
-    // eslint-disable-next-line @next/next/no-img-element -- hotlinked from many hosts; next/image would re-host them
-    <img
-      className={`act-img${state === "ok" ? " is-loaded" : ""}`}
-      src={photo.url}
-      srcSet={srcSet(photo)}
-      sizes="160px"
-      alt={name}
-      loading="lazy"
-      decoding="async"
-      referrerPolicy="no-referrer"
-      data-photo-id={id}
-      onLoad={() => setState("ok")}
-      onError={() => setState("error")}
-    />
-  );
-}
 
 export function mapsPhotoLink(query: string) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;

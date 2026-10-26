@@ -20,7 +20,6 @@ function useNarrow(): boolean {
 }
 import { ShareButton } from "./Share";
 import { PlanReel } from "./PlanReel";
-import { GooglePhoto } from "./GooglePhoto";
 import { PlaceGallery } from "./PlaceGallery";
 import { dayNightLabel, optionCard, optionPalette, type OptionCard } from "@/domain/options";
 import { OPTION_THEMES } from "@/domain/schema";
@@ -87,8 +86,6 @@ export function TripOptions() {
 /** Details of the selected plan, with each stop's photo for comparison. */
 function OptionDetail({ c, jump }: { c: OptionCard; jump: number }) {
   const { doc, mode, online, runOpUndoable, ask, counts, gotoDay } = useTrip();
-  const [broken, setBroken] = useState<Set<string>>(() => new Set());
-  const { token } = useTrip();
   const reduce = useReducedMotion();
   const firstDay = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
@@ -156,18 +153,7 @@ function OptionDetail({ c, jump }: { c: OptionCard; jump: number }) {
               <ul className="plan-stops">
                 {c.items[i].map((it) => (
                   <li key={it.id}>
-                    <PlaceGallery
-                      item={it}
-                      thumb={
-                        it.photo && !broken.has(it.photo.url) ? (
-                          // eslint-disable-next-line @next/next/no-img-element -- hotlinked place photo; credit shows in the gallery
-                          <img src={it.photo.url} alt={it.name} loading="lazy" referrerPolicy="no-referrer" onError={() => setBroken((b) => new Set(b).add(it.photo!.url))} />
-                        ) : mode === "owner" || token ? (
-                          <GooglePhoto item={it} alt={it.name} bare fallback={<span className="pg-placeholder" aria-hidden="true" />} />
-                        ) : null
-                      }
-                      fallback={<div className="plan-stop-noimg" aria-hidden="true" />}
-                    />
+                    <PlaceGallery item={it} />
                     <p>
                       <span className="small muted">{it.time}</span> {it.name}
                     </p>

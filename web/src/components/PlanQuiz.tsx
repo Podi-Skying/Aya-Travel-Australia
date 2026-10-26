@@ -1,9 +1,11 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTrip } from "./TripApp";
-import { Icon } from "./Icon";
-import { PendingButton } from "./ui";
+import { Icon, iconPath } from "./Icon";
+import { PendingButton, useReducedMotion } from "./ui";
+import { commonsFor } from "@/client/photos";
+import { cardSrc } from "./PlaceGallery";
 import { DayMap } from "./MapViews";
 import { CATEGORY_META } from "./Places";
 import ChromaGrid from "./chroma-grid/ChromaGrid";
@@ -24,20 +26,25 @@ import type { Day, Item } from "@/domain/schema";
 
 const STEPS = ["起點", "區域", "景點", "交通", "結果"] as const;
 
-const PLACEHOLDER =
-  "data:image/svg+xml;utf8," +
-  encodeURIComponent(
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 200"><rect width="300" height="200" fill="#f3eee3"/><path d="M0 140 C40 118 62 92 96 106 S150 62 188 84 S250 120 300 94" fill="none" stroke="#625e55" stroke-width="3" stroke-linecap="round"/></svg>',
+// Card images are data URIs while a place's photos load (a pulsing drawn camera) or when it has none
+// (its category icon on a tint) — never a blank placeholder (Kai 2026-10-26).
+const svgUri = (body: string) => "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 200">${body}</svg>`);
+const CAMERA = "M4 8h3l1.5-2h7L17 8h3v11H4z M12 17a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z";
+const loadingImg = (still: boolean) =>
+  svgUri(
+    `<rect width="300" height="200" fill="#f3eee3"/><g transform="translate(126 76) scale(2)" fill="none" stroke="#625e55" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="${CAMERA}">${still ? "" : '<animate attributeName="opacity" values=".35;1;.35" dur="1.4s" repeatCount="indefinite"/>'}</path></g>`,
   );
+const emptyImg = (cat?: string) =>
+  svgUri(`<rect width="300" height="200" fill="#e9e1cf"/><g transform="translate(126 76) scale(2)" fill="none" stroke="#3e3b34" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="${iconPath(cat ? `cat-${cat}` : "pin")}"/></g>`);
 
-const photoOf = (i: Item) => i.photo?.url ?? i.gallery?.[0]?.url ?? PLACEHOLDER;
+
 const accents = [...PALETTES.map((p) => p.deep), INK_PALETTE.deep];
 const hours = (m: number) => `${Math.round(m / 30) / 2} 小時`;
 const at = (i: Item): [number, number] => [i.lat!, i.lng!];
 const accentFor = (k: string) => accents[[...k].reduce((a, c) => a + c.charCodeAt(0), 0) % accents.length];
 
 export function PlanQuiz({ active }: { active: boolean }) {
-  const { doc, mode, online, runOpUndoable, ask } = useTrip();
+  const { doc, mode, online, runOpUndoable, ask, token } = useTrip();
   const [step, setStep] = useState(0);
   const [region, setRegion] = useState<string | null>(null);
   const [picked, setPicked] = useState<string[]>([]);
@@ -48,6 +55,34 @@ export function PlanQuiz({ active }: { active: boolean }) {
   const home = homeKey ? stayPin(doc, homeKey) : null;
   const homeName = home?.name === "住處" || !homeKey ? "住處" : (doc.stays[homeKey]?.name ?? "住處");
   const places = useMemo(() => quizPlaces(doc), [doc]);
+  const reduce = useReducedMotion();
+  // Places without their own photo use their cached Commons photos (they had shown a blank tile before).
+  const [commons, setCommons] = useState<Record<string, string | null>>({});
+  useEffect(() => {
+    if (!active || !(mode === "owner" || token)) return;
+    const need = places.filter((p) => !p.item.photo && !p.item.gallery?.length && !(p.item.id in commons));
+    if (!need.length) return;
+    let live = true;
+    void (async () => {
+      for (let k = 0; k < need.length && live; k += 6) {
+        const part = need.slice(k, k + 6);
+        const lists = await Promise.all(part.map((p) => commonsFor({ id: p.item.id, name: p.item.name, lat: p.item.lat, lng: p.item.lng }, token)));
+        if (live) setCommons((c) => ({ ...c, ...Object.fromEntries(part.map((p, j) => [p.item.id, lists[j][0]?.url ?? null])) }));
+      }
+    })();
+    return () => {
+      live = false;
+    };
+    // `commons` only filters what is still missing; refetching on its change would loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, places, mode, token]);
+  const photoOf = (i: Item) => {
+    const own = i.photo?.url ?? i.gallery?.[0]?.url;
+    if (own) return cardSrc(own);
+    const c = commons[i.id];
+    if (c) return cardSrc(c);
+    return c === undefined && (mode === "owner" || token) ? loadingImg(reduce) : emptyImg(i.cat);
+  };
   const regions = REGIONS.map((r) => ({ r, list: places.filter((p) => p.region === r.key) })).filter((x) => x.list.length);
   const inRegion = places.filter((p) => p.region === region);
   const chosen = inRegion.filter((p) => picked.includes(p.item.id));

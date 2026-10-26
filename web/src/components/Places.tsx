@@ -730,17 +730,7 @@ function PlaceCard({
       <button type="button" className="close" ref={closeRef} onClick={onClose} aria-label="關閉景點卡片">
         <Icon name="close" size={18} />
       </button>
-      <PlaceGallery
-        item={i}
-        className="place-card-photo"
-        thumb={
-          i.photo ? (
-            // eslint-disable-next-line @next/next/no-img-element -- hotlinked photo; credit shows in the gallery
-            <img src={i.photo.url} alt={i.name} referrerPolicy="no-referrer" loading="lazy" />
-          ) : undefined
-        }
-        fallback={<span className="pg-placeholder place-card-photo" aria-hidden="true" />}
-      />
+      <PlaceGallery item={i} className="place-card-photo" />
       <h3>{i.name}</h3>
       {i.en && <div className="en">{i.en}</div>}
       <p className="tags">

@@ -71,6 +71,9 @@ export function Icon({ name, size = 20, label }: { name: string; size?: number; 
   );
 }
 
+/** The path of a named icon, for SVGs built outside React (data URIs). */
+export const iconPath = (name: string) => PATHS[name] ?? PATHS.info;
+
 /** The same icon as an SVG string, for HTML that Leaflet renders outside React (markers, popups). */
 export function iconSvg(name: string, size = 14): string {
   const d = PATHS[name] ?? PATHS.info;

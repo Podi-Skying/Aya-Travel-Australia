@@ -13,7 +13,7 @@ import { useWeather } from "@/client/weather";
 import { RainPlan, WxChip, WxLine, wxFor } from "./Weather";
 import { weatherNote } from "@/domain/weather";
 import { CATEGORY_META, distanceLabel, nearbyPlaces, type NearbyPlace } from "./Places";
-import { ActPhotoImg, PhotoViewer, mapsPhotoLink, type DayPhoto } from "./Photos";
+import { PhotoViewer, mapsPhotoLink, type DayPhoto } from "./Photos";
 import { DayMap } from "./MapViews";
 import { effectiveDay, isTentative } from "@/domain/effective-day";
 import { checks, feasibility } from "@/domain/rules";
@@ -23,7 +23,6 @@ import type { Item } from "@/domain/schema";
 import { computeLegs, legLabel, stopsOf, useLegs, type Leg } from "./useLegs";
 import { nightStay } from "@/domain/stay";
 import { dayEnds } from "@/domain/home-pins";
-import { GooglePhoto } from "./GooglePhoto";
 import { PlaceGallery } from "./PlaceGallery";
 import { isLogistics } from "@/domain/day-title";
 
@@ -482,11 +481,9 @@ export function DaysView({ active }: { active: boolean }) {
                               {i.cost && i.cost.status !== "unknown" && <span>{money(lineAmount(i.cost, N))}</span>}
                             </div>
                           </div>
-                          {i.photo && i.id !== dayHero?.id ? (
-                            <PlaceGallery item={i} className="act-thumb" thumb={<ActPhotoImg id={i.id} name={i.name} photo={i.photo} />} />
-                          ) : !i.photo && (owner || token) && i.lat != null && !isLogistics(i) && !i.name.startsWith("住宿：") ? (
-                            <PlaceGallery item={i} className="act-thumb" thumb={<GooglePhoto item={i} alt={i.name} bare fallback={<span className="pg-placeholder" aria-hidden="true" />} />} />
-                          ) : null}
+                          {i.id !== dayHero?.id && !isLogistics(i) && !i.name.startsWith("住宿：") && (i.photo || ((owner || token) && i.lat != null)) && (
+                            <PlaceGallery item={i} className="act-thumb" empty="hide" />
+                          )}
                         </div>
                         {i.note && <ActNote text={i.note} />}
                         {i.ownerNote && (

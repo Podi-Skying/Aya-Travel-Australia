@@ -14,7 +14,6 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Vendored React Bits components, kept verbatim except where their header comment says.
     "src/components/chroma-grid/**",
-    "src/components/stack/**",
     "src/components/click-spark/**",
   ]),
 ]);
