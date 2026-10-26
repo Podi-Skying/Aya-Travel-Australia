@@ -101,7 +101,7 @@ export function toPublicDoc(doc: TripDoc, opts: { photos?: boolean } = {}) {
     scrubbed.days = scrubbed.days.map((d) => ({ ...d, items: d.items.map(byOriginal) }));
     scrubbed.attractionPool = scrubbed.attractionPool.map((p) => ({ ...p, items: p.items.map(byOriginal) }));
   }
-  let out = !opts.photos && homeName ? (renameHome(scrubbed, homeName) as typeof scrubbed) : scrubbed;
+  let out = localiseFriend(!opts.photos && homeName ? renameHome(scrubbed, homeName) : scrubbed) as typeof scrubbed;
   // …nor its internal key (e.g. "utas"), which would name it too.
   const homeKey = Object.entries(doc.stays).find(([, x]) => (x as { home?: boolean }).home)?.[0];
   if (!opts.photos && homeKey && homeKey !== "home") {
@@ -118,12 +118,30 @@ export function toPublicDoc(doc: TripDoc, opts: { photos?: boolean } = {}) {
   return out;
 }
 
-/** Replaces the home base's name (and its short 「UTAS」 forms) with 「住處」 in every string. */
+/** The redaction words in each language's translations (Kai 2026-10-27): same rule, natural wording. */
+const HOME_WORD: Record<string, string> = { zh: "住處", en: "our place", ja: "宿泊先" };
+const FRIEND_WORD: Record<string, string> = { en: "a friend", ja: "友人" };
+
+/** Replaces the home base's name (and its short 「UTAS」 forms) with 「住處」 in every string (in translations, its own word). */
 function renameHome(value: unknown, name: string): unknown {
-  const words = [name, "UTAS 公寓", "UTAS Hobart", "UTAS"].sort((a, b) => b.length - a.length);
-  const walk = (v: unknown): unknown =>
-    typeof v === "string" ? words.reduce((acc, w) => acc.split(w).join("住處"), v) : Array.isArray(v) ? v.map(walk) : v && typeof v === "object" ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, walk(x)])) : v;
-  return walk(value);
+  const words = [name, "UTAS 公寓", "UTAS Hobart Apartments", "UTAS Hobart", "UTAS"].sort((a, b) => b.length - a.length);
+  const walk = (v: unknown, lang: string): unknown =>
+    typeof v === "string"
+      ? words.reduce((acc, w) => acc.split(w).join(HOME_WORD[lang]), v)
+      : Array.isArray(v)
+        ? v.map((x) => walk(x, lang))
+        : v && typeof v === "object"
+          ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, walk(x, k === "en" || k === "ja" ? k : lang)]))
+          : v;
+  return walk(value, "zh");
+}
+
+/** Driver names were masked as 「朋友」 everywhere; inside translations that becomes the language's own word. */
+function localiseFriend(value: unknown, lang = "zh"): unknown {
+  if (typeof value === "string") return lang === "zh" ? value : value.split(PUBLIC_DRIVER_LABEL).join(FRIEND_WORD[lang]);
+  if (Array.isArray(value)) return value.map((x) => localiseFriend(x, lang));
+  if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([k, x]) => [k, localiseFriend(x, k === "en" || k === "ja" ? k : lang)]));
+  return value;
 }
 
 export type PublicDoc = ReturnType<typeof toPublicDoc>;

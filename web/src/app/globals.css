@@ -995,3 +995,13 @@ details.card.day-summary > summary h3 { margin: 0; }
   .pt-photos { grid-column: 1 / -1; max-width: none; }
 }
 @media (prefers-reduced-motion: reduce) { .pt-thumb:active { transform: none; } }
+.lang-root { display: contents; }
+
+/* Language switch (Kai 2026-10-27) */
+.lang-switch { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; margin-right: 8px; }
+.lang-switch button { min-height: 44px; min-width: 44px; padding: 0 10px; border: 0; background: transparent; color: var(--ink-2); font: inherit; font-size: .8rem; cursor: pointer; }
+.lang-switch button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.site-header.dark .lang-switch { border-color: rgba(255,255,255,.4); }
+.site-header.dark .lang-switch button { color: #fff; }
+.site-header.dark .lang-switch button[aria-pressed="true"] { background: #fff; color: var(--ink); }
+@media (max-width: 720px) { .lang-switch button { min-width: 40px; padding: 0 7px; } }

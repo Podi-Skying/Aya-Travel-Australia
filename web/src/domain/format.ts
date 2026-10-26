@@ -1,6 +1,9 @@
+import { getLang } from "@/i18n/current";
+
 /* Display helpers ported from site/js/app.js. Dates are calendar dates without a time zone. */
 
 export const WD = ["日", "一", "二", "三", "四", "五", "六"];
+const WD_L = { zh: WD, en: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"], ja: ["日", "月", "火", "水", "木", "金", "土"] };
 
 export function parseDate(s: string): Date {
   const [y, m, d] = s.split("-").map(Number);
@@ -18,7 +21,8 @@ export function fmtMD(s: string): string {
 
 export function fmtDay(s: string): string {
   const d = parseDate(s);
-  return `${d.getMonth() + 1}/${d.getDate()}（${WD[d.getDay()]}）`;
+  const l = getLang();
+  return l === "en" ? `${WD_L.en[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}` : `${d.getMonth() + 1}/${d.getDate()}（${WD_L[l][d.getDay()]}）`;
 }
 
 export function money(n: number): string {
@@ -26,10 +30,12 @@ export function money(n: number): string {
 }
 
 export function mins(m: number | undefined): string {
-  if (!m) return "0 分";
+  const l = getLang();
+  const [H, M] = l === "en" ? [" h", " min"] : l === "ja" ? ["時間", "分"] : [" 小時", " 分"];
+  if (!m) return "0" + M;
   const h = Math.floor(m / 60);
   const r = m % 60;
-  return (h ? h + " 小時" : "") + (r ? r + " 分" : "");
+  return (h ? h + H : "") + (h && r && l === "en" ? " " : "") + (r ? r + M : "");
 }
 
 export function fmtTs(iso: string): string {

@@ -3,6 +3,9 @@
 import "@/app/walk.css";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
+import { useRootLang } from "@/i18n";
+import { DomTranslator } from "@/i18n/DomTranslator";
+import { contentDict } from "@/i18n/content";
 import type { TripDoc } from "@/domain/schema";
 import { walkDays } from "@/domain/walk";
 import { api, registerServiceWorker } from "@/client/api";
@@ -31,6 +34,9 @@ export function WalkView({
   const [doc, setDoc] = useState(initialDoc);
   const [sync, setSync] = useState({ at: syncedAt, offline: false });
   const days = useMemo(() => walkDays(doc), [doc]);
+  // 繁中 / EN / 日本語 (Kai 2026-10-27): the on-screen translator handles the walk too.
+  const lang = useRootLang();
+  const content = useMemo(() => contentDict(doc), [doc]);
 
   useEffect(() => {
     registerServiceWorker([dataUrl]);
@@ -78,6 +84,7 @@ export function WalkView({
         </div>
       )}
 
+      <DomTranslator key={lang} content={content} />
       <SiteHeader base={base} current="walk" account={account === "owner" ? "signout" : account} />
 
       <main id="rw-days" />

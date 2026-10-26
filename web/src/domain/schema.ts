@@ -78,6 +78,11 @@ const peopleSchema = z.array(personSchema).min(1).max(PEOPLE.length);
 export const CATEGORIES = ["nature", "beach", "lookout", "wildlife", "food", "market", "town", "history", "art", "activity"] as const;
 export type Category = (typeof CATEGORIES)[number];
 
+/** Translations of trip content (Kai 2026-10-27): per language, field → text; the Chinese field is the source. */
+export const trSchema = z
+  .object({ en: z.record(z.string(), z.union([z.string().max(3000), z.array(z.string().max(300)).max(8)])).optional(), ja: z.record(z.string(), z.union([z.string().max(3000), z.array(z.string().max(300)).max(8)])).optional() })
+  .optional();
+
 export const itemSchema = z.object({
   id: z.string().min(1).max(32).regex(/^[A-Za-z0-9_-]+$/, "活動 id 只能使用英數字、- 與 _"),
   time: z.string().regex(TIME_RE, "時間需為 00:00–23:59"),
@@ -105,6 +110,7 @@ export const itemSchema = z.object({
   indoor: z.boolean().optional(),
   /** Curated photos (Kai 2026-10-27): "own" shows only the item's photo and gallery; "own+google" adds live Google photos but no Wikimedia search results. */
   photoSources: z.enum(["own", "own+google"]).optional(),
+  tr: trSchema,
   /** A guided tour or cruise to book (Kai 2026-10-27): where and when it leaves; shown as a card in 行程方案. */
   tour: z.object({ depart: shortText(120), when: shortText(80) }).optional(),
   /** Booking state: confirmed (locked against moves) or pending; absent = planned. Driver days add "tentative" (effective-day.ts). */
@@ -143,6 +149,7 @@ export const daySchema = z.object({
   date: dateStr,
   seg: z.string().min(1).max(20),
   title: z.string().min(1).max(120),
+  tr: trSchema,
   /** The owner pinned `title`; otherwise the shown title follows the activities (domain/day-title.ts). */
   titlePinned: z.boolean().optional(),
   stay: z.string().min(1).max(40),
@@ -163,6 +170,7 @@ export const daySchema = z.object({
 export const packageSchema = z.object({
   key: z.string().min(1).max(40),
   title: z.string().min(1).max(120),
+  tr: trSchema,
   seg: z.string().min(1).max(20),
   items: z.array(itemSchema).max(40),
   costs: z.array(costSchema).max(20),
@@ -206,6 +214,7 @@ export const tripOptionSchema = z.object({
   photoUrl: httpsUrl.optional(),
   chosen: z.boolean(),
   start: dateStr,
+  tr: trSchema,
   days: z
     .array(z.object({ title: z.string().trim().min(1).max(60), stay: shortText(40), driveHrs: z.number().min(0).max(12), noDriver: z.boolean().optional(), itemIds: z.array(z.string()).max(12) }))
     .min(1)

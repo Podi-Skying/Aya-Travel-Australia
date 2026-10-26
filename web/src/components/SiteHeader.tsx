@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { signIn, signOut } from "next-auth/react";
+import { LangSwitch } from "@/i18n";
 
 /*
  * Shared top navigation for every page (docs/DESIGN.md「共用導覽」): logo, 散步, 行程, then
@@ -39,6 +40,7 @@ export function SiteHeader({
       </a>
       {children}
       <nav aria-label="主要頁面">
+        <LangSwitch />
         {!children &&
           links.map((l) => (
           <a key={l.key} href={l.href} aria-current={l.key === current ? "page" : undefined}>

@@ -9,6 +9,10 @@ import { withMediaToken } from "@/domain/media";
 import { api, registerServiceWorker } from "@/client/api";
 import { keyFor, loadSnapshot, saveSnapshot, mergeVersions, type VersionMeta } from "@/client/offline";
 import { SiteHeader } from "./SiteHeader";
+import { useRootLang } from "@/i18n";
+import { DomTranslator } from "@/i18n/DomTranslator";
+import { contentDict } from "@/i18n/content";
+import { t as tt } from "@/i18n/current";
 import { useAsk, useToast, useHobartToday, useUrlState, withTimeout, writeUrl, type ToastAction } from "./ui";
 import { DaysView } from "./DaysView";
 import { PlacesMap } from "./Places";
@@ -92,6 +96,8 @@ function voterKey(): string {
 
 export function TripApp(props: { mode: Mode; token?: string; home?: boolean; initial: { doc: TripDoc; versionNo: number; syncedAt: string } }) {
   const { mode, token } = props;
+  // 繁中 / EN / 日本語 (Kai 2026-10-27): the tree below is keyed by the language, so a switch re-renders it all.
+  const lang = useRootLang();
   // Public home (PUBLIC_HOME=1): read-only like a share link, but without voting (votes belong to a share link).
   const home = mode === "public" && !!props.home;
   const canVote = mode === "public" && !!token;
@@ -99,6 +105,7 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
   const [doc, setDoc] = useState<TripDoc>(props.initial.doc);
   // Share pages reach private photos (/api/media) with their token.
   const viewDoc = useMemo(() => (props.token ? withMediaToken(doc, props.token) : doc), [doc, props.token]);
+  const content = useMemo(() => contentDict(doc), [doc]);
   const [versionNo, setVersionNo] = useState(props.initial.versionNo);
   const [lastSyncAt, setLastSyncAt] = useState(props.initial.syncedAt);
   const [alerts, setAlerts] = useState<Alerts>(() => alertStatus(props.initial.doc, { showWindow: props.mode === "owner" }));
@@ -391,12 +398,14 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
 
   return (
     <TripCtx.Provider value={ctx}>
+      <div key={lang} className="lang-root">
+      <DomTranslator content={content} />
       <a className="skip" href="#main">
-        跳到主要內容
+        {tt("跳到主要內容")}
       </a>
       {/* The planner's tabs live in the top bar; the logo leads back to the walk (2026-10-26). */}
       <SiteHeader base={base} current="plan" account={mode === "owner" ? "signout" : home ? "signin" : null}>
-        <nav className="tabs" aria-label="行程分頁">
+        <nav className="tabs" aria-label={tt("行程分頁")}>
           <div className="tabs-inner" role="tablist" ref={tabsRef} onKeyDown={onTabKey}>
             {visibleTabs.map((t) => (
               <button
@@ -409,7 +418,7 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
                 tabIndex={tab === t.key ? 0 : -1}
                 onClick={() => setTab(t.key)}
               >
-                {t.label}
+                {tt(t.label)}
               </button>
             ))}
           </div>
@@ -475,6 +484,7 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
       </footer>
       {dialog}
       {toastNode}
+      </div>
     </TripCtx.Provider>
   );
 }
@@ -492,21 +502,21 @@ function Hero({ doc }: { doc: TripDoc }) {
   const t = useHobartToday();
   const s = doc.meta.start;
   const e = doc.meta.end;
-  const when = !t ? "" : t < s ? `距離出發還有 ${dayDiff(t, s)} 天` : t <= e ? `旅程第 ${dayDiff(s, t) + 1} 天` : "旅程已結束";
+  const when = !t ? "" : t < s ? tt("距離出發還有 {n} 天", { n: dayDiff(t, s) }) : t <= e ? tt("旅程第 {n} 天", { n: dayDiff(s, t) + 1 }) : tt("旅程已結束");
   return (
     <header className="hero" id="top">
       <div className="hero-inner">
         <h1 className="sr-only">{doc.meta.title}</h1>
         <dl className="hero-facts">
           <div>
-            <dt>出遊時間</dt>
+            <dt>{tt("出遊時間")}</dt>
             <dd>
-              {fmtMD(s)}–{fmtMD(e)}・{doc.days.length} 天
+              {fmtMD(s)}–{fmtMD(e)}・{tt("{n} 天", { n: doc.days.length })}
             </dd>
           </div>
           {when && (
             <div>
-              <dt>倒數</dt>
+              <dt>{tt("倒數")}</dt>
               <dd className="hero-when">{when}</dd>
             </div>
           )}
