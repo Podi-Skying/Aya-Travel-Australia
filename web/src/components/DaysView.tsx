@@ -21,7 +21,7 @@ import { basis, dayTotal, lineAmount, stayOf } from "@/domain/budget";
 import { fmtDay, mins, money } from "@/domain/format";
 import type { Item } from "@/domain/schema";
 import { computeLegs, legLabel, routeStops, useLegs, type Leg } from "./useLegs";
-import { dayNavUrls, navMode, navUrl, type NavPoint } from "@/domain/nav";
+import { daySegments, navMode, navUrl, type NavPoint } from "@/domain/nav";
 import { nightStay } from "@/domain/stay";
 import { dayEnds } from "@/domain/home-pins";
 import { PlaceGallery } from "./PlaceGallery";
@@ -199,8 +199,14 @@ export function DaysView({ active }: { active: boolean }) {
   const navTo = (s: (typeof route)[number]): Exclude<NavPoint, null> =>
     s.kind === "end" && ends.end?.home && !owner ? { query: doc.stays[nightStay(doc, raw)]?.name ?? "Hobart" } : { lat: s.pt[0], lng: s.pt[1] };
   const canNav = owner || !!token;
-  const navBefore = (pos: number) => (canNav && pos > 0 ? navUrl(navPt(route[pos - 1]), navTo(route[pos]), navMode(route[pos].mode)) : null);
-  const dayNav = canNav && route.length >= 2 ? dayNavUrls(route.slice(1).map(navTo), navMode(route.some((s) => s.drive) ? "drive" : (route[1]?.mode ?? "walk")), navPt(route[0])) : [];
+  const navBefore = (pos: number) => {
+    const m = pos > 0 ? navMode(route[pos].mode) : null;
+    return canNav && m ? navUrl(navPt(route[pos - 1]), navTo(route[pos]), m) : null;
+  };
+  // Whole-day links, one set per way of travelling (driving, then walking on an island, …); flights are skipped.
+  const daySegs = canNav && route.length >= 2 ? daySegments(route.map(navTo), route.slice(1).map((s) => navMode(s.mode)), navPt(route[0])) : [];
+  const MODE_T: Record<string, string> = { driving: "開車", walking: "步行", transit: "大眾運輸" };
+  const dayNav = daySegs.flatMap((sg) => sg.urls.map((u, k) => ({ u, t: `${daySegs.length > 1 ? MODE_T[sg.mode] : "全日"}導航${sg.urls.length > 1 ? `（${k + 1}/${sg.urls.length}）` : ""}` })));
   // The owner's view computes missing driving legs once (within the daily Google cap); they are stored.
   const autoAsked = useRef(new Set<string>());
   useEffect(() => {
@@ -489,9 +495,9 @@ export function DaysView({ active }: { active: boolean }) {
                     <strong>出發</strong> <span className="muted">從{ends.start?.home ? "住處" : ends.start?.name}出發</span>
                     {dayNav.length > 0 && (
                       <span className="day-nav-links">
-                        {dayNav.map((u, k) => (
+                        {dayNav.map(({ u, t }) => (
                           <a key={u} className="btn ghost small" href={u} target="_blank" rel="noopener noreferrer">
-                            <Icon name="route" size={14} /> 全日導航{dayNav.length > 1 ? `（${k + 1}/${dayNav.length}）` : ""}
+                            <Icon name="route" size={14} /> {t}
                           </a>
                         ))}
                       </span>
@@ -762,7 +768,7 @@ export function DaysView({ active }: { active: boolean }) {
           </div>
           <p className="map-note">
             實線是已算好的開車路線；虛線是步行、大眾運輸，或還沒算好的開車路段（直線示意）。
-            {roadLegs && route.slice(1).some((s, k) => s.drive && !roadLegs[k]) ? "有開車路段還沒算出道路路線（可能是今天的 Google 用量上限到了），明天會自動補上。" : ""}
+            {roadLegs && route.slice(1).some((s, k) => s.drive && !roadLegs[k]) ? "有開車路段還沒算出道路路線（可能是今天的 Google 用量上限到了）；可以按「重新計算道路路線」，或明天再打開這天。" : ""}
           </p>
         </aside>
       </div>

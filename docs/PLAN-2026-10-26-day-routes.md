@@ -41,3 +41,13 @@
 
 - routeStops: starts and ends at stays, drive flags, walking day, zero-length leg dropped.
 - navUrl: no origin when omitted, place-name destination, 9-waypoint split, modes.
+
+## Inspection 1: dispositions
+
+- **ROUTE-01, by design.** The first trip day (11/3) has no previous night on the trip. It starts at its first stop: Kai's arrival at Sydney airport, a travel day that starts at the airport, as the brief says. The other 24 days start at last night's stay.
+- **ROUTE-02, accepted.** An unlocated activity after the last located stop breaks the leg to tonight's stay, as gaps do elsewhere.
+- **NAV-01, accepted.** Flight legs get no directions link.
+- **NAV-02, accepted.** 全日導航 is split where the way of travelling changes (for example 開車導航, then 步行導航 on Maria Island). Flights are skipped.
+- **MAP-01, accepted.** The 地圖與景點 selected-day map uses the same route from stay to stay, with solid road legs and dashed straight legs.
+- **DATA-01, accepted (data step).** The four stays without a position get one from a Places search after the cap reset, as a backed-up version, before the backfill runs.
+- **OPS-01, accepted.** The note now says to press 「重新計算道路路線」 or open the day again tomorrow, instead of promising an automatic fill.

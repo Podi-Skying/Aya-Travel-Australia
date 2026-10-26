@@ -7,7 +7,7 @@ import { useTrip } from "./TripApp";
 import { Icon, iconSvg } from "./Icon";
 import { PendingButton, useHobartToday, useHydrated, useReducedMotion } from "./ui";
 import { cssVar, esc, loadLeaflet, tiles } from "./MapViews";
-import { computeLegs, routeCredit, stopsOf, useLegs, type Pt } from "./useLegs";
+import { computeLegs, routeCredit, useLegs, type Pt, routeStops } from "./useLegs";
 import { PlaceGallery } from "./PlaceGallery";
 import { creditText } from "./Photos";
 import { project, rubber, spring } from "./motion";
@@ -150,7 +150,8 @@ export function PlacesMap({ active }: { active: boolean }) {
   const selDate = !hydrated ? null : (f.mday ?? (todayMode && inTrip ? today : null));
   const selIdx = selDate ? doc.days.findIndex((d) => d.date === selDate) : -1;
   const selDay = selIdx >= 0 ? effectiveDay(doc.days[selIdx]) : null;
-  const selStops = selDay ? stopsOf(selDay.items, (i) => i.lat! > -40 === (selDay.seg === "syd")) : null;
+  // The selected day as in 每日行程: from last night's stay to tonight's (Kai 2026-10-26).
+  const selStops = selDay ? routeStops(selDay.items.filter((i) => i.lat == null || i.lat > -40 === (selDay.seg === "syd")), dayEnds(doc, selDay.date)) : null;
   const legs = useLegs(selStops);
   // Road totals only when every drive pair has a cached leg (non-drive pairs are never routed).
   const drivePairs = selStops ? selStops.slice(1).map((s) => s.drive) : [];
@@ -270,15 +271,17 @@ export function PlacesMap({ active }: { active: boolean }) {
             const here = (i: { lat?: number; lng?: number }) => i.lat != null && i.lng != null && i.lat > -40 === (d.seg === "syd");
             const pts = d.items.filter(here).map((i) => [i.lat!, i.lng!] as [number, number]);
             if (sel) {
-              // Road geometry from the route cache where it exists, straight segments otherwise.
-              const path: [number, number][] = [];
-              pts.forEach((p, k) => {
-                if (k === 0) return void path.push(p);
+              // Same lines as the day map: computed road legs solid, other legs dashed and straight.
+              const rs = selStops ?? [];
+              const road: [number, number][][] = [];
+              const straight: [number, number][][] = [];
+              for (let k = 1; k < rs.length; k++) {
                 const leg = legs?.[k - 1];
-                if (leg?.geometry.length) path.push(...leg.geometry);
-                else path.push(p);
-              });
-              if (path.length > 1) L.polyline(path, { color: red, weight: 4, opacity: 0.9 }).addTo(dayLayer.current!);
+                if (leg?.geometry.length) road.push(leg.geometry);
+                else straight.push([rs[k - 1].pt, rs[k].pt]);
+              }
+              if (road.length) L.polyline(road, { color: red, weight: 4, opacity: 0.9 }).addTo(dayLayer.current!);
+              if (straight.length) L.polyline(straight, { color: red, weight: 2.5, opacity: 0.7, dashArray: "3 7" }).addTo(dayLayer.current!);
               d.items.forEach((i, k) => {
                 if (!here(i)) return;
                 selPtsHere.push([i.lat!, i.lng!]);
@@ -307,11 +310,6 @@ export function PlacesMap({ active }: { active: boolean }) {
             .bindPopup(`<strong>${p.home ? "住處" : "住宿"}</strong><br>${esc(p.name === "住處" ? (doc.stays[p.key]?.name ?? "住處") : p.name)}`);
         if (selDay && selPtsHere.length) {
           const { start, end } = dayEnds(doc, selDay.date);
-          const red = cssVar("--vermilion", "#b83a2e");
-          const first = selPtsHere[0];
-          const last = selPtsHere.at(-1)!;
-          if (start) L.polyline([[start.lat, start.lng], first], { color: red, weight: 2, opacity: 0.6, dashArray: "2 6" }).addTo(dayLayer.current!);
-          if (end) L.polyline([last, [end.lat, end.lng]], { color: red, weight: 2, opacity: 0.6, dashArray: "2 6" }).addTo(dayLayer.current!);
           // The selected day's view includes where it starts and ends.
           for (const p of [start, end]) if (p) selPtsHere.push([p.lat, p.lng]);
         }

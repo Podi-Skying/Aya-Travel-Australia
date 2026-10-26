@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { routeStops } from "@/components/useLegs";
-import { dayNavUrls, MAX_WAYPOINTS, navMode, navUrl } from "@/domain/nav";
+import { daySegments, dayNavUrls, MAX_WAYPOINTS, navMode, navUrl } from "@/domain/nav";
 
 /* Day route from and to the stay, and navigation links (2026-10-26) */
 
@@ -32,5 +32,19 @@ describe("day route", () => {
     expect(new URL(urls[1]).searchParams.get("origin")).toBe(new URL(urls[0]).searchParams.get("destination"));
     expect(navMode("walk")).toBe("walking");
     expect(navMode("train")).toBe("transit");
+  });
+
+  it("splits whole-day links where the mode changes and skips flights", () => {
+    const p = (k: number) => ({ lat: -42 - k / 10, lng: 148 });
+    const segs = daySegments([p(0), p(1), p(2), p(3), p(4)], ["driving", "driving", "walking", null], null);
+    expect(segs.map((s) => s.mode)).toEqual(["driving", "walking"]);
+    expect(new URL(segs[0].urls[0]).searchParams.get("origin")).toBeNull();
+    expect(new URL(segs[1].urls[0]).searchParams.get("origin")).toBe("-42.20000,148.00000");
+    expect(navMode("flight")).toBeNull();
+  });
+
+  it("keeps a gap before tonight's stay when the last activity has no position", () => {
+    const r = routeStops([mk("a", "drive", -42.12, 148.07), mk("b", "drive")], { start: home, end: { lat: -41.87, lng: 148.3, name: "Bicheno" } });
+    expect(r.at(-1)).toMatchObject({ kind: "end", drive: false });
   });
 });

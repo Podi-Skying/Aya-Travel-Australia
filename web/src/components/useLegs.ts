@@ -149,7 +149,8 @@ export function routeStops<T extends { id: string; name: string; lat?: number; l
     gap = false;
   }
   const lastItem = [...out].reverse().find((s) => s.kind === "item");
-  if (ends.end) out.push({ pt: [ends.end.lat, ends.end.lng], drive: lastItem?.mode === "drive", kind: "end", name: ends.end.name, mode: lastItem?.mode ?? "walk" });
+  // A skipped activity after the last located stop breaks the route like any gap (no routed leg across it).
+  if (ends.end) out.push({ pt: [ends.end.lat, ends.end.lng], drive: lastItem?.mode === "drive" && !gap, kind: "end", name: ends.end.name, mode: lastItem?.mode ?? "walk" });
   // A stay and the first/last stop at the same spot make no leg.
   return out.filter((s, k) => k === 0 || s.pt[0] !== out[k - 1].pt[0] || s.pt[1] !== out[k - 1].pt[1]);
 }

@@ -37,5 +37,24 @@ export function dayNavUrls(points: Exclude<NavPoint, null>[], mode: NavMode, fir
   return out;
 }
 
-/** Leg mode from how the stop is reached. */
-export const navMode = (mode: string): NavMode => (mode === "walk" ? "walking" : mode === "drive" ? "driving" : "transit");
+/** Leg mode from how the stop is reached; flights get no directions (null). */
+export const navMode = (mode: string): NavMode | null => (mode === "flight" ? null : mode === "walk" ? "walking" : mode === "drive" ? "driving" : "transit");
+
+/**
+ * Whole-day links split where the way of travelling changes (drive to the ferry, then walk on the island):
+ * each run of legs with one mode gets its own links. `legs[k]` is the leg into `points[k + 1]`.
+ */
+export function daySegments(points: Exclude<NavPoint, null>[], modes: (NavMode | null)[], firstOrigin: NavPoint): { mode: NavMode; urls: string[] }[] {
+  const out: { mode: NavMode; urls: string[] }[] = [];
+  let k = 0;
+  let origin: NavPoint = firstOrigin;
+  while (k < modes.length) {
+    const mode = modes[k];
+    let j = k;
+    while (j + 1 < modes.length && modes[j + 1] === mode) j++;
+    if (mode) out.push({ mode, urls: dayNavUrls(points.slice(k + 1, j + 2), mode, origin) });
+    origin = points[j + 1];
+    k = j + 1;
+  }
+  return out;
+}
