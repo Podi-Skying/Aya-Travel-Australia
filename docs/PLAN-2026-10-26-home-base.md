@@ -33,3 +33,11 @@ Kai: UTAS Hobart Apartments is where they sleep every night, unless a multi-day 
 
 - Public visitors get no UTAS name, key or position; share links get rounded positions.
 - `nightStay` defaults to home and honours stay notes.
+
+## Inspection 1: dispositions
+
+- **PRIV-001, accepted.** Activities about the home base (their name mentions it, e.g. 「機場前往 UTAS 公寓入住」) follow the stay's rule. Public visitors get no position; share links get it rounded to about 300 m. A test covers this.
+- **STAY-001, rejected with clarification.** A stay note is honoured together with the day's stored stay. It cannot pick a different stay by its text, because note texts like 「住宿：搖籃山附近（待確認）」 don't name a stay key reliably. Applied plans set the stored stay, so they are covered.
+- **DATA-001, partly accepted.** The seed's home stay now carries the UTAS position. The live trip has both positions from the data write. The seed's legacy Sydney stay is not the live Riverwood record, and seeds only create new trips.
+- **MAP-001, accepted.** Whole-trip bounds include the stay pins, and the selected day's bounds include its start and end stays.
+- **STAY-002, accepted.** The schema rejects two applied plans that claim the same night. A test covers this.

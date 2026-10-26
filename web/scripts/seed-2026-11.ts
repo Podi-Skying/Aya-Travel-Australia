@@ -91,7 +91,7 @@ export function buildSeed(legacy: LegacyData): TripDoc {
     segments,
     drivers: L.drivers,
     // UTAS Hobart Apartments is the home base (every Tasmania night unless a multi-day trip goes elsewhere).
-    stays: Object.fromEntries(Object.entries(L.stays).map(([k, v]) => [k, k === "utas" ? { ...(v as object), home: true } : v])),
+    stays: Object.fromEntries(Object.entries(L.stays).map(([k, v]) => [k, k === "utas" ? { ...(v as object), home: true, lat: -42.87991, lng: 147.32469 } : v])),
     alertsSources: L.alertsSources,
     days,
     attractionPool,

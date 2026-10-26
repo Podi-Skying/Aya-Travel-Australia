@@ -81,6 +81,26 @@ export function toPublicDoc(doc: TripDoc, opts: { photos?: boolean } = {}) {
   }
   // Public visitors also do not see the home base's name in activity text (e.g. 「前往 UTAS 公寓入住」).
   const homeName = (Object.values(doc.stays) as { name: string; home?: boolean }[]).find((x) => x.home)?.name;
+  // An activity about the home base (going there, checking in) would give its position away: same rule as the stay.
+  if (homeName) {
+    const words = [homeName, "UTAS"];
+    const aboutHome = (i: { name: string; en?: string }) => words.some((w) => i.name.includes(w) || (i.en ?? "").includes(w));
+    const homeIds = new Set([...doc.days.flatMap((d) => d.items), ...doc.attractionPool.flatMap((p) => p.items)].filter(aboutHome).map((i) => i.id));
+    const byOriginal = <T extends { id: string; lat?: number; lng?: number }>(i: T): T => {
+      if (!homeIds.has(i.id) || i.lat == null || i.lng == null) return i;
+      const out = { ...i };
+      if (opts.photos) {
+        out.lat = Math.round(fuzz(i.lat) * 1e4) / 1e4;
+        out.lng = Math.round(fuzz(i.lng) * 1e4) / 1e4;
+      } else {
+        delete out.lat;
+        delete out.lng;
+      }
+      return out;
+    };
+    scrubbed.days = scrubbed.days.map((d) => ({ ...d, items: d.items.map(byOriginal) }));
+    scrubbed.attractionPool = scrubbed.attractionPool.map((p) => ({ ...p, items: p.items.map(byOriginal) }));
+  }
   let out = !opts.photos && homeName ? (renameHome(scrubbed, homeName) as typeof scrubbed) : scrubbed;
   // …nor its internal key (e.g. "utas"), which would name it too.
   const homeKey = Object.entries(doc.stays).find(([, x]) => (x as { home?: boolean }).home)?.[0];

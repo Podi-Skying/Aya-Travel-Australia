@@ -192,7 +192,7 @@ describe("home base privacy", () => {
   it("public visitors get no stay positions or home name; share links get positions rounded to ~300 m", () => {
     const doc = seedDoc();
     Object.assign(doc.stays.utas, { home: true, lat: -42.87991, lng: 147.32469 });
-    doc.days.find((d) => d.seg === "tas")!.items.push({ ...doc.days[0].items[0], id: "x-home", name: "機場前往 UTAS 公寓入住" });
+    doc.days.find((d) => d.seg === "tas")!.items.push({ ...doc.days[0].items[0], id: "x-home", name: "機場前往 UTAS 公寓入住", lat: -42.8826, lng: 147.3257 });
     const pub = toPublicDoc(doc);
     const s = JSON.stringify(pub);
     expect(s).not.toMatch(/UTAS|utas|-42\.8799|147\.3246/);
@@ -203,6 +203,18 @@ describe("home base privacy", () => {
     expect(Math.abs(st.lat! - -42.87991)).toBeLessThan(0.003);
     expect(st.lat).not.toBe(-42.87991);
     expect(JSON.stringify(share)).not.toContain("147.32469");
+    // An activity about the home base follows the same rule as the stay.
+    expect(s).not.toContain("147.3257");
+    const shared = share.days.flatMap((d) => d.items).find((i) => i.id === "x-home")!;
+    expect(shared.lng).not.toBe(147.3257);
+    expect(Math.abs(shared.lng! - 147.3257)).toBeLessThan(0.003);
+  });
+
+  it("rejects two applied plans claiming the same night", async () => {
+    const { parseTripDoc } = await import("@/domain/schema");
+    const doc = seedDoc();
+    const opt = (key: string, group: string) => ({ key, group, title: key, summary: "", region: "", themes: [], chosen: true, start: "2026-11-16", days: [{ title: "x", stay: "utas", driveHrs: 0, itemIds: [] }] });
+    expect(parseTripDoc({ ...doc, tripOptions: [opt("a", "g1"), opt("b", "g2")] }).ok).toBe(false);
   });
 
   it("every Tasmania night is the home base unless a chosen plan or a stay note says otherwise", async () => {

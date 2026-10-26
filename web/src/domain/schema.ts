@@ -299,6 +299,17 @@ export const tripDocSchema = z
     });
     // Options point at items that exist, stay inside the trip, and pick at most one per group.
     const segOf = new Map<string, string>([...doc.days.flatMap((d) => d.items.map((i) => [i.id, d.seg] as const)), ...doc.attractionPool.flatMap((p) => p.items.map((i) => [i.id, p.seg] as const))]);
+    // Two applied plans may not claim the same night (their stays would conflict).
+    const claimed = new Map<string, string>();
+    doc.tripOptions.forEach((o, oi) => {
+      if (!o.chosen || !isRealDate(o.start)) return;
+      o.days.forEach((_, k) => {
+        const date = new Date(Date.parse(o.start + "T00:00:00Z") + k * 86_400_000).toISOString().slice(0, 10);
+        const other = claimed.get(date);
+        if (other) ctx.addIssue({ code: "custom", message: `採用中的方案 ${other} 與 ${o.key} 都包含 ${date}`, path: ["tripOptions", oi, "chosen"] });
+        claimed.set(date, o.key);
+      });
+    });
     const optKeys = new Set<string>();
     const chosenGroups = new Set<string>();
     doc.tripOptions.forEach((o, oi) => {

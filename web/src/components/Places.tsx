@@ -308,9 +308,14 @@ export function PlacesMap({ active }: { active: boolean }) {
         if (selDay && selPtsHere.length) {
           const { start, end } = dayEnds(doc, selDay.date);
           const red = cssVar("--vermilion", "#b83a2e");
-          if (start) L.polyline([[start.lat, start.lng], selPtsHere[0]], { color: red, weight: 2, opacity: 0.6, dashArray: "2 6" }).addTo(dayLayer.current!);
-          if (end) L.polyline([selPtsHere.at(-1)!, [end.lat, end.lng]], { color: red, weight: 2, opacity: 0.6, dashArray: "2 6" }).addTo(dayLayer.current!);
+          const first = selPtsHere[0];
+          const last = selPtsHere.at(-1)!;
+          if (start) L.polyline([[start.lat, start.lng], first], { color: red, weight: 2, opacity: 0.6, dashArray: "2 6" }).addTo(dayLayer.current!);
+          if (end) L.polyline([last, [end.lat, end.lng]], { color: red, weight: 2, opacity: 0.6, dashArray: "2 6" }).addTo(dayLayer.current!);
+          // The selected day's view includes where it starts and ends.
+          for (const p of [start, end]) if (p) selPtsHere.push([p.lat, p.lng]);
         }
+        for (const p of homePins) all.push([p.lat, p.lng]);
         allBounds.current = all.length ? L.latLngBounds(all) : null;
         if (me) L.circleMarker(me, { radius: 7, color: "#fff", weight: 2, fillColor: "#2f6fdf", fillOpacity: 1 }).addTo(dayLayer.current!).bindTooltip("你的位置");
         const pins = shown.filter(({ i }) => i.lat != null && i.lng != null);
