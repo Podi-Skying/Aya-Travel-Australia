@@ -40,7 +40,7 @@ export function TripOptions() {
   const shown = cards;
   const [picked, setPicked] = useState<string | null>(null);
   // A clicked plan opens at its 第 1 天 (Kai 2026-10-26); arrow keys stay on the reel.
-  const [jump, setJump] = useState<string | null>(null);
+  const [jump, setJump] = useState<{ key: string; n: number } | null>(null);
   const narrow = useNarrow();
   const current = shown.find((c) => c.option.key === picked) ?? shown.find((c) => c.option.chosen) ?? shown[0];
   const pal = current ? optionPalette(current.option) : null;
@@ -64,7 +64,7 @@ export function TripOptions() {
               active={current.option.key}
               onSelect={(k, via) => {
                 setPicked(k);
-                setJump(via === "click" ? k : null);
+                setJump(via === "click" ? { key: k, n: (jump?.n ?? 0) + 1 } : null);
               }}
               slices={shown.map((c) => ({
                 key: c.option.key,
@@ -76,7 +76,7 @@ export function TripOptions() {
               }))}
             />
           </div>
-          <OptionDetail key={current.option.key} c={current} jump={jump === current.option.key} />
+          <OptionDetail key={current.option.key} c={current} jump={jump?.key === current.option.key ? jump.n : 0} />
         </>
       )}
     </div>
@@ -85,7 +85,7 @@ export function TripOptions() {
 
 
 /** Details of the selected plan, with each stop's photo for comparison. */
-function OptionDetail({ c, jump }: { c: OptionCard; jump: boolean }) {
+function OptionDetail({ c, jump }: { c: OptionCard; jump: number }) {
   const { doc, mode, online, runOpUndoable, ask, counts, gotoDay } = useTrip();
   const [broken, setBroken] = useState<Set<string>>(() => new Set());
   const { token } = useTrip();
@@ -96,9 +96,9 @@ function OptionDetail({ c, jump }: { c: OptionCard; jump: boolean }) {
     if (!jump || !h) return;
     h.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
     h.focus({ preventScroll: true });
-    // Only when the plan was just picked; later renders leave the scroll alone.
+    // Each click asks again (jump counts clicks); other renders leave the scroll alone.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [jump]);
   const o = c.option;
   const ids = new Set(o.days.flatMap((d) => d.itemIds));
   // Votes follow the activity: include votes recorded on a date it has since moved away from.

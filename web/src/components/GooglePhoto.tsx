@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { googleFor } from "@/client/photos";
 import { useTrip } from "./TripApp";
 
@@ -17,15 +17,25 @@ export function GooglePhoto({ item, alt, className, bare = false, fallback = nul
   const [g, setG] = useState<{ key: string; v: Awaited<ReturnType<typeof googleFor>>[number] | null } | null>(null);
   const [broken, setBroken] = useState(false);
   const { token } = useTrip();
+  const probe = useRef<HTMLSpanElement>(null);
+  // Google photos are billed: ask only once the thumbnail is on screen (hidden tabs never are).
   useEffect(() => {
+    const el = probe.current;
+    if (!el) return;
     let live = true;
-    void googleFor({ id: item.id, name: item.name, lat: item.lat, lng: item.lng }, token).then((v) => live && setG({ key, v: v[0] ?? null }));
+    const io = new IntersectionObserver((es) => {
+      if (!es.some((e) => e.isIntersecting)) return;
+      io.disconnect();
+      void googleFor({ id: item.id, name: item.name, lat: item.lat, lng: item.lng }, token).then((v) => live && setG({ key, v: v[0] ?? null }));
+    });
+    io.observe(el);
     return () => {
       live = false;
+      io.disconnect();
     };
   }, [key, item.id, item.name, item.lat, item.lng, token]);
   const v = g?.key === key ? g.v : null;
-  if (!v || broken) return <>{fallback}</>;
+  if (!v || broken) return <span ref={probe} className="g-probe">{fallback}</span>;
   // Inside a gallery button: the opened gallery shows the full attribution, which Google allows for thumbnails.
   // eslint-disable-next-line @next/next/no-img-element -- Google photo media URI, resolved per view
   if (bare) return <img className={className} src={v.photoUri} alt={alt} loading="lazy" referrerPolicy="no-referrer" onError={() => setBroken(true)} />;

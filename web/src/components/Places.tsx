@@ -9,6 +9,7 @@ import { PendingButton, useHobartToday, useHydrated, useReducedMotion } from "./
 import { cssVar, esc, loadLeaflet, tiles } from "./MapViews";
 import { computeLegs, routeCredit, stopsOf, useLegs, type Pt } from "./useLegs";
 import { PlaceGallery } from "./PlaceGallery";
+import { creditText } from "./Photos";
 import { project, rubber, spring } from "./motion";
 import { Pool } from "./Pool";
 import { effectiveDay } from "@/domain/effective-day";
@@ -260,7 +261,7 @@ export function PlacesMap({ active }: { active: boolean }) {
         const ink = cssVar("--ink", "#292823");
         const red = cssVar("--vermilion", "#b83a2e");
         const popup = (d: ReturnType<typeof effectiveDay>, i: Item, idx: number) =>
-          `<div class="stop-pop">${i.photo ? `<img src="${esc(i.photo.url)}" alt="" referrerpolicy="no-referrer" loading="lazy">` : ""}<div><div class="d">${fmtDay(d.date)}・${esc(dayTitle(d))}</div><strong>${esc(i.name)}</strong><a href="#" data-goto="${idx}">查看當天行程 →</a>${i.photo ? `<span class="src small muted">${esc(i.photo.site)}</span>` : ""}</div></div>`;
+          `<div class="stop-pop">${i.photo ? `<img src="${esc(i.photo.url)}" alt="" referrerpolicy="no-referrer" loading="lazy">` : ""}<div><div class="d">${fmtDay(d.date)}・${esc(dayTitle(d))}</div><strong>${esc(i.name)}</strong><a href="#" data-goto="${idx}">查看當天行程 →</a>${i.photo ? `<span class="src small muted">${esc(creditText(i.photo))}</span>` : ""}</div></div>`;
         if (f.days)
           doc.days.forEach((raw, idx) => {
             if (f.seg !== "all" && raw.seg !== f.seg) return;
@@ -738,6 +739,7 @@ function PlaceCard({
             <img src={i.photo.url} alt={i.name} referrerPolicy="no-referrer" loading="lazy" />
           ) : undefined
         }
+        fallback={<span className="pg-placeholder place-card-photo" aria-hidden="true" />}
       />
       <h3>{i.name}</h3>
       {i.en && <div className="en">{i.en}</div>}

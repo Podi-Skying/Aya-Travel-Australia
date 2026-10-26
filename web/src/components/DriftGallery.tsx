@@ -189,21 +189,25 @@ function Field({ shots, active, onPick }: { shots: Shot[]; active: boolean; onPi
       e.preventDefault();
       vel.current += (e.deltaY + e.deltaX) * 6;
     };
-    let drag: { y: number; t: number; moved: number } | null = null;
+    // Drag moves the camera along the dominant axis (2 px of depth per px), so diagonals never cancel out.
+    let drag: { x: number; y: number; t: number; moved: number } | null = null;
     const onDown = (e: PointerEvent) => {
       // Grabbing stops the drift at once (interruptible), then the field follows the finger 1:1.
       vel.current = 0;
-      drag = { y: e.clientY + e.clientX, t: performance.now(), moved: 0 };
+      delete box.dataset.dragged;
+      drag = { x: e.clientX, y: e.clientY, t: performance.now(), moved: 0 };
     };
     const onMove = (e: PointerEvent) => {
       if (!drag) return;
-      const p = e.clientY + e.clientX;
       const now = performance.now();
-      const dy = drag.y - p;
-      drag.moved += Math.abs(dy);
-      cam.current += dy * 3;
-      vel.current = (dy * 3 * 1000) / Math.max(8, now - drag.t);
-      drag.y = p;
+      const dx = drag.x - e.clientX;
+      const dyRaw = drag.y - e.clientY;
+      const delta = Math.abs(dx) > Math.abs(dyRaw) ? dx : dyRaw;
+      drag.moved += Math.abs(delta);
+      cam.current += delta * 2;
+      vel.current = (delta * 2 * 1000) / Math.max(8, now - drag.t);
+      drag.x = e.clientX;
+      drag.y = e.clientY;
       drag.t = now;
     };
     const onUp = () => {
@@ -241,6 +245,14 @@ function Field({ shots, active, onPick }: { shots: Shot[]; active: boolean; onPi
       role="region"
       aria-label="照片漂流畫廊：用方向鍵前進或後退"
       onKeyDown={onKey}
+      onClickCapture={(e) => {
+        // A drag ends in a click wherever the pointer lands; swallow it once, at the field.
+        const box = boxRef.current;
+        if (box?.dataset.dragged) {
+          delete box.dataset.dragged;
+          e.stopPropagation();
+        }
+      }}
     >
       <div className="drift-stage">
         {Array.from({ length: PLANES }, (_, i) => (
@@ -253,11 +265,6 @@ function Field({ shots, active, onPick }: { shots: Shot[]; active: boolean; onPi
               planes.current[i] = el;
             }}
             onClick={(e) => {
-              const box = boxRef.current;
-              if (box?.dataset.dragged) {
-                delete box.dataset.dragged;
-                return;
-              }
               const idx = Number(e.currentTarget.dataset.idx);
               if (Number.isFinite(idx) && shotsRef.current[idx]) onPick(shotsRef.current[idx]);
             }}

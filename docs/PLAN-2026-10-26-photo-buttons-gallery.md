@@ -7,7 +7,7 @@
 - **Count chip:**
   - The number counts the place's own photos, the gallery and cached Commons photos. The Commons list loads when the thumbnail scrolls into view; it costs no external calls.
   - A trailing 「+」 means Google photos may add more. They load only when the sheet opens, because they are billed.
-- **No photos:** a stop with no photo shows the hand-drawn placeholder tile. When there can be no photos at all, the tile is plain and not a button: public viewers, logistics items and 住宿 notes, which never trigger Google.
+- **No photos:** a plan stop or map place card with no photo shows the hand-drawn placeholder tile; 每日行程 rows without a photo stay text-only. When there can be no photos at all, the tile is plain and not a button: public viewers, logistics items and 住宿 notes, which never trigger Google.
 - The plan-level photo overview stack in 跨日行程方案 is removed. Clicking a plan in the reel scrolls to its 第 1 天 and focuses that heading (an instant jump under reduced motion). Arrow keys in the reel keep focus on the reel. The reel itself is kept as the plan chooser.
 
 ## 2. Source link icons removed
@@ -27,7 +27,7 @@
   - **Rendering:** 36 recycled photo planes are drawn with CSS 3D transforms (perspective 900px). One requestAnimationFrame loop moves a camera through a repeating depth of 36 × 260 px. Each plane's photo and scatter are fixed for each lap, so planes recycle endlessly in both directions. Fog fades planes in from far and out just before the camera.
   - **Input and pausing:**
     - Wheel and trackpad (non-passive listener) add velocity, with exponential friction.
-    - Drag and touch move the camera 1:1. Grabbing stops the drift.
+    - Drag and touch move the camera along the dominant axis (2 px of depth per px). Grabbing stops the drift.
     - Arrow keys push the camera.
     - A slow idle drift runs when nothing is held.
     - The loop pauses when the tab is hidden or the page is not active.
@@ -63,3 +63,14 @@
   - the photo button opens the sheet with credits;
   - a plan click lands on 第 1 天 and the overview is gone;
   - 畫廊 drifts, and wheel input and clicks show info.
+
+## Inspection 1: dispositions
+
+- **PHOTO-001, accepted.** `GooglePhoto` asks Google only once its thumbnail is on screen (IntersectionObserver). Hidden tabs never trigger it. 每日行程 rows skip logistics and 住宿 notes, the same rule as the gallery.
+- **PHOTO-002, accepted; plan corrected.** Drag follows the dominant axis, so diagonals no longer cancel out, and moves the camera 2 px of depth per px (not 1:1, which would take 260 px per plane). Velocity on release uses the same delta.
+- **PHOTO-003, accepted.** The click after a drag is swallowed once at the field (`onClickCapture`), and the flag resets on the next pointerdown.
+- **PHOTO-004, accepted.** The jump request counts clicks, so clicking the plan that is already open returns to 第 1 天 too.
+- **PHOTO-005, accepted.** Fixed the malformed `var(--var(--ease))` in 13 transitions.
+- **PHOTO-006, accepted.** The map popup shows source, author and licence as plain text.
+- **PHOTO-007, partly accepted.** Map place cards now show the placeholder tile when there is no photo. 每日行程 rows without a photo stay text-only by design: a tile on every transport or meal row would be noise. The plan text is corrected.
+- **PHOTO-008, plan corrected.** The site-wide reduced-motion rule turns animations off, so the sheet appears at once under reduced motion. That is acceptable, and the plan now says so.

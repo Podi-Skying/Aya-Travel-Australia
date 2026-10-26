@@ -22,6 +22,7 @@ import { nightStay } from "@/domain/stay";
 import { dayEnds } from "@/domain/home-pins";
 import { GooglePhoto } from "./GooglePhoto";
 import { PlaceGallery } from "./PlaceGallery";
+import { isLogistics } from "@/domain/day-title";
 
 function Legs({ travel, road }: { travel: Item["travel"]; road?: Leg | null }) {
   const parts = Object.entries(travel ?? {}).filter(([, v]) => (v ?? 0) > 0) as [string, number][];
@@ -466,7 +467,7 @@ export function DaysView({ active }: { active: boolean }) {
                           </div>
                           {i.photo && i.id !== dayHero?.id ? (
                             <PlaceGallery item={i} className="act-thumb" thumb={<ActPhotoImg id={i.id} name={i.name} photo={i.photo} />} />
-                          ) : !i.photo && (owner || token) && i.lat != null ? (
+                          ) : !i.photo && (owner || token) && i.lat != null && !isLogistics(i) && !i.name.startsWith("住宿：") ? (
                             <PlaceGallery item={i} className="act-thumb" thumb={<GooglePhoto item={i} alt={i.name} bare fallback={<span className="pg-placeholder" aria-hidden="true" />} />} />
                           ) : null}
                         </div>
