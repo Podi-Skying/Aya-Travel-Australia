@@ -958,3 +958,4 @@ details.card.day-summary > summary h3 { margin: 0; }
 .wx-strip li { display: grid; gap: 2px; padding: 8px 10px; border-radius: 12px; background: var(--bg); }
 .wx-strip li.wet { box-shadow: inset 2px 0 0 var(--vermilion); }
 .wx-strip .d { font-weight: 500; }
+.rain-indoor { margin-top: 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; } .rain-indoor-item { display: inline-flex; align-items: center; gap: 4px; }

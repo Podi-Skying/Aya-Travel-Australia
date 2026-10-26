@@ -24,6 +24,9 @@ export type DayWx = {
 
 export type WxPlace = { name: string; lat: number; lng: number };
 
+/** A trip day's forecast: `wx` null with `unavailable` when the source could not be reached for a date in range. */
+export type WxDay = { date: string; place: string; wx: DayWx | null; unavailable?: boolean };
+
 export const SYDNEY: WxPlace = { name: "雪梨", lat: -33.87, lng: 151.21 };
 export const HOBART: WxPlace = { name: "荷巴特", lat: -42.88, lng: 147.33 };
 
@@ -67,7 +70,8 @@ export function wxLabel(code: number): { t: string; icon: "sun" | "partly" | "cl
   return { t: "雷雨", icon: "storm" };
 }
 
-const SEVERE = new Set([65, 67, 75, 82, 86, 95, 96, 99]);
+// Heavy rain, freezing rain, any snow and thunder (the codes wxLabel shows as 大雨, 雪 or 雷雨).
+const SEVERE = new Set([65, 67, 71, 73, 75, 77, 82, 85, 86, 95, 96, 99]);
 
 /** A day that wants its rain plan: rain likely (≥60 %) or a severe code. */
 export const isWet = (w: DayWx | undefined) => !!w && ((w.pop ?? 0) >= 60 || SEVERE.has(w.code));

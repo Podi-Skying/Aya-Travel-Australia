@@ -56,12 +56,16 @@ async function forecastFor(lat: number, lng: number, f: Fetch) {
   });
 }
 
-export type TripWeatherDay = { date: string; place: string; wx: DayWx | null };
+export type TripWeatherDay = { date: string; place: string; wx: DayWx | null; unavailable?: boolean };
+
+/** Today's date in Hobart (the trip's clock), YYYY-MM-DD. */
+const hobartDate = (d: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: "Australia/Hobart" }).format(d);
 
 /** Forecast for every trip day: within the horizon from the cache (or one fetch per place), later days null. */
 export async function tripWeather(doc: Pick<TripDoc, "days" | "stays" | "tripOptions">, now = new Date(), f: Fetch = fetch as unknown as Fetch) {
-  const today = now.toISOString().slice(0, 10);
-  const last = new Date(now.getTime() + (HORIZON_DAYS - 1) * 86_400_000).toISOString().slice(0, 10);
+  // Open-Meteo answers in local dates (timezone=auto), so the window is counted in Hobart dates too.
+  const today = hobartDate(now);
+  const last = new Date(Date.parse(today + "T00:00:00Z") + (HORIZON_DAYS - 1) * 86_400_000).toISOString().slice(0, 10);
   const days = doc.days.map((d) => ({ d, place: dayPlace(doc, d) }));
   const wanted = days.filter(({ d }) => d.date >= today && d.date <= last);
   const places = new Map(wanted.map(({ place }) => [`${place.lat},${place.lng}`, place]));
@@ -75,7 +79,9 @@ export async function tripWeather(doc: Pick<TripDoc, "days" | "stays" | "tripOpt
       if (!fetchedAt || r.fetchedAt < fetchedAt) fetchedAt = r.fetchedAt;
       stale ||= r.stale;
     }
-    return { date: d.date, place: place.name, wx: r?.value.find((w) => w.date === d.date) ?? null };
+    const inRange = d.date >= today && d.date <= last;
+    const wx = r?.value.find((w) => w.date === d.date) ?? null;
+    return { date: d.date, place: place.name, wx, ...(inRange && !wx ? { unavailable: true } : {}) };
   });
   return { days: out, source: WX_SOURCE, url: "https://open-meteo.com/", fetchedAt: (fetchedAt as Date | null)?.toISOString() ?? null, stale, horizonEnd: last };
 }

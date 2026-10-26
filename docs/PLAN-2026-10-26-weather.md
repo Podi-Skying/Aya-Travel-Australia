@@ -47,3 +47,17 @@
 
 - Open-Meteo is mocked: parsing, labels, the horizon, one fetch per place, a cache hit on the second call, and no residence in the output.
 - Wet and indoor rules, the backup search, `useBackup`, `setIndoor` and `swapDays` (confirmed items stay; different regions are refused).
+
+## Inspection 1: dispositions
+
+- **WX-001, rejected with reason.**
+  - `scripts/seed-2026-11.ts` is the 10-22 baseline used by tests. Every later data change (cruise picks, Google Maps packages, the home base, Maria photos) is a backed-up, versioned write to the stored trip, never a seed edit.
+  - The indoor packages were written that way as v107, with a backup first. Their Commons photos were backfilled, and all seven places reach 5+ photos for share links.
+- **WX-002, accepted.** 「換成備案」 is hidden for confirmed bookings, with a line saying to set the status to 待確認 first.
+- **WX-003, accepted.**
+  - The rain card lists plans counted as indoor, each with 「其實在戶外」.
+  - Outdoor plans keep 「其實是室內」.
+  - Any overridden plan gets 「改回自動判斷」.
+- **WX-004, accepted.** Every snow code (71, 73, 75, 77, 85, 86) counts as a wet day, as wxLabel shows them.
+- **WX-005, accepted.** The 16-day window is counted from today's date in Hobart, matching Open-Meteo's local dates.
+- **WX-006, accepted.** Days in range whose fetch failed (with no stale cache) carry `unavailable: true`. They read 「暫時取不到預報」 instead of 「尚無預報」.

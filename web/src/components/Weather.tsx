@@ -3,6 +3,7 @@
 import { useWeather, type TripWeather } from "@/client/weather";
 import { backupsFor, isWet, isWindy, outdoorPlans, weatherNote, wxLabel, type DayWx } from "@/domain/weather";
 import { PendingButton } from "./ui";
+import { isLogistics } from "@/domain/day-title";
 import type { Item, TripDoc } from "@/domain/schema";
 import { fmtDay } from "@/domain/format";
 
@@ -38,8 +39,8 @@ export function wxFor(w: TripWeather | null, date: string) {
 }
 
 /** Day header chip: icon, high/low and rain chance. */
-export function WxChip({ wx, place }: { wx: DayWx | null; place?: string }) {
-  if (!wx) return <span className="wx-chip none">尚無預報</span>;
+export function WxChip({ wx, place, unavailable }: { wx: DayWx | null; place?: string; unavailable?: boolean }) {
+  if (!wx) return <span className="wx-chip none">{unavailable ? "暫無預報" : "尚無預報"}</span>;
   const l = wxLabel(wx.code);
   return (
     <span className={`wx-chip${isWet(wx) ? " wet" : ""}`} aria-label={`${place ? `${place}：` : ""}${l.t}，高溫 ${deg(wx.tMax)}、低溫 ${deg(wx.tMin)}，降雨機率 ${wx.pop ?? "–"}%`}>
@@ -53,10 +54,10 @@ export function WxChip({ wx, place }: { wx: DayWx | null; place?: string }) {
 }
 
 /** Day detail: a short forecast line plus rain or wind warnings. */
-export function WxLine({ day }: { day: { date: string; place: string; wx: DayWx | null } | null }) {
+export function WxLine({ day }: { day: { date: string; place: string; wx: DayWx | null; unavailable?: boolean } | null }) {
   if (!day) return null;
   const wx = day.wx;
-  if (!wx) return <p className="wx-line small muted">{day.place}：尚無預報（出發前 16 天內才有）</p>;
+  if (!wx) return <p className="wx-line small muted">{day.place}：{day.unavailable ? "暫時取不到預報，稍後再看" : "尚無預報（出發前 16 天內才有）"}</p>;
   const l = wxLabel(wx.code);
   return (
     <div className="wx-line small">
@@ -87,7 +88,7 @@ export function WeatherStrip() {
           <li key={d.date} className={isWet(d.wx ?? undefined) ? "wet" : ""}>
             <span className="d">{fmtDay(d.date)}</span>
             <span className="p small muted">{d.place}</span>
-            <WxChip wx={d.wx} place={d.place} />
+            <WxChip wx={d.wx} place={d.place} unavailable={d.unavailable} />
           </li>
         ))}
       </ol>
@@ -126,11 +127,13 @@ export function RainPlan({
   owner: boolean;
   onUse: (itemId: string, key: string, backupId: string) => Promise<unknown>;
   onSwapDay: (toDate: string) => Promise<unknown>;
-  onIndoor: (itemId: string) => Promise<unknown>;
+  onIndoor: (itemId: string, indoor: "" | "yes" | "no") => Promise<unknown>;
 }) {
   const day = wxFor(w, date);
   if (!day?.wx || !isWet(day.wx)) return null;
   const outdoor = outdoorPlans({ items });
+  // Plans counted as indoor (by the owner or the rules), so the owner can correct either way.
+  const indoorNow = items.filter((i) => !outdoor.includes(i) && !isLogistics(i) && !i.name.startsWith("住宿：") && !/^Kai 有工作/.test(i.name));
   const dry = (w?.days ?? []).filter((d) => d.date !== date && d.wx && !isWet(d.wx) && d.date >= new Date().toISOString().slice(0, 10));
   return (
     <section className="card rain-plan" aria-labelledby={`rain-${date}`}>
@@ -154,7 +157,7 @@ export function RainPlan({
                     {alts.map((b) => (
                       <li key={b.item.id}>
                         {b.item.name} <span className="small muted">約 {b.minutes} 分鐘</span>
-                        {owner && (
+                        {owner && i.status !== "confirmed" && (
                           <PendingButton className="btn ghost small" pendingLabel="換成中…" onAction={() => onUse(i.id, b.key, b.item.id)}>
                             換成備案
                           </PendingButton>
@@ -165,9 +168,15 @@ export function RainPlan({
                 ) : (
                   <p className="small muted">附近的待安排景點裡沒有室內備案。</p>
                 )}
+                {owner && i.status === "confirmed" && alts.length > 0 && <p className="small muted">已確認預訂，要換成備案請先把狀態改成「待確認」。</p>}
                 {owner && (
-                  <PendingButton className="btn ghost small" pendingLabel="儲存中…" onAction={() => onIndoor(i.id)}>
+                  <PendingButton className="btn ghost small" pendingLabel="儲存中…" onAction={() => onIndoor(i.id, "yes")}>
                     其實是室內，不用備案
+                  </PendingButton>
+                )}
+                {owner && i.indoor != null && (
+                  <PendingButton className="btn ghost small" pendingLabel="儲存中…" onAction={() => onIndoor(i.id, "")}>
+                    改回自動判斷
                   </PendingButton>
                 )}
               </li>
@@ -176,6 +185,24 @@ export function RainPlan({
         </ul>
       ) : (
         <p className="small">這天的行程都在室內。</p>
+      )}
+      {owner && indoorNow.length > 0 && (
+        <div className="rain-indoor small">
+          <span className="muted">算作室內：</span>
+          {indoorNow.map((i) => (
+            <span key={i.id} className="rain-indoor-item">
+              {i.name}
+              <PendingButton className="btn ghost small" pendingLabel="儲存中…" onAction={() => onIndoor(i.id, "no")}>
+                其實在戶外
+              </PendingButton>
+              {i.indoor != null && (
+                <PendingButton className="btn ghost small" pendingLabel="儲存中…" onAction={() => onIndoor(i.id, "")}>
+                  改回自動判斷
+                </PendingButton>
+              )}
+            </span>
+          ))}
+        </div>
       )}
       {owner && dry.length > 0 && (
         <div className="rain-swap">

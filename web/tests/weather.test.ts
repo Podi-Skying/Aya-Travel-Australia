@@ -105,4 +105,19 @@ describe("weather", () => {
     for (const id of locked) expect(s.doc.days.find((d) => d.date === a.date)!.items.some((i) => i.id === id)).toBe(true);
     expect(applyOp(doc, { op: "swapDays", date: doc.days[0].date, toDate: tas[0].date }).ok).toBe(false);
   });
+
+  it("treats any snow as wet, counts the window in Hobart dates, and flags a failed fetch apart from the horizon", async () => {
+    expect(isWet({ code: 71, pop: 10 } as DayWx)).toBe(true);
+    const doc = seedDoc() as TripDoc;
+    const first = doc.days[0].date;
+    // 20:00 UTC the day before is already the first trip day in Hobart.
+    const now = new Date(Date.parse(first + "T00:00:00Z") - 4 * 3_600_000);
+    const fail = vi.fn(async () => ({ ok: false, json: async () => ({}) }));
+    const r = await tripWeather(doc, now, fail);
+    expect(r.days[0]).toMatchObject({ date: first, wx: null, unavailable: true });
+    const later = r.days.find((d) => d.date > r.horizonEnd);
+    if (later) expect(later.unavailable).toBeUndefined();
+    expect(r.horizonEnd).toBe(new Date(Date.parse(first + "T00:00:00Z") + 15 * 86_400_000).toISOString().slice(0, 10));
+  });
 });
+

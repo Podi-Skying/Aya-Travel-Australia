@@ -7,7 +7,7 @@ import type { DayWx } from "@/domain/weather";
  * for 3 hours, so this never reaches Open-Meteo directly.
  */
 
-export type TripWeather = { days: { date: string; place: string; wx: DayWx | null }[]; source: string; url: string; fetchedAt: string | null; stale: boolean; horizonEnd: string };
+export type TripWeather = { days: { date: string; place: string; wx: DayWx | null; unavailable?: boolean }[]; source: string; url: string; fetchedAt: string | null; stale: boolean; horizonEnd: string };
 
 let memo: { at: number; p: Promise<TripWeather | null> } | null = null;
 

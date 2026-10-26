@@ -311,7 +311,7 @@ export function DaysView({ active }: { active: boolean }) {
           <div className="day-head">
             <div>
               <div className="day-date">
-                第 {currentDay + 1} 天・{fmtDay(d.date)}・{seg?.name} {weather && <WxChip wx={wxFor(weather, d.date)?.wx ?? null} place={wxFor(weather, d.date)?.place} />}
+                第 {currentDay + 1} 天・{fmtDay(d.date)}・{seg?.name} {weather && <WxChip wx={wxFor(weather, d.date)?.wx ?? null} place={wxFor(weather, d.date)?.place} unavailable={wxFor(weather, d.date)?.unavailable} />}
               </div>
               <h2>{dayTitle(raw)}</h2>
               {night !== "none" && st.name && (
@@ -372,7 +372,7 @@ export function DaysView({ active }: { active: boolean }) {
             owner={editable}
             onUse={(itemId, key, backupId) => runOpUndoable({ op: "useBackup", date: d.date, itemId, key, backupId }, "已換成備案，可以按「復原」")}
             onSwapDay={(toDate) => runOpUndoable({ op: "swapDays", date: d.date, toDate }, "已對調，可以按「復原」")}
-            onIndoor={(itemId) => runOp({ op: "setIndoor", itemId, indoor: "yes" })}
+            onIndoor={(itemId, indoor) => runOp({ op: "setIndoor", itemId, indoor })}
           />
           <div className="day-facts two">
             <div className="fact">
