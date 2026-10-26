@@ -1,5 +1,6 @@
 "use client";
 
+import { dayTitle } from "@/domain/day-title";
 import { useEffect, useState } from "react";
 import { useTrip } from "./TripApp";
 import { Icon } from "./Icon";
@@ -223,7 +224,7 @@ function VersionPreview({ v, onClose }: { v: VersionMeta; onClose: () => void })
       <ol className="small">
         {doc.days.map((d) => (
           <li key={d.date}>
-            {fmtDay(d.date)} {d.title}
+            {fmtDay(d.date)} {dayTitle(d)}
             {d.items.length ? "：" + d.items.map((i) => i.name).join(" → ") : ""}
           </li>
         ))}

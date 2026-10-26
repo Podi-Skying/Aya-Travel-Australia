@@ -1,3 +1,4 @@
+import { dayTitle } from "./day-title";
 import type { TripDoc } from "./schema";
 import { effectiveDay } from "./effective-day";
 
@@ -9,7 +10,7 @@ export function walkDays(doc: Pick<TripDoc, "days" | "segments">) {
       date: d.date,
       seg: d.seg,
       segName: doc.segments[d.seg]?.name ?? d.seg,
-      title: d.title,
+      title: dayTitle(d),
       driveHrs: d.driveHrs,
       needsDriver: !!d.needsDriver,
       driverOk: d.driverOk,

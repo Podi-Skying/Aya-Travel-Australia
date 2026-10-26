@@ -1,5 +1,6 @@
 "use client";
 
+import { dayTitle } from "@/domain/day-title";
 import { useEffect, useState } from "react";
 import { useTrip } from "./TripApp";
 import { Icon, MODE_ICON } from "./Icon";
@@ -304,7 +305,26 @@ export function DaysView({ active }: { active: boolean }) {
               <div className="day-date">
                 第 {currentDay + 1} 天・{fmtDay(d.date)}・{seg?.name}
               </div>
-              <h2>{d.title}</h2>
+              <h2>{dayTitle(raw)}</h2>
+              {editable && (
+                <p className="title-pin small">
+                  {raw.titlePinned ? "標題已固定" : "標題依當天活動自動產生"}{" "}
+                  <PendingButton
+                    className="btn ghost small"
+                    pendingLabel="儲存中…"
+                    onAction={async () => {
+                      const v = await ask(raw.titlePinned ? "修改或取消固定標題" : "自訂這天的標題", {
+                        body: <p className="small muted">留空會改回依當天活動自動產生的標題。</p>,
+                        fields: [{ name: "title", label: "標題（最多 60 字）", value: raw.titlePinned ? raw.title : dayTitle(raw), maxLength: 60 }],
+                      });
+                      if (!v) return null;
+                      return runOp({ op: "setDayTitle", date: raw.date, title: v.title });
+                    }}
+                  >
+                    {raw.titlePinned ? "修改標題" : "自訂標題"}
+                  </PendingButton>
+                </p>
+              )}
               <AvatarStack people={dayPeople} size={30} />
             </div>
             <div className="day-nav">

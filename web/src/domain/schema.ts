@@ -135,6 +135,8 @@ export const daySchema = z.object({
   date: dateStr,
   seg: z.string().min(1).max(20),
   title: z.string().min(1).max(120),
+  /** The owner pinned `title`; otherwise the shown title follows the activities (domain/day-title.ts). */
+  titlePinned: z.boolean().optional(),
   stay: z.string().min(1).max(40),
   driveHrs: z.number().min(0).max(24),
   needsDriver: shortText(40).optional(),

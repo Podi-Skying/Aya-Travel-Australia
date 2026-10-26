@@ -1,5 +1,6 @@
 "use client";
 
+import { dayTitle } from "@/domain/day-title";
 import { useState } from "react";
 import { useTrip } from "./TripApp";
 import { Icon } from "./Icon";
@@ -101,7 +102,7 @@ function PackageCard({ pkg }: { pkg: Package }) {
             <select value={date} onChange={(e) => setDate(e.target.value)}>
               {eligible.map((d) => (
                 <option key={d.date} value={d.date}>
-                  {fmtDay(d.date)} {d.title}
+                  {fmtDay(d.date)} {dayTitle(d)}
                 </option>
               ))}
             </select>

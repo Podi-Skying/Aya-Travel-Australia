@@ -1,5 +1,6 @@
 "use client";
 
+import { dayTitle } from "@/domain/day-title";
 import { useTrip } from "./TripApp";
 import { Badge } from "./ui";
 import { effectiveDay } from "@/domain/effective-day";
@@ -21,7 +22,7 @@ export function Checklist() {
 
   // Everything awaiting confirmation: unconfirmed driver days, pending activities, and places still to arrange.
   const pending: { key: string; idx: number; t: string }[] = [
-    ...eff.flatMap((d, idx) => (d.needsDriver && !d.driverOk ? [{ key: `drv-${d.date}`, idx, t: `${mode === "owner" ? d.needsDriver : "朋友"}開車的時段（${d.title}）` }] : [])),
+    ...eff.flatMap((d, idx) => (d.needsDriver && !d.driverOk ? [{ key: `drv-${d.date}`, idx, t: `${mode === "owner" ? d.needsDriver : "朋友"}開車的時段（${dayTitle(d)}）` }] : [])),
     ...doc.days.flatMap((d, idx) => d.items.filter((i) => i.status === "pending").map((i) => ({ key: i.id, idx, t: i.name }))),
     ...doc.attractionPool.filter((p) => p.key === "arrange").flatMap((p) => p.items.map((i) => ({ key: i.id, idx: -1, t: i.name }))),
   ];

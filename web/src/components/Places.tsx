@@ -1,5 +1,6 @@
 "use client";
 
+import { dayTitle } from "@/domain/day-title";
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import type * as Leaflet from "leaflet";
 import { useTrip } from "./TripApp";
@@ -530,7 +531,7 @@ export function PlacesMap({ active }: { active: boolean }) {
                 type="button"
                 className={`chip${d.date === selDate ? " on" : ""}${d.items.length ? "" : " open"}`}
                 aria-pressed={d.date === selDate}
-                aria-label={`${fmtDay(d.date)} ${d.title}`}
+                aria-label={`${fmtDay(d.date)} ${dayTitle(d)}`}
                 onClick={() => pickDay(d.date === selDate ? null : d.date)}
               >
                 {fmtMD(d.date)}
@@ -539,7 +540,7 @@ export function PlacesMap({ active }: { active: boolean }) {
           </div>
           {selDay && (
             <p className="day-strip-sum small">
-              <strong>{fmtDay(selDay.date)}</strong> {selDay.title}
+              <strong>{fmtDay(selDay.date)}</strong> {dayTitle(selDay)}
               {roadTotal && roadTotal.s > 0 && (
                 <span className="muted">
                   ・開車路段約 {Math.round(roadTotal.m / 1000)} 公里、{Math.round((roadTotal.s / 3600) * 10) / 10} 小時（道路計算）
@@ -741,7 +742,7 @@ function PlaceCard({
             <select value={date} onChange={(e) => setDate(e.target.value)}>
               {days.map((d) => (
                 <option key={d.date} value={d.date}>
-                  {fmtDay(d.date)} {d.title}
+                  {fmtDay(d.date)} {dayTitle(d)}
                   {d.date === suggestion?.date ? "（建議）" : ""}
                 </option>
               ))}

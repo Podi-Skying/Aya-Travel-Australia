@@ -1,5 +1,6 @@
 "use client";
 
+import { dayTitle } from "@/domain/day-title";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { useTrip } from "./TripApp";
 import { useHobartToday, useReducedMotion } from "./ui";
@@ -275,7 +276,7 @@ export function DayCalendar() {
                     tabIndex={c.dayIdx === focusIdx ? 0 : -1}
                     aria-selected={sel}
                     aria-current={isToday ? "date" : undefined}
-                    aria-label={`${fmtDay(c.date)} ${x2.title}${isToday ? "，今天" : ""}，${STATUS_T[status[c.dayIdx]]}${x2.needsDriver ? "，朋友開車" : ""}${warn[c.dayIdx] ? "，有提醒" : ""}`}
+                    aria-label={`${fmtDay(c.date)} ${dayTitle(x2)}${isToday ? "，今天" : ""}，${STATUS_T[status[c.dayIdx]]}${x2.needsDriver ? "，朋友開車" : ""}${warn[c.dayIdx] ? "，有提醒" : ""}`}
                     onClick={() => setCurrentDay(c.dayIdx)}
                     onPointerEnter={(e) => e.pointerType === "mouse" && setHoverIdx(c.dayIdx)}
                     onPointerLeave={() => setHoverIdx(null)}
@@ -303,7 +304,7 @@ export function DayCalendar() {
         </button>
       )}
       <p className="cal-caption" aria-live="polite">
-        <span className="d">{fmtDay(sd.date)}</span> {sd.title}
+        <span className="d">{fmtDay(sd.date)}</span> {dayTitle(sd)}
       </p>
     </div>
   );

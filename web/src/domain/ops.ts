@@ -33,6 +33,7 @@ export type Op =
   | { op: "addSkyPost"; kind: string; text: string; date: string; url?: string; photoUrl?: string; newId: string }
   | { op: "removeSkyPost"; id: string }
   | { op: "applyOption"; key: string }
+  | { op: "setDayTitle"; date: string; title: string }
   | { op: "snapshot"; summary: string };
 
 export type ItemFields = {
@@ -461,6 +462,8 @@ export function applyOp(input: TripDoc, op: Op): OpResult {
       if (!d) return err(404, "找不到日期");
       const { move, keep } = clearDaySplit(d.items);
       if (!move.length) return err(400, "這天沒有可以移回待安排的活動");
+      // An emptied day shows 「未規劃」, so a pinned title is released too.
+      delete d.titlePinned;
       let cur = doc;
       for (const it of move) {
         const r = applyOp(cur, { op: "unscheduleItem", date: op.date, itemId: it.id });
@@ -505,6 +508,20 @@ export function applyOp(input: TripDoc, op: Op): OpResult {
     }
     case "applyOption":
       return applyOption(doc, op.key);
+    case "setDayTitle": {
+      // A pinned title stays as written; an empty one returns the day to its automatic title.
+      const d = findDay(doc, op.date);
+      if (!d) return err(404, "找不到日期");
+      const t = op.title.trim();
+      if (t.length > 60) return err(400, "標題最多 60 字");
+      if (!t) {
+        delete d.titlePinned;
+        return { ok: true, doc, summary: `${fmtDay(d.date)} 標題改回自動` };
+      }
+      d.title = t;
+      d.titlePinned = true;
+      return { ok: true, doc, summary: `${fmtDay(d.date)} 標題固定為「${t}」` };
+    }
     case "snapshot": {
       const s = op.summary.trim();
       if (!s || s.length > 60) return err(400, "版本說明需為 1–60 字");
