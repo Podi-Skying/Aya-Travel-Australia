@@ -38,16 +38,16 @@
 
 ## 4. Maria Island cruise photos (Kai)
 
-- Kai's 6 images are stored as 1600 px webp in `web/media/maria-island-cruise`, behind the owner or share-token media route.
+- Kai's 6 images are stored as webp in `web/media/maria-island-cruise` at their original size, capped at 1600 px (01 is 1224×816, 02–04 are 663×442, 05–06 are 1600×1067), behind the owner or share-token media route.
 - The cover is 01 (the aerial view of Île des Phoques). 05 (passengers from behind, operator branding) is last in the gallery.
 - Data version v106; the backup was taken first.
 - The branch `assets/maria-island-cruise` could not be deleted from here (permission), so Kai deletes it.
 
 ## 5. Design pass (apple-design)
 
-- **One motion family:** `--ease` (critically damped curve), `--t-press` 100 ms, `--t-ui` 200 ms and `--t-sheet` 280 ms. Every transition now uses `--ease`.
+- **One motion family:** `--ease` (critically damped curve), `--t-press` 100 ms, `--t-ui` 200 ms and `--t-sheet` 280 ms. Every transition uses `--ease`, except the plan reel, which keeps its own tuned curves for the slice swell.
 - **Press feedback on pointer-down:** buttons, chips and photo buttons scale to 0.97 when pressed. Under reduced motion they don't scale.
-- **Gallery sheet:** it rises 16 px and fades in with its scrim. Under reduced motion it only fades.
+- **Gallery sheet:** it rises 16 px and fades in with its scrim. Under reduced motion it appears at once (the site-wide reduced-motion rule turns animations off).
 - **Loading and empty states:** while loading, the gallery shows a 230 px placeholder box that pulses (still under reduced motion); 畫廊 has an explicit empty state.
 - **Photo-first stop cards:** steadier spacing between photo, time and name.
 
@@ -74,3 +74,14 @@
 - **PHOTO-006, accepted.** The map popup shows source, author and licence as plain text.
 - **PHOTO-007, partly accepted.** Map place cards now show the placeholder tile when there is no photo. 每日行程 rows without a photo stay text-only by design: a tile on every transport or meal row would be noise. The plan text is corrected.
 - **PHOTO-008, plan corrected.** The site-wide reduced-motion rule turns animations off, so the sheet appears at once under reduced motion. That is acceptable, and the plan now says so.
+
+## Inspection 2: dispositions (the two-round budget is now used up; covered by tests and a local check)
+
+- **REVIEW-001, rejected with reason.**
+  - The Google thumbnail on stops without their own photo predates this batch. Kai chose Google photos for share links, with the share sub-cap (300 per day) and the overall cap (700).
+  - This batch makes it cheaper: a request goes out only when the thumbnail is on screen, not when the page loads. That request is the same cached one the gallery reuses (one Place Details + up to 5 photos per place, kept 20 minutes).
+  - Dropping the thumbnails would undo the photo-first cards Kai asked for.
+- **REVIEW-002, accepted.** 畫廊 shows 「照片載入中…」 until every Commons batch has finished, and shows the empty state only afterwards.
+- **REVIEW-003, plan corrected.** Sizes are as delivered: the originals were smaller than 1600 px.
+- **REVIEW-004, accepted.** The toast now uses `--ease`. The reel keeps its own curves, as the plan now says.
+- **REVIEW-005, accepted.** The plan says the sheet appears at once under reduced motion. The ineffective reduced-motion sheet animation rule is removed.

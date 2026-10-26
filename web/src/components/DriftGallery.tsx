@@ -55,6 +55,7 @@ export function DriftGallery({ active }: { active: boolean }) {
   const { doc, token, mode, gotoDay } = useTrip();
   const reduce = useReducedMotion();
   const [commons, setCommons] = useState<Record<string, Photo[]>>({});
+  const [loading, setLoading] = useState(true);
   const [picked, setPicked] = useState<Shot | null>(null);
 
   // Cached Commons photos for places, a few requests at a time once the page is open (never Google: billed).
@@ -71,6 +72,7 @@ export function DriftGallery({ active }: { active: boolean }) {
         const lists = await Promise.all(part.map((i) => commonsFor({ id: i.id, name: i.name, lat: i.lat, lng: i.lng }, token)));
         if (live) setCommons((c) => ({ ...c, ...Object.fromEntries(part.map((i, j) => [i.id, lists[j]])) }));
       }
+      if (live) setLoading(false);
     })();
     return () => {
       live = false;
@@ -88,7 +90,7 @@ export function DriftGallery({ active }: { active: boolean }) {
         </p>
       </div>
       {shots.length === 0 ? (
-        <p className="section muted">還沒有照片。景點加上照片之後會出現在這裡。</p>
+        <p className="section muted">{loading ? "照片載入中…" : "還沒有照片。景點加上照片之後會出現在這裡。"}</p>
       ) : reduce ? (
         <ul className="drift-grid">
           {shots.map((s) => (
