@@ -6,7 +6,7 @@ import { useTrip } from "./TripApp";
 import { Icon, iconSvg } from "./Icon";
 import { PendingButton, useHobartToday, useHydrated, useReducedMotion } from "./ui";
 import { cssVar, esc, loadLeaflet, tiles } from "./MapViews";
-import { ROUTE_CREDIT, stopsOf, useLegs, type Pt } from "./useLegs";
+import { computeLegs, ROUTE_CREDIT, stopsOf, useLegs, type Pt } from "./useLegs";
 import { PhotoCredit } from "./Photos";
 import { project, rubber, spring } from "./motion";
 import { Pool } from "./Pool";
@@ -553,7 +553,12 @@ export function PlacesMap({ active }: { active: boolean }) {
               >
                 查看當天行程 →
               </a>
-              {legs?.some((l) => l && l.source !== "same-place") && <span className="route-credit">{ROUTE_CREDIT}</span>}
+              {editable && selStops && legs && drivePairs.some((dr, k) => dr && !legs[k]) && (
+                <PendingButton className="btn ghost small" pendingLabel="計算中…" onAction={() => computeLegs(selStops)}>
+                  計算道路路線
+                </PendingButton>
+              )}
+              {legs?.some((l) => l && l.source !== "same-place") && <span className="route-credit">{legs.some((l) => l?.source === "google-routes") ? "路線 © Google" : ROUTE_CREDIT}</span>}
             </p>
           )}
           {selected && (

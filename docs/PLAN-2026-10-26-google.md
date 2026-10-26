@@ -35,7 +35,8 @@ There is no Google base map.
 - `getLegs` uses Google Routes `computeRoutes` when a key is set, and OSRM otherwise.
 - Field mask: `routes.legs.distanceMeters,routes.legs.duration,routes.legs.polyline.encodedPolyline`.
 - Polyline, distance and duration are stored in `route_cache` with `source = google-routes`.
-- Google is called only on a cache miss, during an owner action or the backfill. Page views read the cache and record a "hit".
+- Page views (owner and guests) only read `route_cache` and record a "hit".
+- Google is called only for missing legs, when the owner presses 「計算道路路線」 (`compute: true`) or during the backfill.
 - `upgrade` (backfill only) replaces earlier OSRM rows with Google rows.
 
 ### Places
@@ -77,3 +78,16 @@ There is no Google base map.
    - the backfill stores Google legs;
    - the live map draws road geometry for scheduled driving days;
    - the usage endpoint answers.
+
+## Inspection 1: dispositions (all accepted)
+
+- **G-01.** `/api/routes` computes only when `compute: true` is sent, i.e. from the owner's 「計算道路路線」 button or the backfill. Owner page views are read-only. Covered by a test.
+- **G-02.** The cap is enforced atomically: the `_total` row is upserted with `setWhere calls < cap`. A concurrency test is included.
+- **G-03.** Expired Google rows are deleted when they are found.
+- **G-04.** The client keeps photo answers for 25 minutes and does not keep failures.
+- **G-05.**
+  - The place-ID mapping stores the activity name.
+  - A renamed activity is looked up again by the backfill.
+  - The photo endpoint returns 404 until then.
+- **G-06.** Protocol-relative attribution links are normalised to https.
+- **G-07.** Owner pool items without a photo show the Google photo.

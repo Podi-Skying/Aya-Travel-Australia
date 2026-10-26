@@ -183,7 +183,7 @@ export function DayMap({
           </div>
         )}
       </div>
-      {legs?.some((l) => l && l.source !== "same-place") && <p className="route-credit">{ROUTE_CREDIT}</p>}
+      {legs?.some((l) => l && l.source !== "same-place") && <p className="route-credit">{legs.some((l) => l?.source === "google-routes") ? "路線 © Google" : ROUTE_CREDIT}</p>}
     </>
   );
 }

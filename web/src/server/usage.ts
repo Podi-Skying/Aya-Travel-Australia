@@ -1,4 +1,4 @@
-import { and, eq, gte, like, sql } from "drizzle-orm";
+import { and, gte, like, sql } from "drizzle-orm";
 import { getDb, schema } from "./db/client";
 
 /*
@@ -9,6 +9,8 @@ import { getDb, schema } from "./db/client";
  */
 
 const { googleUsage } = schema;
+/** Per-day reservation counter row used for the atomic cap; excluded from reports. */
+const TOTAL = "_total";
 
 export const GOOGLE_APIS = {
   places_search: { sku: "Text Search Essentials (IDs Only)", perThousand: 0, freePerMonth: Infinity },
@@ -31,15 +33,22 @@ async function bump(api: GoogleApi, field: "calls" | "hits", now: Date) {
     .onConflictDoUpdate({ target: [googleUsage.day, googleUsage.api], set: { [field]: sql`${googleUsage[field]} + 1` } });
 }
 
-/** Reserves one billable call under today's cap (Hobart day); false when capped or the DB fails. */
+/**
+ * Reserves one billable call under today's cap (Hobart day), atomically: the day's `_total` row is
+ * incremented only while below the cap, in one statement. False when capped or the DB fails.
+ */
 export async function takeGoogleCall(api: GoogleApi, now = new Date()): Promise<boolean> {
+  const cap = dailyCap();
+  if (cap <= 0) return false;
   try {
     const db = await getDb();
+    const day = hobartDay(now);
     const r = await db
-      .select({ n: sql<number>`coalesce(sum(${googleUsage.calls}), 0)` })
-      .from(googleUsage)
-      .where(eq(googleUsage.day, hobartDay(now)));
-    if (Number(r[0]?.n ?? 0) >= dailyCap()) return false;
+      .insert(googleUsage)
+      .values({ day, api: TOTAL, calls: 1 })
+      .onConflictDoUpdate({ target: [googleUsage.day, googleUsage.api], set: { calls: sql`${googleUsage.calls} + 1` }, setWhere: sql`${googleUsage.calls} < ${cap}` })
+      .returning({ calls: googleUsage.calls });
+    if (!r.length) return false;
     await bump(api, "calls", now);
     return true;
   } catch {
@@ -59,6 +68,7 @@ export async function usageSince(fromDay: string): Promise<DayUsage[]> {
   const rows = await db.select().from(googleUsage).where(gte(googleUsage.day, fromDay));
   const by = new Map<string, DayUsage>();
   for (const r of rows) {
+    if (r.api === TOTAL) continue;
     const d = by.get(r.day) ?? { date: r.day, apis: {}, calls: 0, hits: 0 };
     d.apis[r.api] = { calls: r.calls, hits: r.hits };
     d.calls += r.calls;
@@ -73,7 +83,7 @@ export async function monthCost(month: string): Promise<{ usd: number; calls: Re
   const db = await getDb();
   const rows = await db.select().from(googleUsage).where(and(like(googleUsage.day, `${month}-%`)));
   const calls: Record<string, number> = {};
-  for (const r of rows) calls[r.api] = (calls[r.api] ?? 0) + r.calls;
+  for (const r of rows) if (r.api !== TOTAL) calls[r.api] = (calls[r.api] ?? 0) + r.calls;
   let usd = 0;
   for (const [api, n] of Object.entries(calls)) {
     const p = GOOGLE_APIS[api as GoogleApi];

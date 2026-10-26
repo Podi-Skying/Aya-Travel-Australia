@@ -16,7 +16,7 @@ import { checks, feasibility } from "@/domain/rules";
 import { basis, dayTotal, lineAmount, stayOf } from "@/domain/budget";
 import { fmtDay, mins, money } from "@/domain/format";
 import type { Item } from "@/domain/schema";
-import { legLabel, stopsOf, useLegs, type Leg } from "./useLegs";
+import { computeLegs, legLabel, stopsOf, useLegs, type Leg } from "./useLegs";
 import { GooglePhoto } from "./GooglePhoto";
 
 function Legs({ travel, road }: { travel: Item["travel"]; road?: Leg | null }) {
@@ -639,6 +639,11 @@ export function DaysView({ active }: { active: boolean }) {
               }))}
             onAdd={editable ? (key, id) => runOp({ op: "scheduleItem", key, itemId: id, date: d.date }) : undefined}
           />
+          {editable && roadLegs && stopsOf(d.items).slice(1).some((s, k) => s.drive && !roadLegs[k]) && (
+            <PendingButton className="btn ghost small" pendingLabel="計算中…" onAction={() => computeLegs(stopsOf(d.items))}>
+              計算道路路線（只算一次，存在後台）
+            </PendingButton>
+          )}
           <p className="map-note">開車路段若已計算過會沿實際道路畫出，其他路段是點對點直線示意；實際路線與時間請以導航為準。</p>
         </aside>
       </div>

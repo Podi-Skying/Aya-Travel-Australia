@@ -10,17 +10,21 @@ import { api } from "@/client/api";
  */
 type G = { photoUri: string; attributions: { name: string; uri?: string }[]; mapsUri?: string };
 
-const memo = new Map<string, Promise<G | null>>();
+/** Photo URIs are temporary: answers are reused for 25 minutes, failures are not kept. */
+const memo = new Map<string, { at: number; p: Promise<G | null> }>();
+const TTL = 25 * 60_000;
 
 export function GooglePhoto({ itemId, alt, className }: { itemId: string; alt: string; className?: string }) {
   const [g, setG] = useState<{ id: string; v: G | null } | null>(null);
   const [broken, setBroken] = useState(false);
   useEffect(() => {
     let live = true;
-    let p = memo.get(itemId);
+    const m = memo.get(itemId);
+    let p = m && Date.now() - m.at < TTL ? m.p : undefined;
     if (!p) {
       p = api<G>(`/api/place-photo?item=${encodeURIComponent(itemId)}`).then((r) => (r.ok ? r.data : null));
-      memo.set(itemId, p);
+      memo.set(itemId, { at: Date.now(), p });
+      void p.then((v) => !v && memo.delete(itemId));
     }
     void p.then((v) => live && setG({ id: itemId, v }));
     return () => {

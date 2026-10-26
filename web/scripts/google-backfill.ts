@@ -10,7 +10,8 @@ import { listPrice } from "../src/server/usage";
  * One-time Google backfill (docs/PLAN-2026-10-26-google.md), run by hand after the key is set:
  *   npx tsx --env-file=.env.local scripts/google-backfill.ts           # dry run: counts and estimate
  *   npx tsx --env-file=.env.local scripts/google-backfill.ts --write   # calls Google, within the daily cap
- * Finds place ids for activities without a photo, and stores every scheduled driving leg in route_cache.
+ * Finds place ids for activities without a photo, and stores every driving leg of the scheduled days
+ * and of the recommended plans in route_cache.
  */
 
 async function main() {
@@ -27,8 +28,14 @@ async function main() {
   for (const i of items) if (!(await getLookup("place-id", i.id).catch(() => null))) todo.push(i);
 
   // Routes: each run of consecutive drive legs, in chunks of at most 25 points.
+  // Scheduled days, plus each recommended plan's days so their routes are ready when a plan is applied.
+  const all = [...doc.days.flatMap((d) => d.items), ...doc.attractionPool.flatMap((p) => p.items)];
+  const dayLists = [
+    ...doc.days.map((d) => ({ seg: d.seg, items: d.items })),
+    ...(doc.tripOptions ?? []).flatMap((o) => o.days.map((od) => ({ seg: "tas", items: od.itemIds.map((id) => all.find((i) => i.id === id)).filter((i): i is (typeof all)[number] => !!i).sort((x, y) => x.time.localeCompare(y.time)) }))),
+  ];
   const runs: Pt[][] = [];
-  for (const d of doc.days) {
+  for (const d of dayLists) {
     const stops = stopsOf(d.items, (i) => i.lat! > -40 === (d.seg === "syd"));
     let run: Pt[] = [];
     stops.forEach((s, k) => {

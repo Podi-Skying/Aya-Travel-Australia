@@ -1,4 +1,4 @@
-import { and, eq, or } from "drizzle-orm";
+import { and, eq, like, lt, or } from "drizzle-orm";
 import { getDb, schema } from "./db/client";
 import { GOOGLE_ROUTE_TTL_MS, googleKey, googleLegs, type GFetch } from "./google";
 
@@ -67,10 +67,13 @@ async function readCached(points: Pt[], mode: string): Promise<(Leg | null)[]> {
         or(...pairs.map(([a, b]) => and(eq(routeCache.fromLat, a[0]), eq(routeCache.fromLng, a[1]), eq(routeCache.toLat, b[0]), eq(routeCache.toLng, b[1])))),
       ),
     );
+  // Google route data is kept for at most 30 days (Maps Platform terms): older rows are deleted and count as missing.
+  const old = new Date(Date.now() - GOOGLE_ROUTE_TTL_MS);
+  if (rows.some((r) => r.source.startsWith("google") && r.computedAt < old))
+    await db.delete(routeCache).where(and(like(routeCache.source, "google%"), lt(routeCache.computedAt, old))).catch(() => {});
   return pairs.map(([a, b]) => {
     const r = rows.find((x) => x.fromLat === a[0] && x.fromLng === a[1] && x.toLat === b[0] && x.toLng === b[1]);
-    // Google route data is kept for at most 30 days (Maps Platform terms); older rows count as missing.
-    if (r && r.source.startsWith("google") && Date.now() - r.computedAt.getTime() > GOOGLE_ROUTE_TTL_MS) return null;
+    if (r && r.source.startsWith("google") && r.computedAt < old) return null;
     return r ? { distanceM: r.distanceM, durationS: r.durationS, geometry: r.geometry as Pt[], source: r.source, computedAt: r.computedAt.toISOString() } : null;
   });
 }

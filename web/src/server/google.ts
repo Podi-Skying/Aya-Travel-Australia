@@ -16,7 +16,7 @@ export function googleKey(): string | null {
 }
 
 export type GFetch = (url: string, init?: { method?: string; headers?: Record<string, string>; body?: string; signal?: AbortSignal }) => Promise<{ ok: boolean; status: number; json(): Promise<unknown> }>;
-const defaultFetch = fetch as unknown as GFetch;
+const defaultFetch: GFetch = (url, init) => (fetch as unknown as GFetch)(url, init);
 
 async function call<T>(api: GoogleApi, url: string, init: Parameters<GFetch>[1], f: GFetch): Promise<T> {
   if (!(await takeGoogleCall(api))) throw new Error("google quota");
@@ -29,8 +29,9 @@ async function call<T>(api: GoogleApi, url: string, init: Parameters<GFetch>[1],
 
 /** Finds the Google place id for an activity (IDs-only Text Search) and stores it; null if none. */
 export async function findPlaceId(itemId: string, name: string, lat: number, lng: number, f: GFetch = defaultFetch): Promise<string | null> {
-  const hit = await getLookup<{ placeId: string | null }>("place-id", itemId).catch(() => null);
-  if (hit) {
+  const hit = await getLookup<{ placeId: string | null; name?: string }>("place-id", itemId).catch(() => null);
+  // A renamed activity is looked up again, so its photo is never another place's.
+  if (hit && hit.value.name === name) {
     await noteGoogleHit("places_search");
     return hit.value.placeId;
   }
@@ -50,6 +51,9 @@ export async function findPlaceId(itemId: string, name: string, lat: number, lng
   await putLookup("place-id", itemId, { placeId, name }, "Google Places Text Search (IDs only)", null);
   return placeId;
 }
+
+/** Google returns some links protocol-relative (`//maps.google.com/...`); show them as https. */
+const httpsUri = (u?: string) => (u?.startsWith("//") ? `https:${u}` : u?.startsWith("https://") ? u : undefined);
 
 export type PlacePhoto = { photoUri: string; attributions: { name: string; uri?: string }[]; mapsUri?: string };
 
@@ -75,8 +79,8 @@ export async function placePhoto(placeId: string, maxWidthPx = 1200, f: GFetch =
   if (!media.photoUri?.startsWith("https://")) return null;
   return {
     photoUri: media.photoUri,
-    attributions: (p.authorAttributions ?? []).filter((a) => a.displayName).map((a) => ({ name: a.displayName!, uri: a.uri?.startsWith("https://") ? a.uri : undefined })),
-    mapsUri: p.googleMapsUri?.startsWith("https://") ? p.googleMapsUri : undefined,
+    attributions: (p.authorAttributions ?? []).filter((a) => a.displayName).map((a) => ({ name: a.displayName!, uri: httpsUri(a.uri) })),
+    mapsUri: httpsUri(p.googleMapsUri),
   };
 }
 

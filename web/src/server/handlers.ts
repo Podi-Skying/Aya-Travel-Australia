@@ -177,7 +177,7 @@ export async function postRoutes(req: Request) {
     // Same-origin JSON only, checked before any quota is charged (share-link viewers are same-origin).
     if (!sameOrigin(req)) return fail(403, "來源不符");
     if (!(req.headers.get("content-type") ?? "").startsWith("application/json")) return fail(415, "需要 JSON");
-    const b = (await readJson(req, ROUTE_BYTES)) as { points?: unknown; refresh?: unknown };
+    const b = (await readJson(req, ROUTE_BYTES)) as { points?: unknown; refresh?: unknown; compute?: unknown };
     const points = validPoints(b.points);
     if (!points) return fail(400, `需要 2–${MAX_POINTS} 個座標`);
     const c = missingConfig("owner").length ? null : await checkOwner();
@@ -190,7 +190,8 @@ export async function postRoutes(req: Request) {
     const missing = hit.legs.some((l) => !l);
     // A page view answered from route_cache: counted as a cache hit, no Google call.
     if (!missing && googleKey()) await noteGoogleHit("routes");
-    if (!owner || (!missing && !refresh)) return json(hit);
+    // Page views only read route_cache; computing takes an explicit owner action (compute: true) or the backfill.
+    if (!owner || b.compute !== true || (!missing && !refresh)) return json(hit);
     if (!(await routeQuota(`routes:${c!.ok ? c!.owner.githubId : ""}`, 30, false))) return json({ ...hit, limited: true });
     const r = await getLegs(points, { compute: true, refresh }).catch(() => null); // routing service unavailable: straight lines stay
     return json(r ?? { ...hit, unavailable: true });
@@ -232,11 +233,15 @@ export async function getUsageDaily(req: Request) {
  * be cached (Places terms), so each answer is resolved now; browsers keep it 30 minutes. Owner only:
  * guests never trigger Google calls.
  */
-export const getPlacePhoto = ownerRoute(async (req) => {
+export const getPlacePhoto = ownerRoute(async (req, owner) => {
   const item = new URL(req.url).searchParams.get("item") ?? "";
   if (!/^[A-Za-z0-9_-]{1,40}$/.test(item)) return fail(400, "缺少活動 id");
-  const hit = await getLookup<{ placeId: string | null }>("place-id", item).catch(() => null);
+  const hit = await getLookup<{ placeId: string | null; name?: string }>("place-id", item).catch(() => null);
   if (!hit?.value.placeId) return fail(404, "沒有 Google 地點");
+  // The stored place must still describe this activity (it may have been renamed since the backfill).
+  const cur = await getCurrentTrip(owner);
+  const it = cur && [...cur.doc.days.flatMap((d) => d.items), ...cur.doc.attractionPool.flatMap((p) => p.items)].find((i) => i.id === item);
+  if (!it || it.name !== hit.value.name) return fail(404, "地點需要重新比對");
   const p = await placePhoto(hit.value.placeId).catch(() => null);
   if (!p) return fail(404, "沒有照片");
   return json(p, 200, { "cache-control": "private, max-age=1800" });

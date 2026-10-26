@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useTrip } from "./TripApp";
 import { Icon } from "./Icon";
+import { GooglePhoto } from "./GooglePhoto";
 import { Badge, MODE, PendingButton, PRI } from "./ui";
 import { packageEstimate } from "@/domain/budget";
 import { fmtDay, money } from "@/domain/format";
@@ -53,6 +54,7 @@ function PackageCard({ pkg }: { pkg: Package }) {
       <ul>
         {pkg.items.map((i) => (
           <li key={i.id}>
+            {mode === "owner" && !i.photo && i.lat != null && <GooglePhoto itemId={i.id} alt={i.name} className="pool-gphoto" />}
             <strong>{i.name}</strong> <Badge {...PRI[i.pri]} />
             <br />
             <span className="small muted">

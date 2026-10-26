@@ -798,3 +798,4 @@ details.card.day-summary > summary h3 { margin: 0; }
 .g-photo img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 10px; }
 .g-photo figcaption { font-size: .68rem; color: var(--ink-muted); overflow-wrap: anywhere; }
 .act-gphoto { width: 112px; flex: 0 0 auto; }
+.pool-gphoto { max-width: 220px; margin-bottom: 4px; }

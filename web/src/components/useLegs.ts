@@ -13,7 +13,38 @@ export type Pt = [number, number];
 export type Leg = { distanceM: number; durationS: number; geometry: Pt[]; source: string };
 
 const MAX_POINTS = 25;
+
 const memo = new Map<string, Promise<(Leg | null)[]>>();
+
+const LEGS_EVENT = "aya-legs-updated";
+
+/** Owner action 「計算道路路線」: computes the missing drive legs once; they are stored server side. */
+export async function computeLegs(stops: Stop[]): Promise<boolean> {
+  let ok = true;
+  for (const c of driveChunks(stops)) {
+    const r = await api<{ legs: (Leg | null)[] }>("/api/routes", { method: "POST", body: { points: c.pts, compute: true } });
+    if (!r.ok || r.data.legs.some((l) => !l)) ok = false;
+  }
+  memo.clear();
+  dispatchEvent(new Event(LEGS_EVENT));
+  return ok;
+}
+
+/** Runs of consecutive drive legs, split into ≤25-point chunks that share their end points. */
+function driveChunks(list: Stop[]): { from: number; pts: Pt[] }[] {
+  const runs: { from: number; pts: Pt[] }[] = [];
+  for (let i = 1; i < list.length; i++) {
+    if (!list[i].drive) continue;
+    const last = runs.at(-1);
+    if (last && last.from + last.pts.length - 1 === i - 1) last.pts.push(list[i].pt);
+    else runs.push({ from: i - 1, pts: [list[i - 1].pt, list[i].pt] });
+  }
+  return runs.flatMap((r) => {
+    const out: { from: number; pts: Pt[] }[] = [];
+    for (let a = 0; a < r.pts.length - 1; a += MAX_POINTS - 1) out.push({ from: r.from + a, pts: r.pts.slice(a, a + MAX_POINTS) });
+    return out;
+  });
+}
 
 export function fetchLegs(points: Pt[]): Promise<(Leg | null)[]> {
   const key = points.map((p) => p.map((n) => n.toFixed(5)).join(",")).join(";");
@@ -21,7 +52,7 @@ export function fetchLegs(points: Pt[]): Promise<(Leg | null)[]> {
   if (!p) {
     p = api<{ legs: (Leg | null)[] }>("/api/routes", { method: "POST", body: { points } }).then((r) => (r.ok ? r.data.legs : points.slice(1).map(() => null)));
     memo.set(key, p);
-    // A failed or partial answer may fill in later (the owner computes); do not keep it forever.
+    // A failed or partial answer may fill in later (after 「計算道路路線」); do not keep it.
     void p.then((legs) => legs.some((l) => !l) && memo.delete(key));
   }
   return p;
@@ -37,23 +68,17 @@ export type Stop = { pt: Pt; drive: boolean };
 export function useLegs(stops: Stop[] | null): (Leg | null)[] | null {
   const key = stops && stops.length >= 2 ? JSON.stringify(stops.map((s) => [s.pt, s.drive ? 1 : 0])) : "";
   const [state, setState] = useState<{ key: string; legs: (Leg | null)[] } | null>(null);
+  const [version, setVersion] = useState(0);
+  useEffect(() => {
+    const on = () => setVersion((v) => v + 1);
+    addEventListener(LEGS_EVENT, on);
+    return () => removeEventListener(LEGS_EVENT, on);
+  }, []);
   useEffect(() => {
     if (!key) return;
     let live = true;
     const list = (JSON.parse(key) as [Pt, number][]).map(([pt, d]) => ({ pt, drive: !!d }));
-    const runs: { from: number; pts: Pt[] }[] = [];
-    for (let i = 1; i < list.length; i++) {
-      if (!list[i].drive) continue;
-      const last = runs.at(-1);
-      if (last && last.from + last.pts.length - 1 === i - 1) last.pts.push(list[i].pt);
-      else runs.push({ from: i - 1, pts: [list[i - 1].pt, list[i].pt] });
-    }
-    // The API takes at most 25 points: split long runs into chunks that share their end points.
-    const chunks = runs.flatMap((r) => {
-      const out: { from: number; pts: Pt[] }[] = [];
-      for (let a = 0; a < r.pts.length - 1; a += MAX_POINTS - 1) out.push({ from: r.from + a, pts: r.pts.slice(a, a + MAX_POINTS) });
-      return out;
-    });
+    const chunks = driveChunks(list);
     void Promise.all(chunks.map((r) => fetchLegs(r.pts))).then((parts) => {
       if (!live) return;
       const legs: (Leg | null)[] = list.slice(1).map(() => null);
@@ -63,7 +88,7 @@ export function useLegs(stops: Stop[] | null): (Leg | null)[] | null {
     return () => {
       live = false;
     };
-  }, [key]);
+  }, [key, version]);
   return state && state.key === key ? state.legs : null;
 }
 

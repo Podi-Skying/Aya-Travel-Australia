@@ -77,12 +77,29 @@ describe("google routes", () => {
   });
 });
 
+describe("explicit compute", () => {
+  it("an owner page view never computes a missing leg; the 計算道路路線 action does", async () => {
+    const spy = vi.fn(async () => new Response(JSON.stringify({ routes: [{ legs: [{ distanceMeters: 7, duration: "7s" }] }] }), { headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", spy);
+    asOwner();
+    const pts = [[-42.88, 147.33], [-42.5, 147.9]];
+    const view = await H.postRoutes(req("POST", "/api/routes", { points: pts }));
+    expect(((await view.json()) as { legs: unknown[] }).legs[0]).toBeNull();
+    expect(spy).not.toHaveBeenCalled();
+    const act = await H.postRoutes(req("POST", "/api/routes", { points: pts, compute: true }));
+    expect(((await act.json()) as { legs: { source: string }[] }).legs[0].source).toBe("google-routes");
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("google places", () => {
   it("finds a place id with an IDs-only search once, then reads it from lookup_cache", async () => {
     const { f, calls } = mock(() => ({ places: [{ id: "ChIJabcdefghijk" }] }));
     expect(await findPlaceId("g37", "Stanley The Nut", -40.76, 145.29, f)).toBe("ChIJabcdefghijk");
     expect(await findPlaceId("g37", "Stanley The Nut", -40.76, 145.29, f)).toBe("ChIJabcdefghijk");
     expect(calls).toHaveLength(1);
+    await findPlaceId("g37", "Stanley Highfield", -40.76, 145.29, f); // renamed: looked up again
+    expect(calls).toHaveLength(2);
     expect(calls[0].headers?.["X-Goog-FieldMask"]).toBe("places.id");
   });
 
@@ -90,7 +107,7 @@ describe("google places", () => {
     const { f, calls } = mock((url) =>
       url.includes("/media")
         ? { photoUri: "https://lh3.googleusercontent.com/p/abc" }
-        : { photos: [{ name: "places/ChIJabcdefghijk/photos/xyz", googleMapsUri: "https://maps.google.com/?cid=1", authorAttributions: [{ displayName: "A. Person", uri: "https://maps.google.com/contrib/1" }] }] },
+        : { photos: [{ name: "places/ChIJabcdefghijk/photos/xyz", googleMapsUri: "https://maps.google.com/?cid=1", authorAttributions: [{ displayName: "A. Person", uri: "//maps.google.com/contrib/1" }] }] },
     );
     const p = await placePhoto("ChIJabcdefghijk", 1200, f);
     expect(p).toEqual({ photoUri: "https://lh3.googleusercontent.com/p/abc", attributions: [{ name: "A. Person", uri: "https://maps.google.com/contrib/1" }], mapsUri: "https://maps.google.com/?cid=1" });
@@ -106,6 +123,8 @@ describe("usage guard and report", () => {
     expect(await takeGoogleCall("routes")).toBe(true);
     expect(await takeGoogleCall("place_photo")).toBe(true);
     expect(await takeGoogleCall("routes")).toBe(false);
+    // Concurrent reservations at the cap: none slips through.
+    expect((await Promise.all([takeGoogleCall("routes"), takeGoogleCall("routes")])).some(Boolean)).toBe(false);
     const d = (await usageSince(hobartDay()))[0];
     expect(d.apis).toMatchObject({ routes: { calls: 1 }, place_photo: { calls: 1 } });
     expect((await monthCost(hobartDay().slice(0, 7))).usd).toBe(0); // within free monthly calls
