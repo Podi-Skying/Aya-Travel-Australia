@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { commonsFor } from "@/client/photos";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTrip } from "./TripApp";
 import { AvatarStack } from "./People";
-import { Badge, PendingButton } from "./ui";
+import { Badge, PendingButton, useReducedMotion } from "./ui";
 import { useSyncExternalStore } from "react";
 
 /** Matches the reel's CSS breakpoint so its tablist orientation is announced correctly. */
@@ -22,10 +21,9 @@ function useNarrow(): boolean {
 import { ShareButton } from "./Share";
 import { PlanReel } from "./PlanReel";
 import { GooglePhoto } from "./GooglePhoto";
-import { Carousel, PlaceGallery } from "./PlaceGallery";
-import { galleryPhotos } from "@/domain/gallery";
+import { PlaceGallery } from "./PlaceGallery";
 import { dayNightLabel, optionCard, optionPalette, type OptionCard } from "@/domain/options";
-import { OPTION_THEMES, type Photo } from "@/domain/schema";
+import { OPTION_THEMES } from "@/domain/schema";
 import { fmtDay, fmtMD, money } from "@/domain/format";
 
 /*
@@ -41,6 +39,8 @@ export function TripOptions() {
   const cards = useMemo(() => (doc.tripOptions ?? []).map((o) => optionCard(doc, o, N)), [doc, N]);
   const shown = cards;
   const [picked, setPicked] = useState<string | null>(null);
+  // A clicked plan opens at its 第 1 天 (Kai 2026-10-26); arrow keys stay on the reel.
+  const [jump, setJump] = useState<string | null>(null);
   const narrow = useNarrow();
   const current = shown.find((c) => c.option.key === picked) ?? shown.find((c) => c.option.chosen) ?? shown[0];
   const pal = current ? optionPalette(current.option) : null;
@@ -62,7 +62,10 @@ export function TripOptions() {
               label="跨日行程方案"
               panelId="plan-detail"
               active={current.option.key}
-              onSelect={setPicked}
+              onSelect={(k, via) => {
+                setPicked(k);
+                setJump(via === "click" ? k : null);
+              }}
               slices={shown.map((c) => ({
                 key: c.option.key,
                 title: c.option.title,
@@ -73,7 +76,7 @@ export function TripOptions() {
               }))}
             />
           </div>
-          <OptionDetail key={current.option.key} c={current} />
+          <OptionDetail key={current.option.key} c={current} jump={jump === current.option.key} />
         </>
       )}
     </div>
@@ -82,24 +85,20 @@ export function TripOptions() {
 
 
 /** Details of the selected plan, with each stop's photo for comparison. */
-function OptionDetail({ c }: { c: OptionCard }) {
+function OptionDetail({ c, jump }: { c: OptionCard; jump: boolean }) {
   const { doc, mode, online, runOpUndoable, ask, counts, gotoDay } = useTrip();
   const [broken, setBroken] = useState<Set<string>>(() => new Set());
   const { token } = useTrip();
-  const [commons, setCommons] = useState<Record<string, Photo[]>>({});
-  const stopsKey = c.items.flat().map((it) => `${it.id}|${it.name}|${it.lat}|${it.lng}`).join(",");
+  const reduce = useReducedMotion();
+  const firstDay = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
-    let live = true;
-    const stops = c.items.flat();
-    void Promise.all(stops.map((it) => commonsFor({ id: it.id, name: it.name, lat: it.lat, lng: it.lng }, token))).then(
-      (lists) => live && setCommons(Object.fromEntries(stops.map((it, k) => [`${it.id}|${it.name}|${it.lat}|${it.lng}`, lists[k]]))),
-    );
-    return () => {
-      live = false;
-    };
-    // stopsKey captures the stops' identity, names and positions.
+    const h = firstDay.current;
+    if (!jump || !h) return;
+    h.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+    h.focus({ preventScroll: true });
+    // Only when the plan was just picked; later renders leave the scroll alone.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stopsKey, token]);
+  }, []);
   const o = c.option;
   const ids = new Set(o.days.flatMap((d) => d.itemIds));
   // Votes follow the activity: include votes recorded on a date it has since moved away from.
@@ -146,17 +145,10 @@ function OptionDetail({ c }: { c: OptionCard }) {
         <AvatarStack people={c.people} size={26} />
       </p>
       {o.summary && <p className="small muted">{o.summary}</p>}
-      {(() => {
-        // The plan's stops in one gallery: own, Kai-supplied and cached Commons photos (up to 3 each).
-        // Live Google photos stay in each stop's own gallery below, to keep Google calls per view low.
-        // Lists are keyed by name and position too, so a changed stop never shows its old photos.
-        const shots = c.items.flat().flatMap((it) => galleryPhotos(it, commons[`${it.id}|${it.name}|${it.lat}|${it.lng}`] ?? []).slice(0, 3));
-        return shots.length > 1 ? <Carousel key={o.key} photos={shots} label={`${o.title} 的景點照片`} /> : null;
-      })()}
       <ol className="opt-days">
         {o.days.map((d, i) => (
           <li key={i}>
-            <h4>
+            <h4 ref={i === 0 ? firstDay : undefined} tabIndex={i === 0 ? -1 : undefined} className="opt-day-h">
               第 {i + 1} 天・{fmtDay(c.dates[i])} {d.title}
               <span className="small muted">（開車約 {d.driveHrs} 小時）</span>
             </h4>

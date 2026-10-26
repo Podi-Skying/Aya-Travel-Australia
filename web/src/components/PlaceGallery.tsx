@@ -159,7 +159,7 @@ export function PlaceGallery({ item, thumb, fallback = null, className = "" }: {
             {ready ? (
               photos.length ? <Carousel photos={photos} label={`${item.name} 的照片`} /> : <p className="small muted">這個景點還沒有照片。</p>
             ) : (
-              <p className="small muted">載入照片中…</p>
+              <div className="pg-loading" role="status" aria-label="載入照片中" />
             )}
           </div>
         </dialog>

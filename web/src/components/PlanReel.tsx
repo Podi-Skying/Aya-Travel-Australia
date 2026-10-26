@@ -31,7 +31,8 @@ export function PlanReel({
 }: {
   slices: ReelSlice[];
   active: string;
-  onSelect: (key: string) => void;
+  /** `via` tells a click (go to the plan) from arrow keys (stay on the reel). */
+  onSelect: (key: string, via: "click" | "key") => void;
   label: string;
   panelId: string;
   /** Phones show a vertical stack; screen readers are told which (arrow keys work both ways). */
@@ -47,7 +48,7 @@ export function PlanReel({
     if (to === undefined) return;
     e.preventDefault();
     const k = keys[(to + keys.length) % keys.length];
-    onSelect(k);
+    onSelect(k, "key");
     refs.current.get(k)?.focus();
   };
   return (
@@ -69,7 +70,7 @@ export function PlanReel({
             tabIndex={on ? 0 : -1}
             className={`reel-slice${on ? " on" : ""}`}
             style={{ ["--deep" as string]: s.deep }}
-            onClick={() => onSelect(s.key)}
+            onClick={() => onSelect(s.key, "click")}
             onKeyDown={(e) => onKey(e, s.key)}
           >
             {s.image && !failed.has(s.image) ? (

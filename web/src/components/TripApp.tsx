@@ -15,6 +15,7 @@ import { PlacesMap } from "./Places";
 import { Info } from "./Info";
 import { TripOptions } from "./TripOptions";
 import { PlanQuiz } from "./PlanQuiz";
+import { DriftGallery } from "./DriftGallery";
 
 /*
  * Client shell for both the owner view and the read-only share view.
@@ -66,6 +67,7 @@ const TABS = [
   { key: "map", label: "地圖與景點" },
   { key: "info", label: "資訊與警示" },
   { key: "quiz", label: "旅遊規劃小測驗", private: true },
+  { key: "gallery", label: "畫廊", private: true },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
@@ -446,9 +448,14 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
           <Info />
         </Panel>
         {(mode === "owner" || token) && (
-          <Panel id="quiz" show={tab === "quiz"}>
-            <PlanQuiz active={tab === "quiz"} />
-          </Panel>
+          <>
+            <Panel id="quiz" show={tab === "quiz"}>
+              <PlanQuiz active={tab === "quiz"} />
+            </Panel>
+            <Panel id="gallery" show={tab === "gallery"}>
+              <DriftGallery active={tab === "gallery"} />
+            </Panel>
+          </>
         )}
       </main>
       <footer className="foot">
