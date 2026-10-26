@@ -568,7 +568,7 @@ export function applyOp(input: TripDoc, op: Op): OpResult {
       if (!a || !b || a === b) return err(404, "找不到日期");
       if (a.seg !== b.seg) return err(400, "只能和同一個目的地的日子對調");
       const inPlan = (date: string) => doc.tripOptions.some((o) => o.chosen && isRealDate(o.start) && o.days.some((_, k) => new Date(Date.parse(o.start + "T00:00:00Z") + k * 86_400_000).toISOString().slice(0, 10) === date));
-      if (inPlan(a.date) || inPlan(b.date)) return err(400, "採用中的跨日行程方案那幾天不能對調，請先換方案");
+      if (inPlan(a.date) || inPlan(b.date)) return err(400, "採用中的行程方案那幾天不能對調，請先換方案");
       const movable = (i: Item) => i.status !== "confirmed" && !isLogistics(i) && !i.name.startsWith("住宿：") && !/^Kai 有工作/.test(i.name);
       const fromA = a.items.filter(movable).map((i) => i.id);
       const fromB = b.items.filter(movable).map((i) => i.id);

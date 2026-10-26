@@ -43,7 +43,7 @@ export const REGIONS: Region[] = [
     far: "單程約 2.5 小時以上，比較適合過夜；瑪麗亞島可以排在去東海岸的路上",
   },
   { key: "north", name: "朗塞斯頓與北部", areas: area([-41.4, 147.15], 45), car: true, far: "單程約 2.5 小時，比較適合過夜" },
-  { key: "northwest", name: "搖籃山與西北", areas: area([-41.4, 145.9], 90), car: true, far: "單程 4 小時以上，請用跨日行程方案" },
+  { key: "northwest", name: "搖籃山與西北", areas: area([-41.4, 145.9], 90), car: true, far: "單程 4 小時以上，請用行程方案" },
 ];
 
 export function km(a: [number, number], b: [number, number]): number {

@@ -26,12 +26,12 @@ import { legLabel, routeStops, useLegs, type Leg } from "./useLegs";
 import { stayPin, type StayPin } from "@/domain/home-pins";
 import { homeStayKey } from "@/domain/stay";
 import type { Item } from "@/domain/schema";
-import { dayNightLabel, optionCard, optionPalette, type OptionCard } from "@/domain/options";
+import { dayNightLabel, INK_PALETTE, optionCard, optionPalette, type OptionCard } from "@/domain/options";
 import { OPTION_THEMES } from "@/domain/schema";
-import { fmtDay, fmtMD, money } from "@/domain/format";
+import { fmtDay, fmtMD, mins, money } from "@/domain/format";
 
 /*
- * 跨日行程方案 (renamed from 推薦行程方案 on 2026-10-26, filters removed; PLAN-2026-10-26 §3; reel in PLAN-2026-10-26-plan-reel): overnight trips as photo slices with
+ * 行程方案 (renamed from 推薦行程方案 on 2026-10-26, filters removed; PLAN-2026-10-26 §3; reel in PLAN-2026-10-26-plan-reel): overnight trips as photo slices with
  * their own colour; the owner picks one and it replaces those days in one undoable version.
  */
 
@@ -46,26 +46,29 @@ export function TripOptions() {
   // A clicked plan opens at its 第 1 天 (Kai 2026-10-26); arrow keys stay on the reel.
   const [jump, setJump] = useState<{ key: string; n: number } | null>(null);
   const narrow = useNarrow();
-  const current = shown.find((c) => c.option.key === picked) ?? shown.find((c) => c.option.chosen) ?? shown[0];
+  // Bookable Tasmanian tours (Kai 2026-10-27) sit in the reel beside the multi-day plans, as unscheduled cards.
+  const tours = useMemo(() => doc.attractionPool.filter((p) => p.seg === "tas").flatMap((p) => p.items.filter((i) => i.tour).map((i) => ({ key: `tour-${i.id}`, item: i, pkg: p.key }))), [doc]);
+  const tour = tours.find((t) => t.key === picked) ?? null;
+  const current = tour ? null : (shown.find((c) => c.option.key === picked) ?? shown.find((c) => c.option.chosen) ?? shown[0]);
   const pal = current ? optionPalette(current.option) : null;
 
   return (
     <div className="plan-stage" style={pal ? { ["--plan-tint" as string]: pal.tint, ["--plan-deep" as string]: pal.deep } : undefined}>
       <div className="card plan-intro">
-        <h2>跨日行程方案</h2>
+        <h2>行程方案</h2>
         <p className="muted">
-          兩天一夜、三天兩夜的行程整理成方案，點一張照片看詳細內容。{mode === "owner" ? "按「套用」會把那幾天目前的活動移回待安排，換成方案的內容；沒選的方案會保留，之後可以換回來。" : "擁有者選定的方案會標示「目前採用」。"}
+          兩天一夜、三天兩夜的行程，和需要預訂的塔州跟團遊船，點一張照片看詳細內容。{mode === "owner" ? "按「套用」會把那幾天目前的活動移回待安排，換成方案的內容；沒選的方案會保留，之後可以換回來。" : "擁有者選定的方案會標示「目前採用」。"}
         </p>
       </div>
       {!cards.length && <p className="section muted">還沒有方案。</p>}
-      {current && (
+      {(current || tour) && (
         <>
           <div className="section">
             <PlanReel
               orientation={narrow ? "vertical" : "horizontal"}
-              label="跨日行程方案"
+              label="行程方案"
               panelId="plan-detail"
-              active={current.option.key}
+              active={tour ? tour.key : current!.option.key}
               onSelect={(k, via) => {
                 setPicked(k);
                 setJump(via === "click" ? { key: k, n: (jump?.n ?? 0) + 1 } : null);
@@ -78,10 +81,20 @@ export function TripOptions() {
                 image: c.photo?.url,
                 imagePos: c.photo?.pos,
                 deep: optionPalette(c.option).deep,
-              }))}
+              })).concat(
+                tours.map((t) => ({
+                  key: t.key,
+                  title: t.item.name.replace(/（.*?）/g, ""),
+                  caption: `跟團・需預訂・${mins(t.item.dur ?? 60)}`,
+                  badge: "跟團",
+                  image: t.item.photo?.url,
+                  imagePos: t.item.photo?.pos,
+                  deep: INK_PALETTE.deep,
+                })),
+              )}
             />
           </div>
-          <OptionDetail key={current.option.key} c={current} jump={jump?.key === current.option.key ? jump.n : 0} />
+          {tour ? <TourDetail key={tour.key} item={tour.item} /> : <OptionDetail key={current!.option.key} c={current!} jump={jump?.key === current!.option.key ? jump.n : 0} />}
         </>
       )}
     </div>
@@ -256,4 +269,54 @@ function PlanThumb({ item }: { item: Item }) {
     // eslint-disable-next-line @next/next/no-img-element -- photos from several hosts
     <img src={cardSrc(p.url)} alt="" loading="lazy" referrerPolicy="no-referrer" style={p.pos ? { objectPosition: p.pos } : undefined} />
   ) : null;
+}
+
+/**
+ * A bookable tour as a plan card (Kai 2026-10-27): price for each person and for Kai＋Aya, length,
+ * where and when it leaves, the booking page, and the day as a timeline from and back to the home base.
+ * Nothing is scheduled or booked here; Kai places it on a day himself.
+ */
+function TourDetail({ item }: { item: Item }) {
+  const { doc } = useTrip();
+  const home = homeStayKey(doc) ? stayPin(doc, homeStayKey(doc)!) : null;
+  const pp = item.cost && item.cost.status !== "unknown" && item.cost.unit === "pp" ? item.cost.amount : null;
+  const N = 2; // Kai and Aya (friends are not counted for tours)
+  return (
+    <article className="card opt-card plan-detail tour-detail" id="plan-detail" role="tabpanel" aria-labelledby={`reel-tour-${item.id}`}>
+      <h3>{item.name}</h3>
+      <p className="opt-tags">
+        <Badge t="跟團" c="b-line" /> <Badge t="需預訂" c="b-warn" />
+      </p>
+      <dl className="opt-facts">
+        <div>
+          <dt>價格</dt>
+          <dd>{pp != null ? `每人 ${money(pp)}・Kai＋Aya ${money(pp * N)}` : "價格待查"}</dd>
+        </div>
+        <div>
+          <dt>時間</dt>
+          <dd>約 {mins(item.dur ?? 60)}</dd>
+        </div>
+        <div>
+          <dt>出發</dt>
+          <dd>
+            {item.tour?.depart}
+            <br />
+            <span className="small muted">{item.tour?.when}</span>
+          </dd>
+        </div>
+      </dl>
+      {item.src && (
+        <p>
+          <a className="btn" href={item.src.url} target="_blank" rel="noopener noreferrer">
+            預訂頁面（{item.src.label}）
+          </a>
+        </p>
+      )}
+      {item.note && <p className="small muted">{item.note}</p>}
+      <h4 className="opt-day-h">當天行程（從住處出發、回到住處）</h4>
+      {/* The tour itself is a boat or a plane; getting to where it leaves is a drive. */}
+      <PlanDayTimeline items={[{ ...item, major: true, mode: "drive" }]} start={home} end={home} />
+      <p className="small muted">還沒排進任何一天，也沒有預訂；要去的話由 Kai 排進某一天後再預訂。</p>
+    </article>
+  );
 }

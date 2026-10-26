@@ -48,6 +48,12 @@ async function main() {
         ends: { start: stayPin(doc, k ? o.days[k - 1].stay : (homeStayKey(doc) ?? "")), end: stayPin(doc, od.stay) },
       })),
     ),
+    // Bookable tours (行程方案): from the home base to where the tour leaves and back.
+    ...doc.attractionPool.flatMap((p) =>
+      p.items
+        .filter((i) => i.tour)
+        .map((i) => ({ seg: "tas", items: [{ ...i, mode: "drive" }], date: undefined as string | undefined, ends: { start: stayPin(doc, homeStayKey(doc) ?? ""), end: stayPin(doc, homeStayKey(doc) ?? "") } })),
+    ),
   ];
   const runs: Pt[][] = [];
   for (const d of dayLists) {

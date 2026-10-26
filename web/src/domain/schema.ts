@@ -105,6 +105,8 @@ export const itemSchema = z.object({
   indoor: z.boolean().optional(),
   /** Curated photos (Kai 2026-10-27): "own" shows only the item's photo and gallery; "own+google" adds live Google photos but no Wikimedia search results. */
   photoSources: z.enum(["own", "own+google"]).optional(),
+  /** A guided tour or cruise to book (Kai 2026-10-27): where and when it leaves; shown as a card in 行程方案. */
+  tour: z.object({ depart: shortText(120), when: shortText(80) }).optional(),
   /** Booking state: confirmed (locked against moves) or pending; absent = planned. Driver days add "tentative" (effective-day.ts). */
   status: z.enum(["confirmed", "pending"]).optional(),
   /** Owner-only detail (flight numbers, workplace); removed from every public document. */
