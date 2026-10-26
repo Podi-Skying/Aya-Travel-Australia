@@ -4,7 +4,8 @@ import { getLookup } from "../src/server/cache";
 import { findPlaceId, googleKey, sameRef, type PlaceRef } from "../src/server/google";
 import { getLegs, type Pt } from "../src/server/routes";
 import { routeStops, stopsOf, type Stop } from "../src/components/useLegs";
-import { dayEnds } from "../src/domain/home-pins";
+import { dayEnds, stayPin } from "../src/domain/home-pins";
+import { homeStayKey } from "../src/domain/stay";
 import { listPrice } from "../src/server/usage";
 
 /*
@@ -38,12 +39,20 @@ async function main() {
   const all = [...doc.days.flatMap((d) => d.items), ...doc.attractionPool.flatMap((p) => p.items)];
   const dayLists = [
     ...doc.days.map((d) => ({ seg: d.seg, items: d.items, date: d.date as string | undefined })),
-    ...(doc.tripOptions ?? []).flatMap((o) => o.days.map((od) => ({ seg: "tas", items: od.itemIds.map((id) => all.find((i) => i.id === id)).filter((i): i is (typeof all)[number] => !!i).sort((x, y) => x.time.localeCompare(y.time)), date: undefined }))),
+    // Plan days too, from the night before (the home base on day 1) to the night's stay.
+    ...(doc.tripOptions ?? []).flatMap((o) =>
+      o.days.map((od, k) => ({
+        seg: "tas",
+        items: od.itemIds.map((id) => all.find((i) => i.id === id)).filter((i): i is (typeof all)[number] => !!i).sort((x, y) => x.time.localeCompare(y.time)),
+        date: undefined as string | undefined,
+        ends: { start: stayPin(doc, k ? o.days[k - 1].stay : (homeStayKey(doc) ?? "")), end: stayPin(doc, od.stay) },
+      })),
+    ),
   ];
   const runs: Pt[][] = [];
   for (const d of dayLists) {
     // Scheduled days run from last night's stay to tonight's (Kai 2026-10-26), so those legs are stored too.
-    const stops: Stop[] = d.date ? routeStops(d.items, dayEnds(doc, d.date)) : stopsOf(d.items, (i) => i.lat! > -40 === (d.seg === "syd"));
+    const stops: Stop[] = d.date ? routeStops(d.items, dayEnds(doc, d.date)) : "ends" in d && d.ends ? routeStops(d.items, d.ends as never) : stopsOf(d.items, (i) => i.lat! > -40 === (d.seg === "syd"));
     let run: Pt[] = [];
     stops.forEach((s, k) => {
       if (k && s.drive) {
