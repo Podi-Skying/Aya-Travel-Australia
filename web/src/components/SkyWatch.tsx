@@ -75,21 +75,20 @@ export function SkyWatch() {
         <p className="muted small">Kai 提供社團網址後會顯示在這裡。</p>
       )}
       {sky.links.some((l) => l.url.includes("facebook.com")) && <p className="muted small">Facebook 社團需要登入才看得到貼文，也無法嵌入網站；點連結會在 Facebook 開啟。值得看的貼文，Kai 會整理到下面的「最新消息」。</p>}
-      {!sky.links.some((l) => l.kind === "bio") && sky.links.length > 0 && <p className="muted small">藍眼淚社團的連結還沒有提供。</p>}
       {owner && (
         <PendingButton
           className="btn ghost small"
           pendingLabel="新增中…"
           onAction={async () => {
+            // Only aurora groups: the blue tears group is private (Kai 2026-10-26), so sightings go in as posts.
             const v = await ask("新增社團連結", {
               fields: [
-                { name: "kind", label: "類型", type: "select", value: "aurora", options: [{ value: "aurora", label: "極光" }, { value: "bio", label: "藍眼淚" }] },
                 { name: "label", label: "名稱", value: "", required: true, maxLength: 60 },
                 { name: "url", label: "網址（https://…）", type: "url", value: "", required: true, maxLength: 500 },
               ],
             });
             if (!v) return null;
-            return runOp({ op: "addSkyLink", kind: v.kind.trim(), label: v.label, url: v.url });
+            return runOp({ op: "addSkyLink", kind: "aurora", label: v.label, url: v.url });
           }}
         >
           新增連結
@@ -204,7 +203,7 @@ export function SkyWatch() {
           </table>
         </div>
       )}
-      <p className="muted small">藍眼淚（海螢光）沒有官方預報，只能靠社團回報；通常在無月、無風的夜晚，於荷巴特附近的海灣（例如 Kingston Beach）較常見到。</p>
+      <p className="muted small">藍眼淚（海螢光）沒有官方預報，只能靠社團回報（社團是私人的，Kai 看到後會整理到「最新消息」）；通常在無月、無風的夜晚，於荷巴特附近的海灣（例如 Kingston Beach）較常見到。</p>
     </div>
   );
 }
