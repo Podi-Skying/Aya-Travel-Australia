@@ -20,12 +20,27 @@ const CJK = /[㐀-鿿、-】（-？]/;
 
 type Rule = { re: RegExp; out: string };
 
-function rulesFor(dict: Record<string, string>): Rule[] {
+function rulesFor(source: Record<string, string>): Rule[] {
+  let dict = source;
   const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   // Only patterns with real words around the gaps: "{0}「{1}」{2}" would swallow any text with brackets.
   const words = (k: string) => (k.replace(/\{(\d+|n)\}/g, "").match(/[\u3400-\u9fff]/g) ?? []).length;
+  // Two gaps side by side ("{0}{1}，高溫…") cannot be told apart: one gap takes both.
+  const merged: Record<string, string> = {};
+  for (const [k, v] of Object.entries(dict)) {
+    let mk = k;
+    let mv = v;
+    for (let m = /\{(\d+|n)\}\{(\d+|n)\}/.exec(mk); m; m = /\{(\d+|n)\}\{(\d+|n)\}/.exec(mk)) {
+      mk = mk.replace(m[0], `{${m[1]}}`);
+      mv = mv.replace(`{${m[1]}}{${m[2]}}`, `{${m[1]}}`).replace(`{${m[2]}}`, "");
+    }
+    merged[mk] = mv;
+  }
+  // One word is enough when the gaps sit inside the text (「（約 {0} mm）」), not at its ends.
+  const ok = (k: string) => words(k) >= 2 || (words(k) >= 1 && !/^\{/.test(k) && !/\}$/.test(k));
+  dict = merged;
   return Object.keys(dict)
-    .filter((k) => /\{(\d+|n)\}/.test(k) && words(k) >= 2)
+    .filter((k) => /\{(\d+|n)\}/.test(k) && ok(k))
     .sort((a, b) => b.length - a.length)
     .map((k) => {
       const names: string[] = [];
@@ -59,7 +74,7 @@ export function DomTranslator({ content }: { content: Partial<Record<Exclude<Lan
     const rules = rulesFor(withBare(DICTS[lang]));
     const memo = new Map<string, string>();
 
-    const SEP: Record<string, string> = lang === "en" ? { "。": ". ", "；": "; ", "，": ", ", "、": ", ", "・": " · " } : { "。": "。", "；": "；", "，": "、", "、": "、", "・": "・" };
+    const SEP: Record<string, string> = lang === "en" ? { "。": ". ", "；": "; ", "，": ", ", "、": ", ", "・": " · ", "：": ": " } : { "。": "。", "；": "；", "，": "、", "、": "、", "・": "・", "：": "：" };
     const translate = (s: string, depth = 0): string => {
       if (!CJK.test(s) || depth > 6) return s;
       const hit = memo.get(s);
@@ -76,22 +91,28 @@ export function DomTranslator({ content }: { content: Partial<Record<Exclude<Lan
         const m = r.re.exec(s);
         if (m) return done(r.out.replace(/\$(\d)/g, (_, i) => translate(m[Number(i)] ?? "", depth + 1)));
       }
-      // 4. A name with a note in brackets: 「Church Street Villas（未預訂）」.
+      // 4. Sentences and arrows first, so a note in brackets stays with its own sentence.
+      const split = (seps: string[]) => {
+        for (const sep of seps) {
+          if (!s.includes(sep)) continue;
+          const parts = s.split(sep);
+          const t = parts.map((p) => (p.trim() ? translate(p.trim(), depth + 1) : p));
+          if (t.some((x, i) => x !== parts[i].trim() && parts[i].trim()))
+            return t.filter((x, i) => x || i < t.length - 1).join(SEP[sep] ?? sep).replace(/\s+$/, "");
+        }
+        return null;
+      };
+      const big = split([" → ", " = ", "。", "；"]);
+      if (big !== null) return done(big);
+      // 5. A name with a note in brackets: 「Church Street Villas（未預訂）」.
       const paren = /^(.*?)（([^（）]+)）(.*)$/.exec(s);
       if (paren) {
         const [, a, b, c] = paren;
         const out = `${translate(a, depth + 1)}${lang === "en" ? " (" : "（"}${translate(b, depth + 1)}${lang === "en" ? ")" : "）"}${translate(c, depth + 1)}`;
         if (out !== s) return done(out);
       }
-      // 5. Joined pieces: arrows, then sentences and lists.
-      for (const sep of [" → ", "。", "；", "，", "、", "・"]) {
-        if (!s.includes(sep)) continue;
-        const parts = s.split(sep);
-        const t = parts.map((p) => (p.trim() ? translate(p.trim(), depth + 1) : p));
-        if (t.some((x, i) => x !== parts[i].trim() && parts[i].trim()))
-          return done(t.filter((x, i) => x || i < t.length - 1).join(sep === " → " ? " → " : SEP[sep]).replace(/\s+$/, ""));
-      }
-      return done(s);
+      // 6. Lists and labels: 「A，B」「A、B」「A・B」「雪梨：雷雨」.
+      return done(split(["，", "、", "・", "："]) ?? s);
     };
 
     // Original (Chinese) values, and the value we last wrote, per node.
