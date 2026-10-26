@@ -1,4 +1,5 @@
 import type { TripDoc } from "@/domain/schema";
+import { shortName, shortTr } from "@/domain/day-title";
 
 /*
  * Trip content translations (Kai 2026-10-27) as lookup tables for the on-screen translator: the Chinese text
@@ -37,6 +38,15 @@ export function contentDict(doc: Pick<TripDoc, "days" | "attractionPool" | "trip
   for (const p of doc.textTr ?? []) {
     if (p.en) out.en[p.zh.trim()] = p.en;
     if (p.ja) out.ja[p.zh.trim()] = p.ja;
+  }
+  // Names are also shown shortened (notes in brackets dropped, 「塔斯曼島遊船」): the same text, shortened too.
+  for (const l of ["en", "ja"] as const) {
+    for (const [zh, v] of Object.entries(out[l])) {
+      const bare = zh.replace(/\s*[（(][^）)]*[）)]/g, "").trim();
+      if (bare && bare !== zh && out[l][bare] === undefined) out[l][bare] = shortTr(v);
+      const short = shortName(zh);
+      if (short !== zh && !short.endsWith("…") && out[l][short] === undefined) out[l][short] = shortTr(v);
+    }
   }
   return out;
 }

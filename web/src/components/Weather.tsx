@@ -6,6 +6,7 @@ import { PendingButton } from "./ui";
 import { isLogistics } from "@/domain/day-title";
 import type { Item, TripDoc } from "@/domain/schema";
 import { fmtDay } from "@/domain/format";
+import { getLang } from "@/i18n/current";
 
 /*
  * Weather chips and lines (Kai 2026-10-26). Hand-drawn line icons in the ink colour; rain is the one
@@ -97,7 +98,7 @@ export function WeatherStrip() {
         <a href={w.url} target="_blank" rel="noopener noreferrer">
           {w.source}
         </a>
-        {w.fetchedAt ? `，更新於 ${new Date(w.fetchedAt).toLocaleString("zh-TW", { timeZone: "Australia/Hobart", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}（荷巴特時間）` : ""}
+        {w.fetchedAt ? `，更新於 ${new Date(w.fetchedAt).toLocaleString(({ zh: "zh-TW", en: "en-AU", ja: "ja-JP" } as const)[getLang()], { timeZone: "Australia/Hobart", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}（荷巴特時間）` : ""}
         {w.stale ? "；暫時連不上，顯示上次的資料" : ""}。預報只到出發前 16 天內的日子。
       </p>
     </section>

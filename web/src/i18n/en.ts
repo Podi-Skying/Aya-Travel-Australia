@@ -867,4 +867,6 @@ export const EN: Record<string, string> = {
   "；": "; ",
   "；暫時連不上，顯示上次的資料": "; can't connect right now, showing the last data",
   "；請注意疲勞駕駛和夜間動物。": "; watch for fatigue and wildlife at night.",
+  "Open-Meteo（含 BOM 模型）": "Open-Meteo (incl. the BOM model)",
+  "提案中": "Proposal",
 };

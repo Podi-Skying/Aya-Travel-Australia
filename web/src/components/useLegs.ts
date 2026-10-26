@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/client/api";
+import { getLang } from "@/i18n/current";
 
 /*
  * Road legs between a day's stops, read from the server's route cache (PLAN-2026-10-26 §2).
@@ -115,8 +116,9 @@ export function useLegs(stops: Stop[] | null): (Leg | null)[] | null {
 
 export const legLabel = (l: Leg) => {
   const m = Math.round(l.durationS / 60);
-  const t = m >= 60 ? `${Math.floor(m / 60)} 小時${m % 60 ? ` ${m % 60} 分` : ""}` : `${m} 分`;
-  return `${t}・${l.distanceM >= 10000 ? Math.round(l.distanceM / 1000) : (l.distanceM / 1000).toFixed(1)} 公里`;
+  const [H, M, KM, SEP] = ({ zh: [" 小時", " 分", " 公里", "・"], en: [" h", " min", " km", " · "], ja: ["時間", "分", " km", "・"] } as const)[getLang()];
+  const t = m >= 60 ? `${Math.floor(m / 60)}${H}${m % 60 ? ` ${m % 60}${M}` : ""}` : `${m}${M}`;
+  return `${t}${SEP}${l.distanceM >= 10000 ? Math.round(l.distanceM / 1000) : (l.distanceM / 1000).toFixed(1)}${KM}`;
 };
 
 /**

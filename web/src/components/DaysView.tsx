@@ -1,6 +1,6 @@
 "use client";
 
-import { dayTitle } from "@/domain/day-title";
+import { dayTitle, dayTitleZh } from "@/domain/day-title";
 import { useEffect, useRef, useState } from "react";
 import { useTrip } from "./TripApp";
 import { Icon, MODE_ICON } from "./Icon";
@@ -373,7 +373,7 @@ export function DaysView({ active }: { active: boolean }) {
                     onAction={async () => {
                       const v = await ask(raw.titlePinned ? "修改或取消固定標題" : "自訂這天的標題", {
                         body: <p className="small muted">留空會改回依當天活動自動產生的標題。</p>,
-                        fields: [{ name: "title", label: "標題（最多 60 字）", value: raw.titlePinned ? raw.title : dayTitle(raw), maxLength: 60 }],
+                        fields: [{ name: "title", label: "標題（最多 60 字）", value: raw.titlePinned ? raw.title : dayTitleZh(raw), maxLength: 60 }],
                       });
                       if (!v) return null;
                       return runOp({ op: "setDayTitle", date: raw.date, title: v.title });

@@ -39,12 +39,24 @@ function rulesFor(dict: Record<string, string>): Rule[] {
     });
 }
 
+/** Text is often shown without the punctuation it was written with (「，有提醒」 inside a list): both forms. */
+const EDGE = /^[，。、；：・\s]+|[，。、；：・\s]+$/g;
+const EDGE_TR = /^[,.;:·、。，；・\s]+|[,.;:·、。，；・\s]+$/g;
+function withBare(dict: Record<string, string>): Record<string, string> {
+  const out = { ...dict };
+  for (const [k, v] of Object.entries(dict)) {
+    const b = k.replace(EDGE, "");
+    if (b && b !== k && out[b] === undefined) out[b] = v.replace(EDGE_TR, "");
+  }
+  return out;
+}
+
 export function DomTranslator({ content }: { content: Partial<Record<Exclude<Lang, "zh">, Record<string, string>>> }) {
   const lang = useLang();
   useEffect(() => {
     if (lang === "zh") return;
-    const dict = { ...DICTS[lang], ...(content[lang] ?? {}) };
-    const rules = rulesFor(DICTS[lang]);
+    const dict = withBare({ ...DICTS[lang], ...(content[lang] ?? {}) });
+    const rules = rulesFor(withBare(DICTS[lang]));
     const memo = new Map<string, string>();
 
     const SEP: Record<string, string> = lang === "en" ? { "。": ". ", "；": "; ", "，": ", ", "、": ", ", "・": " · " } : { "。": "。", "；": "；", "，": "、", "、": "、", "・": "・" };

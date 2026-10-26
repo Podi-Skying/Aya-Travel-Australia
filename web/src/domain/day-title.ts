@@ -1,4 +1,5 @@
 import type { Day, Item } from "./schema";
+import { getLang, t, tx } from "@/i18n/current";
 
 /*
  * Day titles follow the day's activities (Kai, 2026-10-26): an emptied day reads 「未規劃」, otherwise
@@ -29,9 +30,16 @@ export function shortName(name: string): string {
   return [...s].length > 14 ? [...s].slice(0, 13).join("") + "…" : s;
 }
 
-const clip = (s: string) => ([...s].length > MAX ? [...s].slice(0, MAX - 1).join("") + "…" : s);
+const clip = (s: string, max = MAX) => ([...s].length > max ? [...s].slice(0, max - 1).join("") + "…" : s);
 
-export function dayTitle(d: Pick<Day, "title" | "items"> & { titlePinned?: boolean }): string {
+/** A translated name for titles: its notes in brackets dropped. */
+export const shortTr = (s: string) => s.replace(/\s*[（(][^）)]*[）)]/g, "").replace(/\s+/g, " ").trim();
+
+/**
+ * The day's title. `nameOf` gives a translated name per item (the English and Japanese pages build the same
+ * title from translated names, so it reads in full instead of a cut Chinese one).
+ */
+export function dayTitleZh(d: Pick<Day, "title" | "items"> & { titlePinned?: boolean }, nameOf?: (i: Item) => string | undefined, joiner = "・"): string {
   if (d.titlePinned && d.title.trim()) return d.title.trim(); // shown as the owner wrote it (≤ 60)
   const plans = d.items.filter(isPlan);
   if (!plans.length) return UNPLANNED;
@@ -40,9 +48,23 @@ export function dayTitle(d: Pick<Day, "title" | "items"> & { titlePinned?: boole
   // Main activities first (must-dos before the rest), then must-dos, then anything planned.
   const major = pool.filter((i) => i.major).sort((a, b) => Number(b.pri === "must") - Number(a.pri === "must"));
   const must = pool.filter((i) => i.pri === "must");
-  const pick = (major.length ? major : must.length ? must : pool).map((i) => shortName(i.name));
+  const name = (i: Item) => {
+    const t = nameOf?.(i);
+    return t ? shortTr(t) : shortName(i.name);
+  };
+  const max = nameOf ? 48 : MAX;
+  const pick = (major.length ? major : must.length ? must : pool).map(name);
   const uniq = pick.filter((n, k) => pick.indexOf(n) === k);
   const driving = plans.some((i) => i.mode === "drive");
-  if (driving && uniq.length >= 2) return clip(`${uniq[0]} → ${uniq.at(-1)}`);
-  return clip(uniq.slice(0, 2).join("・"));
+  if (driving && uniq.length >= 2) return clip(`${uniq[0]} → ${uniq.at(-1)}`, max);
+  return clip(uniq.slice(0, 2).join(joiner), max);
+}
+
+/** The day's title in the language being shown: built from the stored translations of its stops. */
+export function dayTitle(d: Pick<Day, "title" | "items"> & { titlePinned?: boolean; tr?: Day["tr"] }): string {
+  const l = getLang();
+  if (l === "zh") return dayTitleZh(d);
+  if (d.titlePinned && d.title.trim()) return tx(d, "title", d.title.trim());
+  if (!d.items.some(isPlan)) return t(UNPLANNED);
+  return dayTitleZh(d, (i) => tx(i, "name", undefined) || undefined, l === "en" ? " · " : "・");
 }
