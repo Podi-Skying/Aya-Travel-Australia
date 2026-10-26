@@ -93,8 +93,8 @@ describe("explicit compute", () => {
 });
 
 describe("google places", () => {
-  it("finds a place id with an IDs-only search once, then reads it from lookup_cache", async () => {
-    const { f, calls } = mock(() => ({ places: [{ id: "ChIJabcdefghijk" }] }));
+  it("finds a location-checked place id once, then reads it from lookup_cache", async () => {
+    const { f, calls } = mock(() => ({ places: [{ id: "ChIJabcdefghijk", location: { latitude: -40.761, longitude: 145.291 }, displayName: { text: "The Nut" } }] }));
     expect(await findPlaceId("g37", "Stanley The Nut", -40.76, 145.29, f)).toBe("ChIJabcdefghijk");
     expect(await findPlaceId("g37", "Stanley The Nut", -40.76, 145.29, f)).toBe("ChIJabcdefghijk");
     expect(calls).toHaveLength(1);
@@ -102,7 +102,10 @@ describe("google places", () => {
     expect(calls).toHaveLength(2);
     await findPlaceId("g37", "Stanley Highfield", -40.9, 145.29, f); // moved: looked up again
     expect(calls).toHaveLength(3);
-    expect(calls[0].headers?.["X-Goog-FieldMask"]).toBe("places.id");
+    expect(calls[0].headers?.["X-Goog-FieldMask"]).toBe("places.id,places.location,places.displayName");
+    // A match far from the activity is not used.
+    const far = mock(() => ({ places: [{ id: "ChIJfarawayplace", location: { latitude: -42.0, longitude: 147.0 } }] }));
+    expect(await findPlaceId("x1", "Somewhere", -40.76, 145.29, far.f)).toBeNull();
   });
 
   it("resolves a photo live with attributions, using the key only in headers", async () => {

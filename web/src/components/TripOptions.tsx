@@ -98,7 +98,7 @@ function OptionDetail({ c }: { c: OptionCard }) {
     let live = true;
     const stops = c.items.flat();
     void Promise.all(stops.map((it) => commonsFor({ id: it.id, name: it.name, lat: it.lat, lng: it.lng }, token))).then(
-      (lists) => live && setCommons(Object.fromEntries(stops.map((it, k) => [it.id, lists[k]]))),
+      (lists) => live && setCommons(Object.fromEntries(stops.map((it, k) => [`${it.id}|${it.name}|${it.lat}|${it.lng}`, lists[k]]))),
     );
     return () => {
       live = false;
@@ -155,7 +155,8 @@ function OptionDetail({ c }: { c: OptionCard }) {
       {(() => {
         // The plan's stops in one gallery: own, Kai-supplied and cached Commons photos (up to 3 each).
         // Live Google photos stay in each stop's own gallery below, to keep Google calls per view low.
-        const shots = c.items.flat().flatMap((it) => galleryPhotos(it, commons[it.id] ?? []).slice(0, 3));
+        // Lists are keyed by name and position too, so a changed stop never shows its old photos.
+        const shots = c.items.flat().flatMap((it) => galleryPhotos(it, commons[`${it.id}|${it.name}|${it.lat}|${it.lng}`] ?? []).slice(0, 3));
         return shots.length > 1 ? <Carousel key={o.key} photos={shots} label={`${o.title} 的景點照片`} /> : null;
       })()}
       <ol className="opt-days">

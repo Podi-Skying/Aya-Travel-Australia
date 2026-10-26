@@ -27,12 +27,24 @@ async function call<T>(api: GoogleApi, url: string, init: Parameters<GFetch>[1],
 
 /* ---------------------------------------------------------------- Places */
 
-export type PlaceRef = { placeId: string | null; name?: string; lat?: number; lng?: number };
+export type PlaceRef = { placeId: string | null; name?: string; lat?: number; lng?: number; checked?: boolean; googleName?: string; km?: number };
 const round4 = (n: number) => Math.round(n * 1e4) / 1e4;
-/** The stored mapping still describes this activity: same name and position (to ~10 m). */
-export const sameRef = (r: PlaceRef, name: string, lat?: number, lng?: number) => r.name === name && lat != null && lng != null && r.lat === round4(lat) && r.lng === round4(lng);
+/** The stored mapping still describes this activity (same name and position, to ~10 m) and was location-checked. */
+export const sameRef = (r: PlaceRef, name: string, lat?: number, lng?: number) => !!r.checked && r.name === name && lat != null && lng != null && r.lat === round4(lat) && r.lng === round4(lng);
 
-/** Finds the Google place id for an activity (IDs-only Text Search) and stores it; null if none. */
+/** A Google match must lie within this distance of the activity; farther ones stay unmapped for review. */
+export const MATCH_KM = 1.5;
+const kmBetween = (a: [number, number], b: [number, number]) => {
+  const r = Math.PI / 180;
+  const x = (b[1] - a[1]) * r * Math.cos(((a[0] + b[0]) / 2) * r);
+  return 6371 * Math.hypot(x, (b[0] - a[0]) * r);
+};
+
+/**
+ * Finds the Google place id for an activity and stores it; null if none. The search returns the
+ * place's location too (Text Search Pro, within the free monthly calls) so a match farther than
+ * MATCH_KM from the activity is not used.
+ */
 export async function findPlaceId(itemId: string, name: string, lat: number, lng: number, f: GFetch = defaultFetch): Promise<string | null> {
   const hit = await getLookup<PlaceRef>("place-id", itemId).catch(() => null);
   // A renamed or moved activity is looked up again, so its photo is never another place's.
@@ -42,18 +54,21 @@ export async function findPlaceId(itemId: string, name: string, lat: number, lng
   }
   const key = googleKey();
   if (!key) return null;
-  const body = await call<{ places?: { id?: string }[] }>(
+  const body = await call<{ places?: { id?: string; location?: { latitude?: number; longitude?: number }; displayName?: { text?: string } }[] }>(
     "places_search",
     "https://places.googleapis.com/v1/places:searchText",
     {
       method: "POST",
-      headers: { "content-type": "application/json", "X-Goog-Api-Key": key, "X-Goog-FieldMask": "places.id" },
+      headers: { "content-type": "application/json", "X-Goog-Api-Key": key, "X-Goog-FieldMask": "places.id,places.location,places.displayName" },
       body: JSON.stringify({ textQuery: name, maxResultCount: 1, locationBias: { circle: { center: { latitude: lat, longitude: lng }, radius: 2000 } } }),
     },
     f,
   );
-  const placeId = body.places?.[0]?.id ?? null;
-  await putLookup("place-id", itemId, { placeId, name, lat: round4(lat), lng: round4(lng) } satisfies PlaceRef, "Google Places Text Search (IDs only)", null);
+  const top = body.places?.[0];
+  const loc = top?.location;
+  const km = loc?.latitude != null && loc.longitude != null ? Math.round(kmBetween([lat, lng], [loc.latitude, loc.longitude]) * 100) / 100 : undefined;
+  const placeId = top?.id && km != null && km <= MATCH_KM ? top.id : null;
+  await putLookup("place-id", itemId, { placeId, name, lat: round4(lat), lng: round4(lng), checked: true, googleName: top?.displayName?.text?.slice(0, 120), km } satisfies PlaceRef, "Google Places Text Search (location-checked)", null);
   return placeId;
 }
 

@@ -38,7 +38,7 @@ export function Carousel({
   return (
     <div className="gallery">
       {!gl ? (
-        <ul className="gallery-strip" aria-label={label}>
+        <ul className="gallery-strip" aria-label={label} role="region" tabIndex={0}>
           {photos.map((p) => (
             <li key={p.src}>
               {/* eslint-disable-next-line @next/next/no-img-element -- photos from several hosts */}

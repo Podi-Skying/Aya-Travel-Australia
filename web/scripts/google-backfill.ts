@@ -66,7 +66,7 @@ async function main() {
   }
 
   console.log(`trip v${cur.versionNo}: ${todo.length} activities need a place id (of ${items.length} with a position); ${pending.length} of ${chunks.length} driving runs need Google routes`);
-  console.log(`estimated list price: places search US$${listPrice("places_search", todo.length)} (IDs-only search is free), routes US$${listPrice("routes", pending.length)} before free monthly calls`);
+  console.log(`estimated list price: places search US$${listPrice("places_search", todo.length)} (Text Search Pro, 5,000 free a month), routes US$${listPrice("routes", pending.length)} before free monthly calls`);
   if (!write) return console.log("dry run: add --write to call Google");
 
   let places = 0,

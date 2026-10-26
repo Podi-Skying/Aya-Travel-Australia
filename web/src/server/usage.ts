@@ -13,7 +13,7 @@ const { googleUsage } = schema;
 const TOTAL = "_total";
 
 export const GOOGLE_APIS = {
-  places_search: { sku: "Text Search Essentials (IDs Only)", perThousand: 0, freePerMonth: Infinity },
+  places_search: { sku: "Text Search Pro (id, location, name)", perThousand: 32, freePerMonth: 5_000 },
   place_details: { sku: "Place Details Essentials", perThousand: 5, freePerMonth: 10_000 },
   place_photo: { sku: "Place Details Photos", perThousand: 7, freePerMonth: 1_000 },
   routes: { sku: "Compute Routes Essentials", perThousand: 5, freePerMonth: 10_000 },

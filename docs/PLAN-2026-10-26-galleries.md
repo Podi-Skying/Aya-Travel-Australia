@@ -59,7 +59,7 @@ Builder: Claude. Plan review and inspection: Codex.
    - `PhotoCredit` becomes an icon link: 44px hit area, `aria-label="圖片來源：<site>"`, and `title` = site.
    - Google photos keep the author names as text (required), plus an icon link to Google Maps.
 6. **Google photos for share links:** not enabled. The cost estimate is reported only:
-   - Aya browsing 60 places × (1 details + 5 photos) = 60 Place Details + 300 Photos calls.
+   - Aya browsing 60 places × (1 details + 5 photos) = 60 Place Details + 300 Photos calls (the gallery requests 5 Google photos per activity).
    - Free monthly calls: 10,000 Place Details and 1,000 Photos.
    - So one full browse costs US$0 within the free tier. Beyond it, the list price is US$0.30 + US$2.10 = **US$2.40 per full browse**.
 
@@ -106,3 +106,14 @@ Builder: Claude. Plan review and inspection: Codex.
   - Live Google photos stay in each stop's own gallery, so opening a plan does not cost about 7 Google calls per stop.
 - **CACHE-01, accepted.** The client cache key and effect dependencies include the name and position.
 - **COVERAGE-01, accepted.** The report counts unique photos using the gallery's own assembly. The owner number is labelled as an upper bound, and Google is counted only when a key is configured.
+
+## Inspection 2: dispositions (the inspection budget is now used up; these fixes have no third inspection, but tests cover them)
+
+- **COVERAGE-01, open, for Kai to decide.** Share-link coverage after the Commons backfill is 62 of 124 activities with 5+ photos. Reaching 5 for every attraction for Aya needs Google photos on share links (cost below) or more owner-supplied photos. This is reported to Kai rather than marked met.
+- **QUOTA-01, accepted.** 5 Google photos per activity (6 calls per gallery), cap 400 ≈ 66 galleries a day. Estimate: 60 × (1 + 5) = 60 Details + 300 Photos calls, US$0 within the free monthly calls, US$2.40 at list price beyond them.
+- **CACHE-01, accepted.** Plan-carousel Commons lists are keyed by id, name and position.
+- **GOOGLE-01, accepted.**
+  - Text Search now returns location and name (Text Search Pro, 5,000 free a month). A match farther than 1.5 km stays unmapped, with the Google name kept for review.
+  - Older unchecked mappings are searched again.
+- **MEDIA-01, accepted.** A share token opens only media files referenced by that trip's photos or galleries.
+- **A11Y-01, accepted.** The fallback strip is a focusable region with a visible focus ring.

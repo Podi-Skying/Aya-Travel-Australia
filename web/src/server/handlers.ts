@@ -299,7 +299,8 @@ export const getPlacePhotos = ownerRoute(async (req, owner) => {
   const cur = await getCurrentTrip(owner);
   const it = cur && findIn(cur.doc, item);
   if (!it || !sameRef(hit.value, it.name, it.lat, it.lng)) return json({ photos: [] });
-  const photos = await placePhotos(hit.value.placeId, 6).catch(() => []);
+  // 5 photos: one Place Details + 5 media calls = 6 per gallery (cap 400 ≈ 66 galleries a day).
+  const photos = await placePhotos(hit.value.placeId, 5).catch(() => []);
   return json({ photos }, 200, { "cache-control": "private, max-age=1500" });
 });
 
@@ -314,7 +315,12 @@ export async function getMedia(req: Request, ctx: { params: Promise<{ path: stri
     if (!/^[a-z0-9/_-]+\.(webp|jpg|png)$/.test(rel) || rel.includes("..")) return fail(404, "找不到");
     const token = new URL(req.url).searchParams.get("token");
     let ok = false;
-    if (token) ok = !!(await getPublicTrip(token));
+    if (token) {
+      // A share token opens only photos its trip actually shows.
+      const t = await getPublicTrip(token);
+      const want = `/api/media/${rel}`;
+      ok = !!t && [...t.doc.days.flatMap((d) => d.items), ...t.doc.attractionPool.flatMap((p) => p.items)].some((i) => i.photo?.url === want || (i.gallery ?? []).some((g) => g.url === want));
+    }
     else {
       const c = missingConfig("owner").length ? null : await checkOwner();
       ok = !!c?.ok;

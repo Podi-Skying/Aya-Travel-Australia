@@ -815,3 +815,4 @@ details.card.day-summary > summary h3 { margin: 0; }
 .gallery-strip { list-style: none; margin: 0; padding: 0; display: flex; gap: 8px; overflow-x: auto; scroll-snap-type: x mandatory; }
 .gallery-strip li { flex: 0 0 80%; scroll-snap-align: center; }
 .gallery-strip img { width: 100%; height: 320px; object-fit: cover; border-radius: 12px; }
+.gallery-strip:focus-visible { outline: 3px solid var(--vermilion); outline-offset: 2px; }

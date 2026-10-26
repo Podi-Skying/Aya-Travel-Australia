@@ -71,11 +71,20 @@ describe("gallery endpoints", () => {
     expect(((await (await H.getPhotos(req("GET", `/api/photos?item=${it.id}`))).json()) as { commons: unknown[] }).commons).toHaveLength(2);
   });
 
-  it("/api/media serves Kai's photos only to the owner or a share token, and only from web/media", async () => {
+  it("/api/media serves Kai's photos to the owner, and to a share token only when its trip shows them", async () => {
     const path = (p: string) => ({ params: Promise.resolve({ path: p.split("/") }) });
+    const file = "balloon-aloft/06-redballoon-sunrise.webp";
     signedOut();
-    expect((await H.getMedia(req("GET", "/api/media/balloon-aloft/06-redballoon-sunrise.webp"), path("balloon-aloft/06-redballoon-sunrise.webp"))).status).toBe(401);
-    const ok = await H.getMedia(req("GET", `/api/media/balloon-aloft/06-redballoon-sunrise.webp?token=${token}`), path("balloon-aloft/06-redballoon-sunrise.webp"));
+    expect((await H.getMedia(req("GET", `/api/media/${file}`), path(file))).status).toBe(401);
+    // Not referenced by the trip yet: refused for the token.
+    expect((await H.getMedia(req("GET", `/api/media/${file}?token=${token}`), path(file))).status).toBe(401);
+    asOwner();
+    expect((await H.getMedia(req("GET", `/api/media/${file}`), path(file))).status).toBe(200);
+    const cur = (await (await H.getTrip(req("GET", "/api/trip"))).json()) as { versionNo: number; doc: TripDoc };
+    cur.doc.days[0].items[0].gallery = [{ url: `/api/media/${file}`, page: `/api/media/${file}`, site: "Kai 提供", kind: "custom" }];
+    expect((await H.postImport(req("POST", "/api/trip/import", { baseVersionNo: cur.versionNo, doc: cur.doc }))).status).toBe(200);
+    signedOut();
+    const ok = await H.getMedia(req("GET", `/api/media/${file}?token=${token}`), path(file));
     expect(ok.status).toBe(200);
     expect(ok.headers.get("content-type")).toBe("image/webp");
     asOwner();
