@@ -50,3 +50,12 @@
 - **R2.** 每日行程 rows with only gallery photos (no main photo, no position) now show them.
 - **R3.** Cards request nothing (image, preload, Commons or Google) until they come within 200 px of the screen; hidden tabs never do. Images also carry `loading="lazy"`.
 - **R4.** Commons identity keeps the file name's case (only the first letter is case-insensitive on Commons).
+
+## Inspection 2: dispositions (the two-round budget is now used up; covered by tests and a local check)
+
+- **PHOTO-001, accepted in scope.** The quiz loads Commons lists and images only for the cards of the current step: region covers on step 1, the region's places on step 2. Step 0 loads nothing. Per-card viewport tracking inside the vendored ChromaGrid was not added, because a step shows at most about 20 cards.
+- **PHOTO-002, accepted.** Quiz photo state is keyed by id, name and position.
+- **PHOTO-003, accepted.** `PlaceGallery` remounts its inner state when the place's id, name or position changes, so the Google request state and the photo position start fresh.
+- **PHOTO-004, accepted.** Captions wrap instead of being cut, so the author, licence and the Google Maps link stay visible.
+- **PHOTO-005, accepted.** Enter and Space advance the photo, like the arrow keys.
+- **PHOTO-006, accepted.** A card image that has not answered after 20 s counts as failed. A quiz probe that has not answered after 12 s shows the category icon. Late answers are ignored once settled.

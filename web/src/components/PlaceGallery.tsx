@@ -85,7 +85,13 @@ function Credit({ p }: { p: GalleryPhoto }) {
  * (billed) load on screen only when the place has no other photo, else when the viewer reaches the last one.
  * `empty="hide"` renders nothing for a place without photos (每日行程 rows stay text-only).
  */
-export function PlaceGallery({ item, className = "", empty = "tile" }: { item: Item; className?: string; empty?: "tile" | "hide" }) {
+export function PlaceGallery(props: { item: Item; className?: string; empty?: "tile" | "hide" }) {
+  // A renamed or moved place starts fresh (photo position, Google request), as if newly mounted.
+  const { item } = props;
+  return <PlaceGalleryInner key={`${item.id}|${item.name}|${item.lat}|${item.lng}`} {...props} />;
+}
+
+function PlaceGalleryInner({ item, className = "", empty = "tile" }: { item: Item; className?: string; empty?: "tile" | "hide" }) {
   const { mode, token } = useTrip();
   const privateView = mode === "owner" || !!token;
   const googleOk = privateView && item.lat != null && !isLogistics(item) && !item.name.startsWith("住宿：");
@@ -175,7 +181,7 @@ export function PlaceGallery({ item, className = "", empty = "tile" }: { item: I
     setIdx((cur + step + total) % total);
   };
   const onKey = (e: KeyboardEvent) => {
-    const step = ({ ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 } as Record<string, 1 | -1>)[e.key];
+    const step = ({ ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1, Enter: 1, " ": 1 } as Record<string, 1 | -1>)[e.key];
     if (!step || total + (more ? 1 : 0) < 2) return;
     e.preventDefault();
     go(step);
@@ -222,6 +228,14 @@ export function PlaceGallery({ item, className = "", empty = "tile" }: { item: I
           decoding="async"
           loading="lazy"
           onLoad={() => setLoaded((s) => new Set(s).add(p.src))}
+          ref={(el) => {
+            // A request that never answers counts as failed after 20 s, so no card stays loading.
+            if (!el || el.complete) return;
+            const src = p.src;
+            window.setTimeout(() => {
+              if (!el.complete || el.naturalWidth === 0) setBroken((s) => (s.has(src) ? s : new Set(s).add(src)));
+            }, 20_000);
+          }}
           onError={() => setBroken((s) => new Set(s).add(p.src))}
         />
         {!loaded.has(p.src) && <LoadingTile />}

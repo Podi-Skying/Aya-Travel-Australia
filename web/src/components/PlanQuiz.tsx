@@ -56,40 +56,41 @@ export function PlanQuiz({ active }: { active: boolean }) {
   const homeName = home?.name === "住處" || !homeKey ? "住處" : (doc.stays[homeKey]?.name ?? "住處");
   const places = useMemo(() => quizPlaces(doc), [doc]);
   const reduce = useReducedMotion();
-  // Places without their own photo use their cached Commons photos (they had shown a blank tile before).
+  const regions = REGIONS.map((r) => ({ r, list: places.filter((p) => p.region === r.key) })).filter((x) => x.list.length);
+  const inRegion = places.filter((p) => p.region === region);
+  // Only the cards of the current step load anything.
+  const shown = step === 1 ? regions.map(({ list }) => list.find((p) => p.item.photo)?.item ?? list[0].item) : step === 2 ? inRegion.map((p) => p.item) : [];
+  // Places without their own photo use their cached Commons photos, keyed by name and position too (a moved
+  // or renamed place asks again, as the server does).
+  const idOf = (i: Item) => `${i.id}|${i.name}|${i.lat}|${i.lng}`;
   const [commons, setCommons] = useState<Record<string, string | null>>({});
+  const needKey = shown.filter((i) => !i.photo && !i.gallery?.length && !(idOf(i) in commons)).map(idOf).join("\n");
   useEffect(() => {
-    if (!active || !(mode === "owner" || token)) return;
-    const need = places.filter((p) => !p.item.photo && !p.item.gallery?.length && !(p.item.id in commons));
-    if (!need.length) return;
-    let live = true;
+    if (!active || !needKey || !(mode === "owner" || token)) return;
+    const need = shown.filter((i) => needKey.split("\n").includes(idOf(i)));
     void (async () => {
-      for (let k = 0; k < need.length && live; k += 6) {
+      for (let k = 0; k < need.length; k += 6) {
         const part = need.slice(k, k + 6);
-        const lists = await Promise.all(part.map((p) => commonsFor({ id: p.item.id, name: p.item.name, lat: p.item.lat, lng: p.item.lng }, token)));
-        if (live) setCommons((c) => ({ ...c, ...Object.fromEntries(part.map((p, j) => [p.item.id, lists[j][0]?.url ?? null])) }));
+        const lists = await Promise.all(part.map((i) => commonsFor({ id: i.id, name: i.name, lat: i.lat, lng: i.lng }, token)));
+        setCommons((c) => ({ ...c, ...Object.fromEntries(part.map((i, j) => [idOf(i), lists[j][0]?.url ?? null])) }));
       }
     })();
-    return () => {
-      live = false;
-    };
-    // `commons` only filters what is still missing; refetching on its change would loop.
+    // needKey names exactly the cards still to ask for; commonsFor shares one request per place.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, places, mode, token]);
-  // Each photo is loaded off-screen first: the card shows the camera until it arrives, the category if it fails.
+  }, [active, needKey, mode, token]);
+  // Each photo is loaded off-screen first: the card shows the camera until it arrives, the category if it fails
+  // or takes longer than 12 s.
   const [probe, setProbe] = useState<Record<string, "ok" | "err">>({});
   const wanted = (i: Item) => {
     const own = i.photo?.url ?? i.gallery?.[0]?.url;
-    return own ? cardSrc(own) : commons[i.id] ? cardSrc(commons[i.id]!) : null;
+    const c = commons[idOf(i)];
+    return own ? cardSrc(own) : c ? cardSrc(c) : null;
   };
   const photoOf = (i: Item) => {
     const url = wanted(i);
     if (url) return probe[url] === "ok" ? url : probe[url] === "err" ? emptyImg(i.cat) : loadingImg(reduce);
-    return commons[i.id] === undefined && (mode === "owner" || token) ? loadingImg(reduce) : emptyImg(i.cat);
+    return commons[idOf(i)] === undefined && (mode === "owner" || token) ? loadingImg(reduce) : emptyImg(i.cat);
   };
-  const regions = REGIONS.map((r) => ({ r, list: places.filter((p) => p.region === r.key) })).filter((x) => x.list.length);
-  const inRegion = places.filter((p) => p.region === region);
-  const shown = step === 1 ? regions.map(({ list }) => list.find((p) => p.item.photo)?.item ?? list[0].item) : step === 2 ? inRegion.map((p) => p.item) : [];
   const toProbe = shown.map(wanted).filter((u): u is string => !!u && !(u in probe));
   const probeKey = toProbe.join("|");
   const probing = useRef(new Set<string>());
@@ -101,8 +102,15 @@ export function PlanQuiz({ active }: { active: boolean }) {
       probing.current.add(u);
       const im = new Image();
       im.referrerPolicy = "no-referrer";
-      im.onload = () => setProbe((p) => ({ ...p, [u]: "ok" }));
-      im.onerror = () => setProbe((p) => ({ ...p, [u]: "err" }));
+      let settled = false;
+      const settle = (v: "ok" | "err") => {
+        if (settled) return;
+        settled = true;
+        setProbe((p) => ({ ...p, [u]: v }));
+      };
+      im.onload = () => settle("ok");
+      im.onerror = () => settle("err");
+      setTimeout(() => settle("err"), 12_000);
       im.src = u;
     }
   }, [active, probeKey]);

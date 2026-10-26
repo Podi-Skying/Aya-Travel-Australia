@@ -945,7 +945,8 @@ details.card.day-summary > summary h3 { margin: 0; }
 .pg-chip { position: absolute; right: 6px; bottom: 6px; display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 999px; background: rgba(41, 40, 35, .72); color: #fff; font-size: .7rem; font-variant-numeric: tabular-nums; pointer-events: none; }
 .pg-more { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--vermilion), transparent); background-size: 50% 100%; background-repeat: no-repeat; animation: pgBar 1s linear infinite; }
 @keyframes pgBar { from { background-position: -50% 0; } to { background-position: 150% 0; } }
-.pg-card figcaption { font-size: .68rem; line-height: 1.4; color: var(--ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pg-card figcaption { font-size: .68rem; line-height: 1.4; color: var(--ink-muted); overflow-wrap: anywhere; }
+.act-thumb figcaption { font-size: .62rem; }
 .pg-card figcaption a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 .ph-tile { display: grid; place-items: center; align-content: center; gap: 6px; width: 100%; aspect-ratio: 4 / 3; border-radius: 10px; color: var(--ink-2); }
 .ph-tile.is-loading { background: linear-gradient(100deg, var(--paper-raised) 30%, #fbf8f1 50%, var(--paper-raised) 70%); background-size: 300% 100%; animation: phShimmer 1.4s var(--ease) infinite; }
