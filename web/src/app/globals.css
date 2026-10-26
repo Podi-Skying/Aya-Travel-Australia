@@ -969,3 +969,4 @@ details.card.day-summary > summary h3 { margin: 0; }
 .day-nav-links .btn { min-height: 44px; display: inline-flex; align-items: center; gap: 4px; text-decoration: none; }
 .map-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
 .map-tools .toggle { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; }
+.chroma-inset.is-inline { position: relative; top: auto; left: auto; display: block; width: 48px; height: 48px; margin: 10px 10px 0; }

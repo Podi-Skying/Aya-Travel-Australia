@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useTrip } from "./TripApp";
-import { Icon, iconPath } from "./Icon";
+import { Icon } from "./Icon";
 import { PendingButton, useReducedMotion } from "./ui";
 import { commonsFor } from "@/client/photos";
 import { cardSrc } from "./PlaceGallery";
@@ -34,8 +34,6 @@ const loadingImg = (still: boolean) =>
   svgUri(
     `<rect width="300" height="200" fill="#f3eee3"/><g transform="translate(126 76) scale(2)" fill="none" stroke="#625e55" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="${CAMERA}">${still ? "" : '<animate attributeName="opacity" values=".35;1;.35" dur="1.4s" repeatCount="indefinite"/>'}</path></g>`,
   );
-const emptyImg = (cat?: string) =>
-  svgUri(`<rect width="300" height="200" fill="#e9e1cf"/><g transform="translate(126 76) scale(2)" fill="none" stroke="#3e3b34" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="${iconPath(cat ? `cat-${cat}` : "pin")}"/></g>`);
 
 
 const accents = [...PALETTES.map((p) => p.deep), INK_PALETTE.deep];
@@ -88,8 +86,8 @@ export function PlanQuiz({ active }: { active: boolean }) {
   };
   const photoOf = (i: Item) => {
     const url = wanted(i);
-    if (url) return probe[url] === "ok" ? url : probe[url] === "err" ? emptyImg(i.cat) : loadingImg(reduce);
-    return commons[idOf(i)] === undefined && (mode === "owner" || token) ? loadingImg(reduce) : emptyImg(i.cat);
+    if (url) return probe[url] === "ok" ? url : probe[url] === "err" ? "" /* no photo found: no picture (Kai 2026-10-27) */ : loadingImg(reduce);
+    return commons[idOf(i)] === undefined && (mode === "owner" || token) ? loadingImg(reduce) : "" /* no photo found: no picture (Kai 2026-10-27) */;
   };
   const toProbe = shown.map(wanted).filter((u): u is string => !!u && !(u in probe));
   const probeKey = toProbe.join("|");

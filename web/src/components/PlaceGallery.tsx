@@ -91,7 +91,7 @@ export function PlaceGallery(props: { item: Item; className?: string; empty?: "t
   return <PlaceGalleryInner key={`${item.id}|${item.name}|${item.lat}|${item.lng}`} {...props} />;
 }
 
-function PlaceGalleryInner({ item, className = "", empty = "tile" }: { item: Item; className?: string; empty?: "tile" | "hide" }) {
+function PlaceGalleryInner({ item, className = "", empty = "hide" }: { item: Item; className?: string; empty?: "tile" | "hide" }) {
   const { mode, token } = useTrip();
   const privateView = mode === "owner" || !!token;
   const googleOk = privateView && item.lat != null && !isLogistics(item) && !item.name.startsWith("住宿：");

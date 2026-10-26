@@ -250,12 +250,17 @@ export const ChromaGrid = ({
           const body = (
             <>
               <span className="chroma-wash" aria-hidden="true" />
-              <div className="chroma-media" data-chroma-area="">
-                <img className="chroma-mono" src={item.image} alt={item.alt ?? item.title ?? ''} loading="lazy" referrerPolicy="no-referrer" />
-                <img className="chroma-color" src={item.image} alt="" aria-hidden="true" loading="lazy" referrerPolicy="no-referrer" />
-                <span className="chroma-media-rim" aria-hidden="true" />
-                {item.inset && <span className="chroma-inset" aria-hidden="true">{item.inset}</span>}
-              </div>
+              {/* Local extension: a card without a photo has no picture area (Kai 2026-10-27); its inset map moves into the text. */}
+              {item.image ? (
+                <div className="chroma-media" data-chroma-area="">
+                  <img className="chroma-mono" src={item.image} alt={item.alt ?? item.title ?? ''} loading="lazy" referrerPolicy="no-referrer" />
+                  <img className="chroma-color" src={item.image} alt="" aria-hidden="true" loading="lazy" referrerPolicy="no-referrer" />
+                  <span className="chroma-media-rim" aria-hidden="true" />
+                  {item.inset && <span className="chroma-inset" aria-hidden="true">{item.inset}</span>}
+                </div>
+              ) : (
+                item.inset && <span className="chroma-inset is-inline" aria-hidden="true">{item.inset}</span>
+              )}
               {showInfo && (item.title || item.subtitle) && (
                 <div className="chroma-info">
                   {item.title && <span className="chroma-title">{item.title}</span>}
