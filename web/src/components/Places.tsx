@@ -277,7 +277,8 @@ export function PlacesMap({ active }: { active: boolean }) {
               const straight: [number, number][][] = [];
               for (let k = 1; k < rs.length; k++) {
                 const leg = legs?.[k - 1];
-                if (leg?.geometry.length) road.push(leg.geometry);
+                // Walking and transit legs follow their real path but stay dashed; driven legs are solid.
+          if (leg?.geometry.length) (leg.source.startsWith("google-routes-") ? straight : road).push(leg.geometry);
                 else straight.push([rs[k - 1].pt, rs[k].pt]);
               }
               if (road.length) L.polyline(road, { color: red, weight: 4, opacity: 0.9 }).addTo(dayLayer.current!);

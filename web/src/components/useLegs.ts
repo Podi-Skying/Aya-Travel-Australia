@@ -10,6 +10,20 @@ import { api } from "@/client/api";
  */
 
 export type Pt = [number, number];
+export type Travel = "driving" | "walking" | "transit";
+
+/** How a stop is reached when not by car: walking, public transport, or nothing to route (ferry, flight). */
+export const softTravel = (mode?: string): Exclude<Travel, "driving"> | null => (mode === "walk" ? "walking" : mode && ["train", "bus", "transit"].includes(mode) ? "transit" : null);
+
+/** Walking and transit pairs of a route (driving legs go through driveChunks). */
+function softPairs(list: Stop[]): { at: number; pts: Pt[]; mode: Travel }[] {
+  const out: { at: number; pts: Pt[]; mode: Travel }[] = [];
+  for (let i = 1; i < list.length; i++) {
+    const m = list[i].drive ? null : softTravel(list[i].mode);
+    if (m && !list[i].gap) out.push({ at: i - 1, pts: [list[i - 1].pt, list[i].pt], mode: m });
+  }
+  return out;
+}
 export type Leg = { distanceM: number; durationS: number; geometry: Pt[]; source: string };
 
 const MAX_POINTS = 25;
@@ -23,6 +37,10 @@ export async function computeLegs(stops: Stop[]): Promise<boolean> {
   let ok = true;
   for (const c of driveChunks(stops)) {
     const r = await api<{ legs: (Leg | null)[] }>("/api/routes", { method: "POST", body: { points: c.pts, compute: true } });
+    if (!r.ok || r.data.legs.some((l) => !l)) ok = false;
+  }
+  for (const c of softPairs(stops)) {
+    const r = await api<{ legs: (Leg | null)[] }>("/api/routes", { method: "POST", body: { points: c.pts, compute: true, mode: c.mode } });
     if (!r.ok || r.data.legs.some((l) => !l)) ok = false;
   }
   memo.clear();
@@ -46,11 +64,11 @@ function driveChunks(list: Stop[]): { from: number; pts: Pt[] }[] {
   });
 }
 
-export function fetchLegs(points: Pt[]): Promise<(Leg | null)[]> {
-  const key = points.map((p) => p.map((n) => n.toFixed(5)).join(",")).join(";");
+export function fetchLegs(points: Pt[], mode: Travel = "driving"): Promise<(Leg | null)[]> {
+  const key = mode + ":" + points.map((p) => p.map((n) => n.toFixed(5)).join(",")).join(";");
   let p = memo.get(key);
   if (!p) {
-    p = api<{ legs: (Leg | null)[] }>("/api/routes", { method: "POST", body: { points } }).then((r) => (r.ok ? r.data.legs : points.slice(1).map(() => null)));
+    p = api<{ legs: (Leg | null)[] }>("/api/routes", { method: "POST", body: mode === "driving" ? { points } : { points, mode } }).then((r) => (r.ok ? r.data.legs : points.slice(1).map(() => null)));
     memo.set(key, p);
     // A failed or partial answer may fill in later (after 「計算道路路線」); do not keep it.
     void p.then((legs) => legs.some((l) => !l) && memo.delete(key));
@@ -58,7 +76,8 @@ export function fetchLegs(points: Pt[]): Promise<(Leg | null)[]> {
   return p;
 }
 
-export type Stop = { pt: Pt; drive: boolean };
+/** `mode` is how the stop is reached (walk, train, …); `gap` marks a stop after an activity with no position. */
+export type Stop = { pt: Pt; drive: boolean; mode?: string; gap?: boolean };
 
 /**
  * Legs for consecutive stops, aligned with the pairs (stops.length - 1). Only pairs whose destination
@@ -66,7 +85,7 @@ export type Stop = { pt: Pt; drive: boolean };
  * Each run of consecutive drive legs is one request.
  */
 export function useLegs(stops: Stop[] | null): (Leg | null)[] | null {
-  const key = stops && stops.length >= 2 ? JSON.stringify(stops.map((s) => [s.pt, s.drive ? 1 : 0])) : "";
+  const key = stops && stops.length >= 2 ? JSON.stringify(stops.map((s) => [s.pt, s.drive ? 1 : 0, s.mode ?? "", s.gap ? 1 : 0])) : "";
   const [state, setState] = useState<{ key: string; legs: (Leg | null)[] } | null>(null);
   const [version, setVersion] = useState(0);
   useEffect(() => {
@@ -77,12 +96,14 @@ export function useLegs(stops: Stop[] | null): (Leg | null)[] | null {
   useEffect(() => {
     if (!key) return;
     let live = true;
-    const list = (JSON.parse(key) as [Pt, number][]).map(([pt, d]) => ({ pt, drive: !!d }));
+    const list = (JSON.parse(key) as [Pt, number, string, number][]).map(([pt, d, mode, gap]) => ({ pt, drive: !!d, mode, gap: !!gap }));
     const chunks = driveChunks(list);
-    void Promise.all(chunks.map((r) => fetchLegs(r.pts))).then((parts) => {
+    const soft = softPairs(list);
+    void Promise.all([Promise.all(chunks.map((r) => fetchLegs(r.pts))), Promise.all(soft.map((s) => fetchLegs(s.pts, s.mode)))]).then(([parts, softParts]) => {
       if (!live) return;
       const legs: (Leg | null)[] = list.slice(1).map(() => null);
       chunks.forEach((r, k) => parts[k].forEach((l, j) => (legs[r.from + j] = l)));
+      soft.forEach((s, k) => (legs[s.at] = softParts[k][0] ?? null));
       setState({ key, legs });
     });
     return () => {
@@ -145,12 +166,12 @@ export function routeStops<T extends { id: string; name: string; lat?: number; l
       gap = true;
       continue;
     }
-    out.push({ pt: [i.lat, i.lng], drive: i.mode === "drive" && !gap && out.length > 0, kind: "item", name: i.name, mode: i.mode, itemId: i.id });
+    out.push({ pt: [i.lat, i.lng], drive: i.mode === "drive" && !gap && out.length > 0, gap: gap || out.length === 0, kind: "item", name: i.name, mode: i.mode, itemId: i.id });
     gap = false;
   }
   const lastItem = [...out].reverse().find((s) => s.kind === "item");
   // A skipped activity after the last located stop breaks the route like any gap (no routed leg across it).
-  if (ends.end) out.push({ pt: [ends.end.lat, ends.end.lng], drive: lastItem?.mode === "drive" && !gap, kind: "end", name: ends.end.name, mode: lastItem?.mode ?? "walk" });
+  if (ends.end) out.push({ pt: [ends.end.lat, ends.end.lng], drive: lastItem?.mode === "drive" && !gap, gap, kind: "end", name: ends.end.name, mode: lastItem?.mode ?? "walk" });
   // A stay and the first/last stop at the same spot make no leg.
   return out.filter((s, k) => k === 0 || s.pt[0] !== out[k - 1].pt[0] || s.pt[1] !== out[k - 1].pt[1]);
 }

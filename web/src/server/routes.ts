@@ -1,6 +1,6 @@
 import { and, eq, like, lt, or } from "drizzle-orm";
 import { getDb, schema } from "./db/client";
-import { GOOGLE_ROUTE_TTL_MS, googleKey, googleLegs, type GFetch } from "./google";
+import { GOOGLE_ROUTE_TTL_MS, googleKey, googleLegs, type GFetch, type TravelMode } from "./google";
 
 /*
  * Road legs between consecutive stops (PLAN-2026-10-26 §2). Every computed leg is stored in
@@ -85,10 +85,10 @@ async function readCached(points: Pt[], mode: string): Promise<(Leg | null)[]> {
  */
 export async function getLegs(
   raw: Pt[],
-  opts: { compute: boolean; refresh?: boolean; upgrade?: boolean; fetch?: Fetch; gfetch?: GFetch; provider?: "google" | "osrm" } = { compute: false },
+  opts: { compute: boolean; refresh?: boolean; upgrade?: boolean; fetch?: Fetch; gfetch?: GFetch; provider?: "google" | "osrm"; mode?: TravelMode } = { compute: false },
 ): Promise<{ legs: (Leg | null)[]; computed: number; cached?: boolean }> {
   const points = raw.map(roundPt);
-  const mode = "driving";
+  const mode: TravelMode = opts.mode ?? "driving";
   // Consecutive duplicates (two activities at one place) are zero legs, not routing work.
   let legs: (Leg | null)[];
   try {
@@ -100,10 +100,12 @@ export async function getLegs(
     if (same(points[i], b)) legs[i] = { distanceM: 0, durationS: 0, geometry: [b], source: "same-place", computedAt: new Date(0).toISOString() };
   });
   const provider = opts.provider ?? (googleKey() ? "google" : "osrm");
-  const redo = (l: Leg | null) => !l || (opts.upgrade && provider === "google" && l.source !== "google-routes" && l.source !== "same-place");
+  // OSRM's demo server only drives: walking and transit legs need Google.
+  if (mode !== "driving" && provider !== "google") return { legs, computed: 0 };
+  const redo = (l: Leg | null) => !l || (mode === "driving" && opts.upgrade && provider === "google" && l.source !== "google-routes" && l.source !== "same-place");
   const need = opts.refresh ? points.slice(1).some((b, i) => !same(points[i], b)) : legs.some(redo);
   if (!opts.compute || !need) return { legs, computed: 0 };
-  const fresh = provider === "google" ? await googleLegs(points, opts.gfetch) : await osrm(points, opts.fetch ?? (fetch as unknown as Fetch));
+  const fresh = provider === "google" ? await googleLegs(points, opts.gfetch, mode) : await osrm(points, opts.fetch ?? (fetch as unknown as Fetch));
   const db = await getDb().catch(() => null);
   const now = new Date();
   let computed = 0;

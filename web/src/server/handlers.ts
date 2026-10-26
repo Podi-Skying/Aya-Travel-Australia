@@ -192,7 +192,8 @@ export async function postRoutes(req: Request) {
     // Same-origin JSON only, checked before any quota is charged (share-link viewers are same-origin).
     if (!sameOrigin(req)) return fail(403, "來源不符");
     if (!(req.headers.get("content-type") ?? "").startsWith("application/json")) return fail(415, "需要 JSON");
-    const b = (await readJson(req, ROUTE_BYTES)) as { points?: unknown; refresh?: unknown; compute?: unknown };
+    const b = (await readJson(req, ROUTE_BYTES)) as { points?: unknown; refresh?: unknown; compute?: unknown; mode?: unknown };
+    const mode = b.mode === "walking" || b.mode === "transit" ? b.mode : "driving";
     const points = validPoints(b.points);
     if (!points) return fail(400, `需要 2–${MAX_POINTS} 個座標`);
     const c = missingConfig("owner").length ? null : await checkOwner();
@@ -200,7 +201,7 @@ export async function postRoutes(req: Request) {
     const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || "unknown";
     // Reads are limited per client; the owner's computation quota is charged only when OSRM will be called.
     if (!owner && !(await routeQuota(`routes-ip:${sha256(ip)}`, 120))) return fail(429, "操作太頻繁，請稍後再試");
-    const hit = await getLegs(points, { compute: false });
+    const hit = await getLegs(points, { compute: false, mode });
     const refresh = owner && b.refresh === true;
     const missing = hit.legs.some((l) => !l);
     // A page view answered from route_cache: counted as a cache hit, no Google call.
@@ -208,7 +209,7 @@ export async function postRoutes(req: Request) {
     // Page views only read route_cache; computing takes an explicit owner action (compute: true) or the backfill.
     if (!owner || b.compute !== true || (!missing && !refresh)) return json(hit);
     if (!(await routeQuota(`routes:${c!.ok ? c!.owner.githubId : ""}`, 30, false))) return json({ ...hit, limited: true });
-    const r = await getLegs(points, { compute: true, refresh }).catch(() => null); // routing service unavailable: straight lines stay
+    const r = await getLegs(points, { compute: true, refresh, mode }).catch(() => null); // routing service unavailable: straight lines stay
     return json(r ?? { ...hit, unavailable: true });
   } catch (e) {
     return errorResponse(e);

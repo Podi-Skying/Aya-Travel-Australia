@@ -20,7 +20,7 @@ import { checks, feasibility } from "@/domain/rules";
 import { basis, dayTotal, lineAmount, stayOf } from "@/domain/budget";
 import { fmtDay, mins, money } from "@/domain/format";
 import type { Item } from "@/domain/schema";
-import { computeLegs, legLabel, routeStops, useLegs, type Leg } from "./useLegs";
+import { computeLegs, legLabel, routeStops, softTravel, useLegs, type Leg } from "./useLegs";
 import { daySegments, navMode, navUrl, type NavPoint } from "@/domain/nav";
 import { nightStay } from "@/domain/stay";
 import { dayEnds } from "@/domain/home-pins";
@@ -38,15 +38,17 @@ function Legs({ travel, road, nav }: { travel?: Item["travel"]; road?: Leg | nul
       <Icon name="route" size={14} /> 導航
     </a>
   ) : null;
-  if (road && road.durationS > 0)
+  if (road && road.durationS > 0) {
+    const how = road.source.endsWith("-walking") ? { icon: "walk", t: "步行" } : road.source.endsWith("-transit") ? { icon: "bus", t: "大眾運輸" } : { icon: "car", t: "開車" };
     return (
       <li className="leg">
         <span className="leg-road">
-          <Icon name="car" size={16} /> 開車 {legLabel(road)}
+          <Icon name={how.icon} size={16} /> {how.t} {legLabel(road)}
         </span>
         {link}
       </li>
     );
+  }
   if (!parts.length) return link ? <li className="leg">{link}</li> : null;
   const total = parts.reduce((a, [, v]) => a + v, 0);
   const [k, v] = parts.length === 1 ? parts[0] : [null, total];
@@ -211,7 +213,7 @@ export function DaysView({ active }: { active: boolean }) {
   const autoAsked = useRef(new Set<string>());
   useEffect(() => {
     if (!editable || !active || !roadLegs) return;
-    if (!route.slice(1).some((s, k) => s.drive && !roadLegs[k])) return;
+    if (!route.slice(1).some((s, k) => (s.drive || (softTravel(s.mode) && !s.gap)) && !roadLegs[k])) return;
     const key = JSON.stringify(route.map((s) => [s.pt, s.drive]));
     if (autoAsked.current.has(key)) return;
     autoAsked.current.add(key);
@@ -760,15 +762,15 @@ export function DaysView({ active }: { active: boolean }) {
             <label className="toggle small">
               <input type="checkbox" checked={showNearby} onChange={(e) => setShowNearby(e.target.checked)} /> 顯示附近的待安排景點
             </label>
-            {editable && roadLegs && route.slice(1).some((s, k) => s.drive && !roadLegs[k]) && (
+            {editable && roadLegs && route.slice(1).some((s, k) => (s.drive || (softTravel(s.mode) && !s.gap)) && !roadLegs[k]) && (
               <PendingButton className="btn ghost small" pendingLabel="計算中…" onAction={() => computeLegs(route)}>
-                重新計算道路路線
+                重新計算路線
               </PendingButton>
             )}
           </div>
           <p className="map-note">
-            實線是已算好的開車路線；虛線是步行、大眾運輸，或還沒算好的開車路段（直線示意）。
-            {roadLegs && route.slice(1).some((s, k) => s.drive && !roadLegs[k]) ? "有開車路段還沒算出道路路線（可能是今天的 Google 用量上限到了）；可以按「重新計算道路路線」，或明天再打開這天。" : ""}
+            實線是開車路線；虛線是步行或大眾運輸（沿實際路線），還沒算好的路段是直線示意。
+            {roadLegs && route.slice(1).some((s, k) => (s.drive || (softTravel(s.mode) && !s.gap)) && !roadLegs[k]) ? "有路段還沒算出路線（可能是今天的 Google 用量上限到了）；可以按「重新計算路線」，或明天再打開這天。" : ""}
           </p>
         </aside>
       </div>

@@ -142,7 +142,8 @@ export function DayMap({
         const straight: [number, number][][] = [];
         for (let k = 1; k < rs.length; k++) {
           const leg = legsRef.current?.[k - 1];
-          if (leg?.geometry.length) road.push(leg.geometry);
+          // Walking and transit legs follow their real path but stay dashed; driven legs are solid.
+          if (leg?.geometry.length) (leg.source.startsWith("google-routes-") ? straight : road).push(leg.geometry);
           else straight.push([rs[k - 1].pt, rs[k].pt]);
         }
         const red = cssVar("--vermilion", "#b83a2e");

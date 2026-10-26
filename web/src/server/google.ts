@@ -144,8 +144,20 @@ export function decodePolyline(s: string): Pt[] {
   return out;
 }
 
-/** Driving legs for consecutive points via Routes API computeRoutes (one call per point list). */
-export async function googleLegs(points: Pt[], f: GFetch = defaultFetch): Promise<{ distanceM: number; durationS: number; geometry: Pt[]; source: string }[]> {
+export type TravelMode = "driving" | "walking" | "transit";
+const G_MODE: Record<TravelMode, string> = { driving: "DRIVE", walking: "WALK", transit: "TRANSIT" };
+
+/**
+ * Legs for consecutive points via Routes API computeRoutes (one call per point list). Walking and transit
+ * legs (Kai 2026-10-27: every leg follows the real way) are asked one pair at a time: transit takes no
+ * intermediate stops.
+ */
+export async function googleLegs(points: Pt[], f: GFetch = defaultFetch, travel: TravelMode = "driving"): Promise<{ distanceM: number; durationS: number; geometry: Pt[]; source: string }[]> {
+  if (travel !== "driving" && points.length > 2) {
+    const out = [];
+    for (let k = 1; k < points.length; k++) out.push(...(await googleLegs([points[k - 1], points[k]], f, travel)));
+    return out;
+  }
   const key = googleKey();
   if (!key) throw new Error("no google key");
   const wp = (p: Pt) => ({ location: { latLng: { latitude: p[0], longitude: p[1] } } });
@@ -155,7 +167,7 @@ export async function googleLegs(points: Pt[], f: GFetch = defaultFetch): Promis
     {
       method: "POST",
       headers: { "content-type": "application/json", "X-Goog-Api-Key": key, "X-Goog-FieldMask": "routes.legs.distanceMeters,routes.legs.duration,routes.legs.polyline.encodedPolyline" },
-      body: JSON.stringify({ origin: wp(points[0]), destination: wp(points.at(-1)!), intermediates: points.slice(1, -1).map(wp), travelMode: "DRIVE" }),
+      body: JSON.stringify({ origin: wp(points[0]), destination: wp(points.at(-1)!), ...(travel === "driving" ? { intermediates: points.slice(1, -1).map(wp) } : {}), travelMode: G_MODE[travel] }),
     },
     f,
   );
@@ -165,7 +177,7 @@ export async function googleLegs(points: Pt[], f: GFetch = defaultFetch): Promis
     distanceM: Math.round(l.distanceMeters ?? 0),
     durationS: Math.round(Number(String(l.duration ?? "0s").replace(/s$/, "")) || 0),
     geometry: l.polyline?.encodedPolyline ? decodePolyline(l.polyline.encodedPolyline) : [],
-    source: "google-routes",
+    source: travel === "driving" ? "google-routes" : `google-routes-${travel}`,
   }));
 }
 

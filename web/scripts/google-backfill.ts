@@ -3,7 +3,7 @@ import type { Owner } from "../src/server/owner";
 import { getLookup } from "../src/server/cache";
 import { findPlaceId, googleKey, sameRef, type PlaceRef } from "../src/server/google";
 import { getLegs, type Pt } from "../src/server/routes";
-import { routeStops, stopsOf, type Stop } from "../src/components/useLegs";
+import { routeStops, softTravel, stopsOf, type Stop } from "../src/components/useLegs";
 import { dayEnds, stayPin } from "../src/domain/home-pins";
 import { homeStayKey } from "../src/domain/stay";
 import { listPrice } from "../src/server/usage";
@@ -76,13 +76,24 @@ async function main() {
     for (let a = 0; a < r.length - 1; a += 24) out.push(r.slice(a, a + 25));
     return out;
   });
+  // Walking and transit legs too (Kai 2026-10-27), one pair at a time, scheduled days only.
+  const soft: { pts: Pt[]; mode: "walking" | "transit" }[] = [];
+  for (const d of doc.days) {
+    const st = routeStops(d.items, dayEnds(doc, d.date));
+    for (let i = 1; i < st.length; i++) {
+      const m = st[i].drive ? null : softTravel(st[i].mode);
+      if (m && !st[i].gap) soft.push({ pts: [st[i - 1].pt, st[i].pt], mode: m });
+    }
+  }
+  const softPending: typeof soft = [];
+  for (const c of soft) if (!(await getLegs(c.pts, { compute: false, mode: c.mode })).legs[0]) softPending.push(c);
   const pending: Pt[][] = [];
   for (const c of chunks) {
     const r = await getLegs(c, { compute: false });
     if (r.legs.some((l) => !l || (l.source !== "google-routes" && l.source !== "same-place"))) pending.push(c);
   }
 
-  console.log(`trip v${cur.versionNo}: ${todo.length} activities need a place id (of ${items.length} with a position); ${pending.length} of ${chunks.length} driving runs need Google routes`);
+  console.log(`trip v${cur.versionNo}: ${todo.length} activities need a place id (of ${items.length} with a position); ${pending.length} of ${chunks.length} driving runs need Google routes; ${softPending.length} of ${soft.length} walking/transit legs need routes`);
   console.log(`estimated list price: places search US$${listPrice("places_search", todo.length)} (Text Search Pro, 5,000 free a month), routes US$${listPrice("routes", pending.length)} before free monthly calls`);
   if (!write) return console.log("dry run: add --write to call Google");
 
@@ -107,6 +118,16 @@ async function main() {
       legs += r.computed;
     } catch (e) {
       console.log(`stopped at routes (${routes} done): ${(e as Error).message}`);
+      break;
+    }
+  }
+  for (const c of softPending) {
+    try {
+      const r = await getLegs(c.pts, { compute: true, provider: "google", mode: c.mode });
+      routes++;
+      legs += r.computed;
+    } catch (e) {
+      console.log(`stopped at ${c.mode} legs (${routes} route calls done): ${(e as Error).message}`);
       break;
     }
   }
