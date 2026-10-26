@@ -19,6 +19,7 @@ import { fmtDay, mins, money } from "@/domain/format";
 import type { Item } from "@/domain/schema";
 import { computeLegs, legLabel, stopsOf, useLegs, type Leg } from "./useLegs";
 import { nightStay } from "@/domain/stay";
+import { dayEnds } from "@/domain/home-pins";
 import { GooglePhoto } from "./GooglePhoto";
 import { PlaceGallery } from "./PlaceGallery";
 
@@ -308,6 +309,11 @@ export function DaysView({ active }: { active: boolean }) {
                 第 {currentDay + 1} 天・{fmtDay(d.date)}・{seg?.name}
               </div>
               <h2>{dayTitle(raw)}</h2>
+              {night !== "none" && st.name && (
+                <p className="tonight small">
+                  <Icon name="home" size={14} /> 今晚住：{st.home ? (st.name === "住處" ? "住處" : "UTAS 公寓") : st.name}
+                </p>
+              )}
               {editable && (
                 <p className="title-pin small">
                   {raw.titlePinned ? "標題已固定" : "標題依當天活動自動產生"}{" "}
@@ -646,6 +652,7 @@ export function DaysView({ active }: { active: boolean }) {
         <aside className="day-map-wrap">
           <DayMap
             day={d}
+            ends={dayEnds(doc, d.date)}
             active={active}
             focusId={focusId}
             nearby={nearby

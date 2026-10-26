@@ -187,3 +187,30 @@ describe("owner-only notes and categories", () => {
     expect(ok.ok && ok.doc.days[0].items[0].cat).toBe("wildlife");
   });
 });
+
+describe("home base privacy", () => {
+  it("public visitors get no stay positions or home name; share links get positions rounded to ~300 m", () => {
+    const doc = seedDoc();
+    Object.assign(doc.stays.utas, { home: true, lat: -42.87991, lng: 147.32469 });
+    doc.days.find((d) => d.seg === "tas")!.items.push({ ...doc.days[0].items[0], id: "x-home", name: "機場前往 UTAS 公寓入住" });
+    const pub = toPublicDoc(doc);
+    const s = JSON.stringify(pub);
+    expect(s).not.toMatch(/UTAS|utas|-42\.8799|147\.3246/);
+    expect((pub.stays as Record<string, { name: string }>).home.name).toBe("住處");
+    const share = toPublicDoc(doc, { photos: true });
+    const st = share.stays.utas as { lat?: number; lng?: number; name: string };
+    expect(st.name).toBe("UTAS Hobart Apartments");
+    expect(Math.abs(st.lat! - -42.87991)).toBeLessThan(0.003);
+    expect(st.lat).not.toBe(-42.87991);
+    expect(JSON.stringify(share)).not.toContain("147.32469");
+  });
+
+  it("every Tasmania night is the home base unless a chosen plan or a stay note says otherwise", async () => {
+    const { nightStay } = await import("@/domain/stay");
+    const doc = seedDoc();
+    Object.assign(doc.stays.utas, { home: true });
+    const day = { ...doc.days.find((d) => d.seg === "tas")!, stay: "cradle", items: [] };
+    expect(nightStay({ ...doc, tripOptions: [] }, day)).toBe("utas");
+    expect(nightStay({ ...doc, tripOptions: [] }, { ...day, items: [{ ...doc.days[0].items[0], name: "住宿：搖籃山附近" }] })).toBe("cradle");
+  });
+});

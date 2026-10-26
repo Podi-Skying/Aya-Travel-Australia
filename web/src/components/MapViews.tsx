@@ -7,6 +7,7 @@ import { PRI, useReducedMotion } from "./ui";
 import type { EffectiveDay } from "@/domain/effective-day";
 import { iconSvg } from "./Icon";
 import { routeCredit, stopsOf, useLegs } from "./useLegs";
+import { HOUSE_SVG, type StayPin } from "@/domain/home-pins";
 
 /*
  * Leaflet is loaded only in the browser. If it or the tiles fail, the itinerary
@@ -54,13 +55,21 @@ export function DayMap({
   focusId,
   nearby = [],
   onAdd,
+  ends = { start: null, end: null },
 }: {
   day: EffectiveDay;
   active: boolean;
   focusId: string | null;
   nearby?: MapExtra[];
   onAdd?: (key: string, id: string) => unknown;
+  /** Where the day starts and ends (last night's and tonight's stay), drawn as the 住處 landmark. */
+  ends?: { start: StayPin | null; end: StayPin | null };
 }) {
+  const endsRef = useRef(ends);
+  useEffect(() => {
+    endsRef.current = ends;
+  });
+  const endsKey = [ends.start, ends.end].map((p) => (p ? `${p.key}:${p.lat}:${p.lng}` : "-")).join("|");
   const box = useRef<HTMLDivElement>(null);
   const map = useRef<Leaflet.Map | null>(null);
   const layer = useRef<Leaflet.LayerGroup | null>(null);
@@ -84,7 +93,7 @@ export function DayMap({
     legsRef.current = legs;
   });
   const legsKey = legs ? legs.map((l) => (l ? l.durationS : "-")).join(",") : "";
-  const sig = `${legsKey}|${day.date}|${day.seg}|${day.items.map((i) => `${i.id}:${i.lat}:${i.lng}:${i.time}:${i.name}:${i.pri}`).join(",")}|${nearby.map((n) => [n.id, n.key, n.lat, n.lng, n.name, n.sub, n.photo ?? "", n.icon ?? ""].join("~")).join(",")}|${onAdd ? 1 : 0}`;
+  const sig = `${endsKey}|${legsKey}|${day.date}|${day.seg}|${day.items.map((i) => `${i.id}:${i.lat}:${i.lng}:${i.time}:${i.name}:${i.pri}`).join(",")}|${nearby.map((n) => [n.id, n.key, n.lat, n.lng, n.name, n.sub, n.photo ?? "", n.icon ?? ""].join("~")).join(",")}|${onAdd ? 1 : 0}`;
 
   useEffect(() => {
     if (!active || !box.current) return;
@@ -131,6 +140,19 @@ export function DayMap({
           else path.push(p);
         });
         if (path.length > 1) L.polyline(path, { color: cssVar("--vermilion", "#b83a2e"), weight: 4, opacity: 0.9, className: legsRef.current?.some(Boolean) ? "" : "route-anim" }).addTo(layer.current).bringToBack();
+        // The day starts at last night's stay and ends at tonight's (dashed, not a computed route).
+        const { start, end } = endsRef.current;
+        for (const p of [start, end].filter((x, k, a): x is StayPin => !!x && a.findIndex((y) => y?.key === x.key) === k)) {
+          L.marker([p.lat, p.lng], { icon: L.divIcon({ className: "home-hit", html: `<span class="home-pin${p.home ? " base" : ""}">${HOUSE_SVG}</span>`, iconSize: [44, 44] }), keyboard: true, title: p.home ? "住處" : `住宿：${p.name}`, zIndexOffset: 800 })
+            .addTo(layer.current!)
+            .bindPopup(`<strong>${p.home ? "住處" : "住宿"}</strong><br>${esc(p.name)}`);
+          pts.push([p.lat, p.lng]);
+        }
+        const first = path[0] ?? null;
+        const last = path.at(-1) ?? null;
+        const dash = { color: cssVar("--vermilion", "#b83a2e"), weight: 2, opacity: 0.6, dashArray: "2 6" };
+        if (start && first) L.polyline([[start.lat, start.lng], first], dash).addTo(layer.current!);
+        if (end && last) L.polyline([last, [end.lat, end.lng]], dash).addTo(layer.current!);
         nearbyRef.current.forEach((n) => {
           const add = addRef.current ? `<button type="button" class="btn small" data-add-key="${esc(n.key)}" data-add-id="${esc(n.id)}">加入這天</button>` : "";
           // 44px hit area around a 26px ring.
