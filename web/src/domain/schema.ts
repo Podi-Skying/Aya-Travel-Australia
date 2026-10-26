@@ -274,6 +274,8 @@ export const tripDocSchema = z
     attractionPool: z.array(packageSchema).max(60).default([]),
     skyWatch: skyWatchSchema.default({ links: [], posts: [] }),
     tripOptions: z.array(tripOptionSchema).max(12).default([]),
+    /** Other translated text (stay names and notes, package notes, cost notes…), as pairs so redaction reaches the source too. */
+    textTr: z.array(z.object({ zh: z.string().max(3000), en: z.string().max(3000).optional(), ja: z.string().max(3000).optional() })).max(800).optional(),
     /** Chapters of the removed 3D page (2026-10-26); kept so stored documents still parse. */
     journey: z
       .object({

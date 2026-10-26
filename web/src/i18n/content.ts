@@ -7,7 +7,7 @@ import type { TripDoc } from "@/domain/schema";
 
 type Tr = { tr?: Partial<Record<"en" | "ja", Record<string, string | string[] | undefined>>> };
 
-export function contentDict(doc: Pick<TripDoc, "days" | "attractionPool" | "tripOptions">): Record<"en" | "ja", Record<string, string>> {
+export function contentDict(doc: Pick<TripDoc, "days" | "attractionPool" | "tripOptions" | "textTr">): Record<"en" | "ja", Record<string, string>> {
   const out: Record<"en" | "ja", Record<string, string>> = { en: {}, ja: {} };
   const add = (o: Tr | undefined, field: string, zh: string | undefined) => {
     if (!o?.tr || !zh) return;
@@ -33,6 +33,10 @@ export function contentDict(doc: Pick<TripDoc, "days" | "attractionPool" | "trip
         if (Array.isArray(v) && v[k]) out[l][od.title.trim()] = v[k];
       }
     });
+  }
+  for (const p of doc.textTr ?? []) {
+    if (p.en) out.en[p.zh.trim()] = p.en;
+    if (p.ja) out.ja[p.zh.trim()] = p.ja;
   }
   return out;
 }
