@@ -2,7 +2,9 @@ import { getCurrentTrip } from "../src/server/trips";
 import type { Owner } from "../src/server/owner";
 import { commonsPhotos } from "../src/server/commons";
 import { getLookup } from "../src/server/cache";
-import { sameRef, type PlaceRef } from "../src/server/google";
+import { googleKey, sameRef, type PlaceRef } from "../src/server/google";
+import { galleryPhotos } from "../src/domain/gallery";
+import type { Photo } from "../src/domain/schema";
 
 /*
  * Gallery photos backfill (docs/PLAN-2026-10-26-galleries.md), run by hand:
@@ -27,19 +29,24 @@ async function main() {
     if (i.lat != null && i.lng != null) {
       const before = await commonsPhotos(i.id, i.name, i.lat, i.lng, { search: false }).catch(() => null);
       if (before === null && write) {
-        commons = (await commonsPhotos(i.id, i.name, i.lat, i.lng, { search: true }).catch(() => [])) ?? [];
+        // Polite to the Commons API: one search every 1.5 s, one retry after 10 s when refused.
+        commons = (await commonsPhotos(i.id, i.name, i.lat, i.lng, { search: true }).catch(async () => {
+          await sleep(10_000);
+          return commonsPhotos(i.id, i.name, i.lat!, i.lng!, { search: true }).catch(() => []);
+        })) ?? [];
         searched++;
-        await sleep(400); // polite to the Commons API
+        await sleep(1_500);
       } else commons = before ?? [];
     }
-    const own = (i.photo ? 1 : 0) + (i.gallery?.length ?? 0);
+    // Same assembly (and de-duplication) as the gallery itself.
+    const share = galleryPhotos(i, commons as Photo[]).length;
     const ref = await getLookup<PlaceRef>("place-id", i.id).catch(() => null);
-    const google = ref?.value.placeId && sameRef(ref.value, i.name, i.lat, i.lng) ? 6 : 0;
-    rows.push({ name: i.name, share: own + commons.length, owner: own + commons.length + google });
+    const google = ref?.value.placeId && sameRef(ref.value, i.name, i.lat, i.lng) && googleKey() ? 6 : 0;
+    rows.push({ name: i.name, share, owner: share + google });
   }
   const five = (k: "share" | "owner") => rows.filter((r) => r[k] >= 5).length;
-  console.log(`${searched} Commons searches. ${rows.length} activities: ${five("share")} have 5+ photos for share links, ${five("owner")} for the owner (Google up to 6 each, live).`);
-  for (const r of rows.filter((x) => x.owner < 5 || x.share < 5)) console.log(`  under 5 — share ${r.share}, owner ${r.owner}: ${r.name}`);
+  console.log(`${searched} Commons searches. ${rows.length} activities: ${five("share")} have 5+ photos for share links; for the owner up to ${five("owner")} (an upper bound: Google returns up to 6 live, sometimes fewer).`);
+  for (const r of rows.filter((x) => x.owner < 5 || x.share < 5)) console.log(`  under 5 — share ${r.share}, owner up to ${r.owner}: ${r.name}`);
 }
 
 main()

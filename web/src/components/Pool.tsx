@@ -54,7 +54,7 @@ function PackageCard({ pkg }: { pkg: Package }) {
       <ul>
         {pkg.items.map((i) => (
           <li key={i.id}>
-            {mode === "owner" && !i.photo && i.lat != null && <GooglePhoto itemId={i.id} alt={i.name} className="pool-gphoto" />}
+            {mode === "owner" && !i.photo && i.lat != null && <GooglePhoto item={i} alt={i.name} className="pool-gphoto" />}
             <strong>{i.name}</strong> <Badge {...PRI[i.pri]} />
             <br />
             <span className="small muted">

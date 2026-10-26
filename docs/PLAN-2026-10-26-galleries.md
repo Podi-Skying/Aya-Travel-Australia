@@ -95,3 +95,14 @@ Builder: Claude. Plan review and inspection: Codex.
   - The release reports every activity under 5, separately for share links and for the owner. The way to close the gap for share links (allowing Google photos there) is put to Kai with its cost.
 - **CACHE-01, accepted.** Commons entries store name, lat and lng. A changed activity reads as missing, and the backfill searches it again.
 - **WEBGL-01, accepted.** Without WebGL2 the gallery shows a plain scrolling strip, with the same credits.
+
+## Inspection 1: dispositions
+
+- **GOOGLE-01, accepted.**
+  - `client/photos.ts` shares one Google request per activity (Place Details + up to 6 photos = 7 calls) between the small photo and the gallery.
+  - The cap of 400 is kept: about 57 activities' galleries per day.
+- **GALLERY-01, partly accepted.**
+  - The plan-wide carousel now includes each stop's cached Commons photos (up to 3 per stop).
+  - Live Google photos stay in each stop's own gallery, so opening a plan does not cost about 7 Google calls per stop.
+- **CACHE-01, accepted.** The client cache key and effect dependencies include the name and position.
+- **COVERAGE-01, accepted.** The report counts unique photos using the gallery's own assembly. The owner number is labelled as an upper bound, and Google is counted only when a key is configured.

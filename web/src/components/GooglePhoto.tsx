@@ -1,38 +1,29 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api } from "@/client/api";
 import { Icon } from "./Icon";
+import { googleFor } from "@/client/photos";
 
 /*
  * Google place photo for an activity without its own photo (owner only; docs/PLAN-2026-10-26-google.md).
- * The server resolves it live (photo names may not be cached) and the attribution Google requires is
- * shown under it: the photo's authors and a Google Maps link.
+ * It shares one request per activity with the gallery (client/photos.ts), and shows the attribution
+ * Google requires: the photo's authors and a Google Maps link.
  */
-type G = { photoUri: string; attributions: { name: string; uri?: string }[]; mapsUri: string };
 
-/** Photo URIs are temporary: answers are reused for 25 minutes, failures are not kept. */
-const memo = new Map<string, { at: number; p: Promise<G | null> }>();
-const TTL = 25 * 60_000;
+type Ref = { id: string; name: string; lat?: number; lng?: number };
 
-export function GooglePhoto({ itemId, alt, className }: { itemId: string; alt: string; className?: string }) {
-  const [g, setG] = useState<{ id: string; v: G | null } | null>(null);
+export function GooglePhoto({ item, alt, className }: { item: Ref; alt: string; className?: string }) {
+  const key = `${item.id}|${item.name}|${item.lat}|${item.lng}`;
+  const [g, setG] = useState<{ key: string; v: Awaited<ReturnType<typeof googleFor>>[number] | null } | null>(null);
   const [broken, setBroken] = useState(false);
   useEffect(() => {
     let live = true;
-    const m = memo.get(itemId);
-    let p = m && Date.now() - m.at < TTL ? m.p : undefined;
-    if (!p) {
-      p = api<G>(`/api/place-photo?item=${encodeURIComponent(itemId)}`).then((r) => (r.ok ? r.data : null));
-      memo.set(itemId, { at: Date.now(), p });
-      void p.then((v) => !v && memo.delete(itemId));
-    }
-    void p.then((v) => live && setG({ id: itemId, v }));
+    void googleFor({ id: item.id, name: item.name, lat: item.lat, lng: item.lng }).then((v) => live && setG({ key, v: v[0] ?? null }));
     return () => {
       live = false;
     };
-  }, [itemId]);
-  const v = g?.id === itemId ? g.v : null;
+  }, [key, item.id, item.name, item.lat, item.lng]);
+  const v = g?.key === key ? g.v : null;
   if (!v || broken) return null;
   return (
     <figure className={`g-photo ${className ?? ""}`}>

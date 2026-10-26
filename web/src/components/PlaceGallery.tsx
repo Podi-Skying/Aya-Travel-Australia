@@ -3,7 +3,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useTrip } from "./TripApp";
 import { Icon } from "./Icon";
-import { api } from "@/client/api";
+import { commonsFor, googleFor } from "@/client/photos";
 import {
   galleryPhotos,
   type GalleryPhoto,
@@ -17,31 +17,6 @@ import FlexCarousel from "./flex-carousel/FlexCarousel";
  * Kai's configuration. It mounts only when opened (each one is a WebGL canvas). Every photo's source
  * is a link icon below; Google photos keep their authors' names as Google requires.
  */
-
-const memo = new Map<
-  string,
-  { at: number; p: Promise<{ commons: Photo[]; google: GoogleShot[] }> }
->();
-const TTL = 20 * 60_000;
-
-function load(itemId: string, owner: boolean, token?: string) {
-  const key = `${itemId}|${owner}|${token ?? ""}`;
-  const m = memo.get(key);
-  if (m && Date.now() - m.at < TTL) return m.p;
-  const qs = `item=${encodeURIComponent(itemId)}${token ? `&token=${encodeURIComponent(token)}` : ""}`;
-  const p = Promise.all([
-    api<{ commons: Photo[] }>(`/api/photos?${qs}`).then((r) =>
-      r.ok ? r.data.commons : [],
-    ),
-    owner
-      ? api<{ photos: GoogleShot[] }>(
-          `/api/place-photos?item=${encodeURIComponent(itemId)}`,
-        ).then((r) => (r.ok ? r.data.photos : []))
-      : Promise.resolve([]),
-  ]).then(([commons, google]) => ({ commons, google }));
-  memo.set(key, { at: Date.now(), p });
-  return p;
-}
 
 /** FlexCarousel needs WebGL2; without it the gallery is a plain scrolling strip. */
 let webgl2: boolean | null = null;
@@ -143,17 +118,18 @@ export function PlaceGallery({ item }: { item: Item }) {
     google: GoogleShot[];
   } | null>(null);
   const owner = mode === "owner";
+  // Name and position are part of the key: a renamed or moved activity asks the server again.
+  const ref = `${item.id}|${item.name}|${item.lat}|${item.lng}`;
   useEffect(() => {
     if (!open) return;
     let live = true;
-    void load(item.id, owner, token).then(
-      (d) => live && setData({ id: item.id, ...d }),
-    );
+    const r = { id: item.id, name: item.name, lat: item.lat, lng: item.lng };
+    void Promise.all([commonsFor(r, token), owner ? googleFor(r) : Promise.resolve([])]).then(([commons, google]) => live && setData({ id: ref, commons, google }));
     return () => {
       live = false;
     };
-  }, [open, item.id, owner, token]);
-  const ready = data?.id === item.id ? data : null;
+  }, [open, ref, item.id, item.name, item.lat, item.lng, owner, token]);
+  const ready = data?.id === ref ? data : null;
   const photos = galleryPhotos(item, ready?.commons, ready?.google);
   return (
     <div className="place-gallery">

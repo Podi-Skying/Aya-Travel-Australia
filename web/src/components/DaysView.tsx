@@ -439,7 +439,7 @@ export function DaysView({ active }: { active: boolean }) {
                           {i.photo && i.id !== dayHero?.id && (
                             <ActPhoto id={i.id} name={i.name} photo={i.photo} caption={false} onOpen={() => setViewer(dayPhotos.findIndex((p) => p.id === i.id))} />
                           )}
-                          {!i.photo && owner && i.lat != null && <GooglePhoto itemId={i.id} alt={i.name} className="act-gphoto" />}
+                          {!i.photo && owner && i.lat != null && <GooglePhoto item={i} alt={i.name} className="act-gphoto" />}
                         </div>
                         {i.note && <ActNote text={i.note} />}
                         {i.ownerNote && (

@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { commonsFor } from "@/client/photos";
 import { useTrip } from "./TripApp";
 import { AvatarStack } from "./People";
 import { Badge, PendingButton } from "./ui";
@@ -25,7 +26,7 @@ import { GooglePhoto } from "./GooglePhoto";
 import { Carousel, PlaceGallery } from "./PlaceGallery";
 import { galleryPhotos } from "@/domain/gallery";
 import { dayNightLabel, optionCard, optionPalette, type OptionCard } from "@/domain/options";
-import { OPTION_THEMES } from "@/domain/schema";
+import { OPTION_THEMES, type Photo } from "@/domain/schema";
 import { fmtDay, fmtMD, money } from "@/domain/format";
 
 /*
@@ -90,6 +91,21 @@ export function TripOptions() {
 function OptionDetail({ c }: { c: OptionCard }) {
   const { doc, mode, online, runOpUndoable, ask, counts, gotoDay } = useTrip();
   const [broken, setBroken] = useState<Set<string>>(() => new Set());
+  const { token } = useTrip();
+  const [commons, setCommons] = useState<Record<string, Photo[]>>({});
+  const stopsKey = c.items.flat().map((it) => `${it.id}|${it.name}|${it.lat}|${it.lng}`).join(",");
+  useEffect(() => {
+    let live = true;
+    const stops = c.items.flat();
+    void Promise.all(stops.map((it) => commonsFor({ id: it.id, name: it.name, lat: it.lat, lng: it.lng }, token))).then(
+      (lists) => live && setCommons(Object.fromEntries(stops.map((it, k) => [it.id, lists[k]]))),
+    );
+    return () => {
+      live = false;
+    };
+    // stopsKey captures the stops' identity, names and positions.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stopsKey, token]);
   const o = c.option;
   const ids = new Set(o.days.flatMap((d) => d.itemIds));
   // Votes follow the activity: include votes recorded on a date it has since moved away from.
@@ -137,8 +153,9 @@ function OptionDetail({ c }: { c: OptionCard }) {
       </p>
       {o.summary && <p className="small muted">{o.summary}</p>}
       {(() => {
-        // The plan's stops in one gallery (their own and Kai-supplied photos); each stop has its own below.
-        const shots = c.items.flat().flatMap((it) => galleryPhotos(it));
+        // The plan's stops in one gallery: own, Kai-supplied and cached Commons photos (up to 3 each).
+        // Live Google photos stay in each stop's own gallery below, to keep Google calls per view low.
+        const shots = c.items.flat().flatMap((it) => galleryPhotos(it, commons[it.id] ?? []).slice(0, 3));
         return shots.length > 1 ? <Carousel key={o.key} photos={shots} label={`${o.title} 的景點照片`} /> : null;
       })()}
       <ol className="opt-days">
@@ -161,7 +178,7 @@ function OptionDetail({ c }: { c: OptionCard }) {
                         </figcaption>
                       </figure>
                     ) : mode === "owner" ? (
-                      <GooglePhoto itemId={it.id} alt={it.name} />
+                      <GooglePhoto item={it} alt={it.name} />
                     ) : (
                       <div className="plan-stop-noimg" aria-hidden="true" />
                     )}
