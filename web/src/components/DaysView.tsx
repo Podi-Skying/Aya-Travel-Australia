@@ -481,7 +481,7 @@ export function DaysView({ active }: { active: boolean }) {
                               {i.cost && i.cost.status !== "unknown" && <span>{money(lineAmount(i.cost, N))}</span>}
                             </div>
                           </div>
-                          {i.id !== dayHero?.id && !isLogistics(i) && !i.name.startsWith("住宿：") && (i.photo || ((owner || token) && i.lat != null)) && (
+                          {i.id !== dayHero?.id && !isLogistics(i) && !i.name.startsWith("住宿：") && (i.photo || i.gallery?.length || ((owner || token) && i.lat != null)) && (
                             <PlaceGallery item={i} className="act-thumb" empty="hide" />
                           )}
                         </div>

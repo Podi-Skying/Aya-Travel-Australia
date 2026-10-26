@@ -43,3 +43,10 @@
   - the Maria Island card goes 1 / 6+ → 2 / 6+ on tap and back on ←, with no dialog;
   - QVMAG shows its category tile when no Commons list is cached locally;
   - 畫廊 shows 35 visible planes, 35 distinct, with no backdrop.
+
+## Inspection 1: dispositions (all accepted)
+
+- **R1.** Each photo shows the camera tile until its image has actually loaded. A photo that fails drops out of the card's list, and the category tile shows when none is left. The quiz preloads each card image off-screen: the camera shows until it arrives and the category icon if it fails. Each URL is asked once and never cancelled, so no card stays loading.
+- **R2.** 每日行程 rows with only gallery photos (no main photo, no position) now show them.
+- **R3.** Cards request nothing (image, preload, Commons or Google) until they come within 200 px of the screen; hidden tabs never do. Images also carry `loading="lazy"`.
+- **R4.** Commons identity keeps the file name's case (only the first letter is case-insensitive on Commons).

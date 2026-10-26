@@ -97,6 +97,10 @@ export function PlaceGallery({ item, className = "", empty = "tile" }: { item: I
   const [idx, setIdx] = useState(0);
   const [dir, setDir] = useState<1 | -1>(1);
   const boxRef = useRef<HTMLDivElement>(null);
+  // Nothing is requested before the card is near the screen (hidden tabs stay mounted).
+  const [seen, setSeen] = useState(false);
+  const [broken, setBroken] = useState<Set<string>>(() => new Set());
+  const [loaded, setLoaded] = useState<Set<string>>(() => new Set());
   const swipe = useRef<{ x: number; y: number; used: boolean } | null>(null);
 
   const own = galleryPhotos(item, undefined, undefined).length;
@@ -105,23 +109,30 @@ export function PlaceGallery({ item, className = "", empty = "tile" }: { item: I
 
   useEffect(() => {
     const el = boxRef.current;
-    if (!privateView || !el) return;
-    let live = true;
-    const io = new IntersectionObserver((es) => {
-      if (!es.some((e) => e.isIntersecting)) return;
-      io.disconnect();
-      void commonsFor(r, token).then((list) => {
-        if (!live) return;
-        setCommons({ id: ref, list });
-        if (!own && !list.length) setWantGoogle(true);
-      });
-    });
+    if (seen || !el) return;
+    const io = new IntersectionObserver(
+      (es) => {
+        if (!es.some((e) => e.isIntersecting)) return;
+        io.disconnect();
+        setSeen(true);
+      },
+      { rootMargin: "200px" },
+    );
     io.observe(el);
+    return () => io.disconnect();
+  }, [seen]);
+  useEffect(() => {
+    if (!seen || !privateView) return;
+    let live = true;
+    void commonsFor(r, token).then((list) => {
+      if (!live) return;
+      setCommons({ id: ref, list });
+      if (!own && !list.length) setWantGoogle(true);
+    });
     return () => {
       live = false;
-      io.disconnect();
     };
-  }, [privateView, ref, r, token, own]);
+  }, [seen, privateView, ref, r, token, own]);
   useEffect(() => {
     if (!wantGoogle || !googleOk) return;
     let live = true;
@@ -131,25 +142,26 @@ export function PlaceGallery({ item, className = "", empty = "tile" }: { item: I
     };
   }, [wantGoogle, googleOk, ref, r, token]);
 
-  const photos = galleryPhotos(item, c, g);
+  // Photos that failed to load drop out; when none is left the category tile shows.
+  const photos = galleryPhotos(item, c, g).filter((x) => !broken.has(x.src));
   const commonsPending = privateView && c === undefined;
   const googlePending = googleOk && wantGoogle && g === undefined;
   const more = googleOk && g === undefined && !wantGoogle; // Google may add photos at the end
   const cur = photos.length ? Math.min(idx, photos.length - 1) : 0;
   const p = photos[cur];
 
-  // Preload the next photo so the switch is instant.
+  // Preload the next photo so the switch is instant (only for a card on screen).
+  const nextSrc = photos.length > 1 ? photos[(cur + 1) % photos.length].src : null;
   useEffect(() => {
-    const next = photos[(cur + 1) % Math.max(1, photos.length)];
-    if (next && photos.length > 1) {
-      const im = new Image();
-      im.referrerPolicy = "no-referrer";
-      im.src = cardSrc(next.src);
-    }
-  }, [cur, photos]);
+    if (!seen || !nextSrc) return;
+    const im = new Image();
+    im.referrerPolicy = "no-referrer";
+    im.src = cardSrc(nextSrc);
+  }, [seen, nextSrc]);
 
+  if (!seen) return <div ref={boxRef} className={`pg-card ${className}`}>{empty === "hide" && !own ? null : <LoadingTile />}</div>;
   if (!p) {
-    if ((commonsPending && !own) || googlePending) return <div ref={boxRef} className={`pg-card ${className}`}><LoadingTile /></div>;
+    if (commonsPending || googlePending) return <div ref={boxRef} className={`pg-card ${className}`}><LoadingTile /></div>;
     return empty === "hide" ? <div ref={boxRef} className="pg-probe" /> : <div ref={boxRef} className={`pg-card ${className}`}><EmptyTile item={item} /></div>;
   }
 
@@ -200,7 +212,19 @@ export function PlaceGallery({ item, className = "", empty = "tile" }: { item: I
         onPointerUp={onUp}
       >
         {/* eslint-disable-next-line @next/next/no-img-element -- photos from several hosts */}
-        <img key={p.src} className={`pg-img in-${dir > 0 ? "next" : "prev"}`} src={cardSrc(p.src)} alt={p.alt} referrerPolicy="no-referrer" draggable={false} decoding="async" />
+        <img
+          key={p.src}
+          className={`pg-img in-${dir > 0 ? "next" : "prev"}${loaded.has(p.src) ? "" : " is-loading"}`}
+          src={cardSrc(p.src)}
+          alt={p.alt}
+          referrerPolicy="no-referrer"
+          draggable={false}
+          decoding="async"
+          loading="lazy"
+          onLoad={() => setLoaded((s) => new Set(s).add(p.src))}
+          onError={() => setBroken((s) => new Set(s).add(p.src))}
+        />
+        {!loaded.has(p.src) && <LoadingTile />}
         {multi && (
           <span className="pg-chip" aria-hidden="true">
             <Icon name="image" size={12} /> {cur + 1} / {total}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useTrip } from "./TripApp";
 import { Icon, iconPath } from "./Icon";
 import { PendingButton, useReducedMotion } from "./ui";
@@ -76,15 +76,36 @@ export function PlanQuiz({ active }: { active: boolean }) {
     // `commons` only filters what is still missing; refetching on its change would loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, places, mode, token]);
-  const photoOf = (i: Item) => {
+  // Each photo is loaded off-screen first: the card shows the camera until it arrives, the category if it fails.
+  const [probe, setProbe] = useState<Record<string, "ok" | "err">>({});
+  const wanted = (i: Item) => {
     const own = i.photo?.url ?? i.gallery?.[0]?.url;
-    if (own) return cardSrc(own);
-    const c = commons[i.id];
-    if (c) return cardSrc(c);
-    return c === undefined && (mode === "owner" || token) ? loadingImg(reduce) : emptyImg(i.cat);
+    return own ? cardSrc(own) : commons[i.id] ? cardSrc(commons[i.id]!) : null;
+  };
+  const photoOf = (i: Item) => {
+    const url = wanted(i);
+    if (url) return probe[url] === "ok" ? url : probe[url] === "err" ? emptyImg(i.cat) : loadingImg(reduce);
+    return commons[i.id] === undefined && (mode === "owner" || token) ? loadingImg(reduce) : emptyImg(i.cat);
   };
   const regions = REGIONS.map((r) => ({ r, list: places.filter((p) => p.region === r.key) })).filter((x) => x.list.length);
   const inRegion = places.filter((p) => p.region === region);
+  const shown = step === 1 ? regions.map(({ list }) => list.find((p) => p.item.photo)?.item ?? list[0].item) : step === 2 ? inRegion.map((p) => p.item) : [];
+  const toProbe = shown.map(wanted).filter((u): u is string => !!u && !(u in probe));
+  const probeKey = toProbe.join("|");
+  const probing = useRef(new Set<string>());
+  useEffect(() => {
+    if (!active || !probeKey) return;
+    // Results land whenever each image answers; a URL is asked once (no cancelling, so none is left loading).
+    for (const u of probeKey.split("|")) {
+      if (probing.current.has(u)) continue;
+      probing.current.add(u);
+      const im = new Image();
+      im.referrerPolicy = "no-referrer";
+      im.onload = () => setProbe((p) => ({ ...p, [u]: "ok" }));
+      im.onerror = () => setProbe((p) => ({ ...p, [u]: "err" }));
+      im.src = u;
+    }
+  }, [active, probeKey]);
   const chosen = inRegion.filter((p) => picked.includes(p.item.id));
   const reg = REGIONS.find((r) => r.key === region);
   const homeAt: [number, number] | null = home ? [home.lat, home.lng] : null;

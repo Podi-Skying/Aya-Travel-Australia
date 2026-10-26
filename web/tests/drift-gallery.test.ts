@@ -21,6 +21,7 @@ describe("drift gallery", () => {
     const a = "https://upload.wikimedia.org/wikipedia/commons/thumb/6/64/Ile_des_Phoques.jpg/1920px-Ile_des_Phoques.jpg";
     const b = "https://upload.wikimedia.org/wikipedia/commons/6/64/Ile_des_Phoques.jpg";
     expect(sameImage(a)).toBe(sameImage(b));
+    expect(sameImage(b)).not.toBe(sameImage(b.replace("Phoques", "phoques")));
     expect(sameImage("/api/media/x/01.webp?token=abc")).toBe(sameImage("/api/media/x/01.webp"));
     const days = [{ date: "2026-11-09", items: [mk("a", "Seals", ph(a, "commons")), mk("b", "Seals again", ph(b, "commons"))] }];
     expect(tripShots(days, [], {})).toHaveLength(1);

@@ -32,7 +32,11 @@ const credit = (p: Photo) => [p.site, p.credit, p.license].filter(Boolean).join(
  */
 export function sameImage(url: string): string {
   const commons = /upload\.wikimedia\.org\/wikipedia\/commons\/(?:thumb\/)?[0-9a-f]\/[0-9a-f]{2}\/([^/?#]+)/i.exec(url);
-  if (commons) return "commons:" + decodeURIComponent(commons[1]).toLowerCase();
+  // Commons titles are case-sensitive except the first letter.
+  if (commons) {
+    const name = decodeURIComponent(commons[1]);
+    return "commons:" + name.charAt(0).toUpperCase() + name.slice(1);
+  }
   return url.replace(/[?#].*$/, "");
 }
 
