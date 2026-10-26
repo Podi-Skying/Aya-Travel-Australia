@@ -5,7 +5,7 @@ import { ConfigNotice, Notice } from "@/components/Notice";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "行程｜南方散步" };
+export const metadata = { title: "行程｜2026澳洲旅程with Aya" };
 
 export default async function Planner() {
   const p = await loadOwnerPage();

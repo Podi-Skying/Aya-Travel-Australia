@@ -4,7 +4,7 @@ import { ConfigNotice, Notice } from "@/components/Notice";
 import { missingConfig } from "@/server/config";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "南方散步（分享）", robots: { index: false, follow: false } };
+export const metadata = { title: "2026澳洲旅程with Aya（分享）", robots: { index: false, follow: false } };
 
 /* Share links open with the walk; the read-only planner with interest voting is at /s/[token]/plan. */
 export default async function SharedWalk({ params }: { params: Promise<{ token: string }> }) {

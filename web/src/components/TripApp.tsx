@@ -4,13 +4,11 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { TripDoc } from "@/domain/schema";
 import type { Op } from "@/domain/ops";
 import { alertStatus } from "@/domain/rules";
-import { dayDiff, fmtDay, fmtMD, fmtTs } from "@/domain/format";
-import { regionsOf, tripTags } from "@/domain/regions";
+import { dayDiff, fmtMD, fmtTs } from "@/domain/format";
 import { withMediaToken } from "@/domain/media";
 import { api, registerServiceWorker } from "@/client/api";
 import { keyFor, loadSnapshot, saveSnapshot, mergeVersions, type VersionMeta } from "@/client/offline";
 import { SiteHeader } from "./SiteHeader";
-import { Icon } from "./Icon";
 import { useAsk, useToast, useHobartToday, useUrlState, withTimeout, writeUrl, type ToastAction } from "./ui";
 import { DaysView } from "./DaysView";
 import { PlacesMap } from "./Places";
@@ -394,9 +392,29 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
       <a className="skip" href="#main">
         跳到主要內容
       </a>
-      <SiteHeader base={base} current="plan" account={mode === "owner" ? "signout" : home ? "signin" : null} />
-      {/* Back to the walk at the selected day (RV-03). */}
-      <Hero doc={doc} mode={mode} gotoDay={gotoDay} walkHref={`${base || "/"}#rw-day-${doc.days[currentDay]?.date ?? ""}`} />
+      {/* The planner's tabs live in the top bar; the logo leads back to the walk (2026-10-26). */}
+      <SiteHeader base={base} current="plan" account={mode === "owner" ? "signout" : home ? "signin" : null}>
+        <nav className="tabs" aria-label="行程分頁">
+          <div className="tabs-inner" role="tablist" ref={tabsRef} onKeyDown={onTabKey}>
+            {visibleTabs.map((t) => (
+              <button
+                key={t.key}
+                id={`tab-${t.key}`}
+                role="tab"
+                type="button"
+                aria-selected={tab === t.key}
+                aria-controls={`panel-${t.key}`}
+                tabIndex={tab === t.key ? 0 : -1}
+                onClick={() => setTab(t.key)}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <div className={`save-bar${busy ? " on" : ""}`} aria-hidden="true" />
+        </nav>
+      </SiteHeader>
+      <Hero doc={doc} />
       {mode === "public" && (
         <div className="banner">
           {canVote ? "你正在檢視 Aya 的旅程（唯讀）。可以對活動按「我有興趣」！" : "你正在檢視 Aya 的旅程（唯讀公開版，住址與司機資訊已隱藏）。"}{" "}
@@ -411,25 +429,6 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
           </button>
         </div>
       )}
-      <nav className="tabs" aria-label="行程分頁">
-        <div className="tabs-inner" role="tablist" ref={tabsRef} onKeyDown={onTabKey}>
-          {visibleTabs.map((t) => (
-            <button
-              key={t.key}
-              id={`tab-${t.key}`}
-              role="tab"
-              type="button"
-              aria-selected={tab === t.key}
-              aria-controls={`panel-${t.key}`}
-              tabIndex={tab === t.key ? 0 : -1}
-              onClick={() => setTab(t.key)}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-        <div className={`save-bar${busy ? " on" : ""}`} aria-hidden="true" />
-      </nav>
       <p className="sr-only" role="status" aria-live="polite">
         {busy ? "正在儲存…" : ""}
       </p>
@@ -484,22 +483,16 @@ function Panel({ id, show, children }: { id: string; show: boolean; children: Re
   );
 }
 
-/**
- * Top banner (2026-10-26, replaces 總覽): title, trip dates, countdown, tags and 途經地區 chips that
- * open the first matching day.
- */
-function Hero({ doc, mode, walkHref, gotoDay }: { doc: TripDoc; mode: Mode; walkHref: string; gotoDay: (i: number) => void }) {
+/** The banner under the top bar (2026-10-26): trip dates and the countdown only. */
+function Hero({ doc }: { doc: TripDoc }) {
   const t = useHobartToday();
   const s = doc.meta.start;
   const e = doc.meta.end;
   const when = !t ? "" : t < s ? `距離出發還有 ${dayDiff(t, s)} 天` : t <= e ? `旅程第 ${dayDiff(s, t) + 1} 天` : "旅程已結束";
-  const regions = regionsOf(doc);
   return (
     <header className="hero" id="top">
       <div className="hero-inner">
-        <p className="eyebrow">{mode === "owner" ? "行程管理・擁有者" : "行程・唯讀瀏覽"}</p>
-        <h1>{doc.meta.title}</h1>
-        <p className="hero-sub">{doc.meta.subtitle}</p>
+        <h1 className="sr-only">{doc.meta.title}</h1>
         <dl className="hero-facts">
           <div>
             <dt>出遊時間</dt>
@@ -514,27 +507,6 @@ function Hero({ doc, mode, walkHref, gotoDay }: { doc: TripDoc; mode: Mode; walk
             </div>
           )}
         </dl>
-        <p className="hero-tags">
-          {tripTags(doc).map((x) => (
-            <span key={x} className="hero-tag">
-              {x}
-            </span>
-          ))}
-        </p>
-        {regions.length > 0 && (
-          <nav className="hero-regions" aria-label="途經地區">
-            {regions.map((r) => (
-              <button key={r.name} type="button" onClick={() => gotoDay(r.dayIdx)} aria-label={`${r.name}：看 ${fmtDay(doc.days[r.dayIdx].date)}`}>
-                {r.name}
-              </button>
-            ))}
-          </nav>
-        )}
-        <p className="hero-links">
-          <a className="hero-cta" href={walkHref}>
-            <Icon name="route" /> 回到散步
-          </a>
-        </p>
       </div>
     </header>
   );

@@ -4,7 +4,7 @@ import { ConfigNotice, Notice } from "@/components/Notice";
 import { missingConfig } from "@/server/config";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "行程（唯讀分享）｜南方散步", robots: { index: false, follow: false } };
+export const metadata = { title: "行程（唯讀分享）｜2026澳洲旅程with Aya", robots: { index: false, follow: false } };
 
 export default async function SharedPlanner({ params }: { params: Promise<{ token: string }> }) {
   const missing = missingConfig("public");

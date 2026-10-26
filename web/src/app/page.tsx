@@ -5,7 +5,7 @@ import { ConfigNotice, Notice } from "@/components/Notice";
 import { toPublicDoc } from "@/domain/privacy";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "南方散步｜Aya 的雪梨與塔斯馬尼亞" };
+export const metadata = { title: "2026澳洲旅程with Aya｜雪梨與塔斯馬尼亞" };
 
 /* Home: the hand-drawn route walk. Everyone sees the redacted document; the planner lives at /plan. */
 export default async function Home() {

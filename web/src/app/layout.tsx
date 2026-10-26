@@ -3,7 +3,7 @@ import "./globals.css";
 import "./site.css";
 
 export const metadata: Metadata = {
-  title: "Aya 的澳洲旅程",
+  title: "2026澳洲旅程with Aya",
   description: "Aya 雪梨與塔斯馬尼亞旅遊規劃（私人測試版）",
   manifest: "/manifest.webmanifest",
   // Private trip: keep every page out of search engines, including the optional public home.
