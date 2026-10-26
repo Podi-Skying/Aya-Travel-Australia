@@ -6,7 +6,7 @@ import { useTrip } from "./TripApp";
 import { Icon, iconSvg } from "./Icon";
 import { PendingButton, useHobartToday, useHydrated, useReducedMotion } from "./ui";
 import { cssVar, esc, loadLeaflet, tiles } from "./MapViews";
-import { computeLegs, ROUTE_CREDIT, stopsOf, useLegs, type Pt } from "./useLegs";
+import { computeLegs, routeCredit, stopsOf, useLegs, type Pt } from "./useLegs";
 import { PhotoCredit } from "./Photos";
 import { project, rubber, spring } from "./motion";
 import { Pool } from "./Pool";
@@ -558,7 +558,7 @@ export function PlacesMap({ active }: { active: boolean }) {
                   計算道路路線
                 </PendingButton>
               )}
-              {legs?.some((l) => l && l.source !== "same-place") && <span className="route-credit">{legs.some((l) => l?.source === "google-routes") ? "路線 © Google" : ROUTE_CREDIT}</span>}
+              {legs?.some((l) => l && l.source !== "same-place") && <span className="route-credit">{routeCredit(legs)}</span>}
             </p>
           )}
           {selected && (

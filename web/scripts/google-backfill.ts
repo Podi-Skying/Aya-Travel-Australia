@@ -1,7 +1,7 @@
 import { getCurrentTrip } from "../src/server/trips";
 import type { Owner } from "../src/server/owner";
 import { getLookup } from "../src/server/cache";
-import { findPlaceId, googleKey } from "../src/server/google";
+import { findPlaceId, googleKey, sameRef, type PlaceRef } from "../src/server/google";
 import { getLegs, type Pt } from "../src/server/routes";
 import { stopsOf } from "../src/components/useLegs";
 import { listPrice } from "../src/server/usage";
@@ -25,7 +25,11 @@ async function main() {
   // Places: activities (days and pool) with coordinates but no photo of their own.
   const items = [...doc.days.flatMap((d) => d.items), ...doc.attractionPool.flatMap((p) => p.items)].filter((i) => !i.photo && i.lat != null && i.lng != null);
   const todo: typeof items = [];
-  for (const i of items) if (!(await getLookup("place-id", i.id).catch(() => null))) todo.push(i);
+  // Missing mappings, and mappings made for an old name or position.
+  for (const i of items) {
+    const hit = await getLookup<PlaceRef>("place-id", i.id).catch(() => null);
+    if (!hit || !sameRef(hit.value, i.name, i.lat, i.lng)) todo.push(i);
+  }
 
   // Routes: each run of consecutive drive legs, in chunks of at most 25 points.
   // Scheduled days, plus each recommended plan's days so their routes are ready when a plan is applied.

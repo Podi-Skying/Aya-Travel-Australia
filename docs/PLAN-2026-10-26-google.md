@@ -91,3 +91,14 @@ There is no Google base map.
   - The photo endpoint returns 404 until then.
 - **G-06.** Protocol-relative attribution links are normalised to https.
 - **G-07.** Owner pool items without a photo show the Google photo.
+
+## Inspection 2: dispositions
+
+- **GPR-01, accepted.** Route credits list every source drawn: Google, OSRM or both.
+- **GPR-02, accepted.**
+  - Mappings store the name and the position (rounded to 4 decimals).
+  - The backfill also redoes mappings whose name or position no longer match. The photo handler checks both.
+- **GPR-03, accepted.** Every photo has a Google Maps link, falling back to the place's `place_id` page.
+- **GPR-04, accepted.** When the usage queries fail, both endpoints return 503 (`usageUnavailable`) instead of zeros.
+- **GPR-05, rejected.** `next.config.ts` already sends `X-Robots-Tag: noindex, nofollow` for `/:path*`, API routes included.
+- **Review budget.** The two-round inspection budget is used up. These fixes have no third inspection; they are covered by tests.

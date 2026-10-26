@@ -3,7 +3,7 @@ import { errorResponse, fail, HttpError, json, ownerRoute, readJson, sameOrigin 
 import { checkOwner } from "./owner";
 import { getLegs, MAX_POINTS, validPoints } from "./routes";
 import { getKpOutlook } from "./sky";
-import { googleKey, placePhoto } from "./google";
+import { googleKey, placePhoto, sameRef, type PlaceRef } from "./google";
 import { dailyCap, hobartDay, monthCost, noteGoogleHit, usageSince } from "./usage";
 import { getLookup } from "./cache";
 import { missingConfig } from "./config";
@@ -205,9 +205,14 @@ export async function postRoutes(req: Request) {
 /** Owner-only: key configured (boolean), the last 14 days per API, month-to-date estimate. Never the key. */
 export const getGoogleStatus = ownerRoute(async () => {
   const now = new Date();
-  const days = await usageSince(hobartDay(new Date(now.getTime() - 13 * 86_400_000))).catch(() => []);
-  const today = days.find((d) => d.date === hobartDay(now));
-  return json({ keyPresent: !!googleKey(), dailyCap: dailyCap(), callsToday: today?.calls ?? 0, days, month: await monthCost(hobartDay(now).slice(0, 7)).catch(() => ({ usd: 0, calls: {} })) });
+  try {
+    const days = await usageSince(hobartDay(new Date(now.getTime() - 13 * 86_400_000)));
+    const today = days.find((d) => d.date === hobartDay(now));
+    return json({ keyPresent: !!googleKey(), dailyCap: dailyCap(), callsToday: today?.calls ?? 0, days, month: await monthCost(hobartDay(now).slice(0, 7)) });
+  } catch {
+    // Never report zero when the numbers are unknown.
+    return json({ keyPresent: !!googleKey(), usageUnavailable: true }, 503);
+  }
 });
 
 /**
@@ -220,8 +225,13 @@ export async function getUsageDaily(req: Request) {
     if (!(await routeQuota(`usage-ip:${sha256(ip)}`, 30))) return fail(429, "操作太頻繁，請稍後再試");
     const q = new URL(req.url).searchParams.get("date");
     const date = q && /^\d{4}-\d{2}-\d{2}$/.test(q) ? q : hobartDay();
-    const d = (await usageSince(date).catch(() => [])).find((x) => x.date === date);
-    const month = await monthCost(date.slice(0, 7)).catch(() => ({ usd: 0, calls: {} }));
+    let d, month;
+    try {
+      d = (await usageSince(date)).find((x) => x.date === date);
+      month = await monthCost(date.slice(0, 7));
+    } catch {
+      return fail(503, "usage unavailable");
+    }
     return json({ date, apis: d?.apis ?? {}, calls: d?.calls ?? 0, cacheHits: d?.hits ?? 0, dailyCap: dailyCap(), monthToDate: { estimatedUsd: month.usd, calls: month.calls } });
   } catch (e) {
     return errorResponse(e);
@@ -236,12 +246,12 @@ export async function getUsageDaily(req: Request) {
 export const getPlacePhoto = ownerRoute(async (req, owner) => {
   const item = new URL(req.url).searchParams.get("item") ?? "";
   if (!/^[A-Za-z0-9_-]{1,40}$/.test(item)) return fail(400, "缺少活動 id");
-  const hit = await getLookup<{ placeId: string | null; name?: string }>("place-id", item).catch(() => null);
+  const hit = await getLookup<PlaceRef>("place-id", item).catch(() => null);
   if (!hit?.value.placeId) return fail(404, "沒有 Google 地點");
   // The stored place must still describe this activity (it may have been renamed since the backfill).
   const cur = await getCurrentTrip(owner);
   const it = cur && [...cur.doc.days.flatMap((d) => d.items), ...cur.doc.attractionPool.flatMap((p) => p.items)].find((i) => i.id === item);
-  if (!it || it.name !== hit.value.name) return fail(404, "地點需要重新比對");
+  if (!it || !sameRef(hit.value, it.name, it.lat, it.lng)) return fail(404, "地點需要重新比對");
   const p = await placePhoto(hit.value.placeId).catch(() => null);
   if (!p) return fail(404, "沒有照片");
   return json(p, 200, { "cache-control": "private, max-age=1800" });

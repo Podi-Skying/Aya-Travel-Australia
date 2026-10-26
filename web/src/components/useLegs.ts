@@ -118,3 +118,9 @@ export function stopsOf<T extends { lat?: number; lng?: number; mode: string }>(
 }
 
 export const ROUTE_CREDIT = "路線 © OSRM・地圖資料 © OpenStreetMap";
+
+/** Credits for every route source drawn (a day can mix OSRM and Google legs). */
+export function routeCredit(legs: (Leg | null)[]): string {
+  const src = new Set(legs.map((l) => l?.source));
+  return [src.has("google-routes") && "路線 © Google", src.has("osrm-demo") && ROUTE_CREDIT].filter(Boolean).join("；");
+}

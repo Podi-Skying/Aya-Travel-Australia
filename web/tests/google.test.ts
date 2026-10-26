@@ -100,6 +100,8 @@ describe("google places", () => {
     expect(calls).toHaveLength(1);
     await findPlaceId("g37", "Stanley Highfield", -40.76, 145.29, f); // renamed: looked up again
     expect(calls).toHaveLength(2);
+    await findPlaceId("g37", "Stanley Highfield", -40.9, 145.29, f); // moved: looked up again
+    expect(calls).toHaveLength(3);
     expect(calls[0].headers?.["X-Goog-FieldMask"]).toBe("places.id");
   });
 

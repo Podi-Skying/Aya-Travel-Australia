@@ -8,7 +8,7 @@ import { api } from "@/client/api";
  * The server resolves it live (photo names may not be cached) and the attribution Google requires is
  * shown under it: the photo's authors and a Google Maps link.
  */
-type G = { photoUri: string; attributions: { name: string; uri?: string }[]; mapsUri?: string };
+type G = { photoUri: string; attributions: { name: string; uri?: string }[]; mapsUri: string };
 
 /** Photo URIs are temporary: answers are reused for 25 minutes, failures are not kept. */
 const memo = new Map<string, { at: number; p: Promise<G | null> }>();
@@ -54,13 +54,9 @@ export function GooglePhoto({ itemId, alt, className }: { itemId: string; alt: s
             ))
           : "Google 使用者"}
         ・
-        {v.mapsUri ? (
-          <a href={v.mapsUri} target="_blank" rel="noopener noreferrer">
-            Google 地圖
-          </a>
-        ) : (
-          "Google 地圖"
-        )}
+        <a href={v.mapsUri} target="_blank" rel="noopener noreferrer">
+          Google 地圖
+        </a>
       </figcaption>
     </figure>
   );

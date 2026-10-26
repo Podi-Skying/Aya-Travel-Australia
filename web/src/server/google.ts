@@ -27,11 +27,16 @@ async function call<T>(api: GoogleApi, url: string, init: Parameters<GFetch>[1],
 
 /* ---------------------------------------------------------------- Places */
 
+export type PlaceRef = { placeId: string | null; name?: string; lat?: number; lng?: number };
+const round4 = (n: number) => Math.round(n * 1e4) / 1e4;
+/** The stored mapping still describes this activity: same name and position (to ~10 m). */
+export const sameRef = (r: PlaceRef, name: string, lat?: number, lng?: number) => r.name === name && lat != null && lng != null && r.lat === round4(lat) && r.lng === round4(lng);
+
 /** Finds the Google place id for an activity (IDs-only Text Search) and stores it; null if none. */
 export async function findPlaceId(itemId: string, name: string, lat: number, lng: number, f: GFetch = defaultFetch): Promise<string | null> {
-  const hit = await getLookup<{ placeId: string | null; name?: string }>("place-id", itemId).catch(() => null);
-  // A renamed activity is looked up again, so its photo is never another place's.
-  if (hit && hit.value.name === name) {
+  const hit = await getLookup<PlaceRef>("place-id", itemId).catch(() => null);
+  // A renamed or moved activity is looked up again, so its photo is never another place's.
+  if (hit && sameRef(hit.value, name, lat, lng)) {
     await noteGoogleHit("places_search");
     return hit.value.placeId;
   }
@@ -48,14 +53,14 @@ export async function findPlaceId(itemId: string, name: string, lat: number, lng
     f,
   );
   const placeId = body.places?.[0]?.id ?? null;
-  await putLookup("place-id", itemId, { placeId, name }, "Google Places Text Search (IDs only)", null);
+  await putLookup("place-id", itemId, { placeId, name, lat: round4(lat), lng: round4(lng) } satisfies PlaceRef, "Google Places Text Search (IDs only)", null);
   return placeId;
 }
 
 /** Google returns some links protocol-relative (`//maps.google.com/...`); show them as https. */
 const httpsUri = (u?: string) => (u?.startsWith("//") ? `https:${u}` : u?.startsWith("https://") ? u : undefined);
 
-export type PlacePhoto = { photoUri: string; attributions: { name: string; uri?: string }[]; mapsUri?: string };
+export type PlacePhoto = { photoUri: string; attributions: { name: string; uri?: string }[]; mapsUri: string };
 
 /** A live photo for a place: Place Details (photos) then the photo media URI. Not cached server side. */
 export async function placePhoto(placeId: string, maxWidthPx = 1200, f: GFetch = defaultFetch): Promise<PlacePhoto | null> {
@@ -80,7 +85,8 @@ export async function placePhoto(placeId: string, maxWidthPx = 1200, f: GFetch =
   return {
     photoUri: media.photoUri,
     attributions: (p.authorAttributions ?? []).filter((a) => a.displayName).map((a) => ({ name: a.displayName!, uri: httpsUri(a.uri) })),
-    mapsUri: httpsUri(p.googleMapsUri),
+    // Users must always be able to open the photo on Google Maps; fall back to the place's page.
+    mapsUri: httpsUri(p.googleMapsUri) ?? `https://www.google.com/maps/place/?q=place_id:${placeId}`,
   };
 }
 

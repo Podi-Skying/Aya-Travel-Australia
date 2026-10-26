@@ -6,7 +6,7 @@ import type * as Leaflet from "leaflet";
 import { PRI, useReducedMotion } from "./ui";
 import type { EffectiveDay } from "@/domain/effective-day";
 import { iconSvg } from "./Icon";
-import { ROUTE_CREDIT, stopsOf, useLegs } from "./useLegs";
+import { routeCredit, stopsOf, useLegs } from "./useLegs";
 
 /*
  * Leaflet is loaded only in the browser. If it or the tiles fail, the itinerary
@@ -183,7 +183,7 @@ export function DayMap({
           </div>
         )}
       </div>
-      {legs?.some((l) => l && l.source !== "same-place") && <p className="route-credit">{legs.some((l) => l?.source === "google-routes") ? "路線 © Google" : ROUTE_CREDIT}</p>}
+      {legs?.some((l) => l && l.source !== "same-place") && <p className="route-credit">{routeCredit(legs)}</p>}
     </>
   );
 }
