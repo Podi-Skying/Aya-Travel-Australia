@@ -2,7 +2,7 @@ import { Notice } from "@/components/Notice";
 
 /* Explains next-auth sign-in errors in Chinese instead of the generic English page. */
 
-export const metadata = { title: "登入失敗｜Aya 的澳洲旅程", robots: { index: false, follow: false } };
+export const metadata = { title: "登入失敗｜2026澳洲旅程with Aya", robots: { index: false, follow: false } };
 
 const MESSAGES: Record<string, { title: string; body: string }> = {
   AccessDenied: {

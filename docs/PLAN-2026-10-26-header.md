@@ -32,3 +32,8 @@ Kai (/apple-design) asked for:
 ## Checks
 
 tsc, lint, tests and build pass. A local preview at desktop width (one row) and at 375px (two rows, 48px tabs, no horizontal scroll) looks right.
+
+## Inspection 1: dispositions (all accepted)
+
+- **HDR-01.** The auth-error page title uses the new name.
+- **HDR-02.** The tab row fades at its edge at every width below 1000px.
