@@ -8,7 +8,7 @@
   - cards are the place photos as `<img alt>`;
   - the same sources as before (own, Kai-supplied, cached Commons, live Google for the owner and share links), loaded when 看照片 is pressed.
 - It is used everywhere the gallery was: 更多資訊, the map place cards, and each 跨日行程方案 stop. The plan-wide carousel uses it too.
-- Input: click, drag or flick, and Enter, Space or the arrow keys all send the front card to the back. Under reduced motion, the component swaps cards without animation.
+- Input: click, drag or flick, and Enter, Space, ArrowRight or ArrowDown send the front card to the back (the component's own keys). Under reduced motion, the component replaces springs with a short 0.2 s ease and turns off tilt, lean and press effects.
 - A counter 「n / total」 follows the front card (`aria-live`). Below it are the front photo's source link icon and, for Google photos, the authors' names.
 - FlexCarousel and `ogl` are removed.
 - **Bundle (all client JS chunks):** 1,137,611 → 1,218,376 bytes (+80,765). `motion` is heavier than `ogl` and FlexCarousel together.
@@ -29,3 +29,9 @@
   - the Stack shows 「1 / 7」;
   - Enter and Space advance it to 2 / 7 and then 3 / 7;
   - a click creates a spark canvas with `pointer-events: none`.
+
+## Inspection 1: dispositions (no second inspection; covered by checks)
+
+- **R1, plan corrected.** The vendored Stack keeps its own reduced-motion behaviour: a 0.2 s ease with no springs, tilt or press. The component stays verbatim, and the plan text now describes this behaviour.
+- **R2, plan corrected.** Stack handles Enter, Space, ArrowRight and ArrowDown. The component stays verbatim, and the plan text now lists those keys.
+- **R3, accepted.** The whole gallery (Stack, counter and credit) is now keyed by the photo sources, so the counter resets when the list changes.

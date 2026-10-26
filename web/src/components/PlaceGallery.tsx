@@ -23,13 +23,17 @@ import Stack from "./stack/Stack";
  * card to the back. The counter and the credit follow the front card.
  */
 export function Carousel({ photos, label }: { photos: GalleryPhoto[]; label: string }) {
+  // Keyed by the sources so the counter resets with the Stack when the list changes.
+  return <PhotoStack key={photos.map((p) => p.src).join("|")} photos={photos} label={label} />;
+}
+
+function PhotoStack({ photos, label }: { photos: GalleryPhoto[]; label: string }) {
   const [top, setTop] = useState(0);
   const front = photos[top] ?? photos[0];
   return (
     <div className="gallery">
       <div className="gallery-stack" role="group" aria-label={`${label}：按一下、Enter 或空白鍵換下一張`}>
         <Stack
-          key={photos.map((p) => p.src).join("|")}
           layout="fan"
           sendToBackOnClick
           onChange={setTop}
