@@ -14,6 +14,7 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Vendored React Bits component, kept verbatim (adapted in PlaceGallery.tsx).
     "src/components/flex-carousel/**",
+    "src/components/chroma-grid/**",
   ]),
 ]);
 

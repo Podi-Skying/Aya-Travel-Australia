@@ -12,10 +12,9 @@ import { SiteHeader } from "./SiteHeader";
 import { useAsk, useToast, useHobartToday, useUrlState, withTimeout, writeUrl, type ToastAction } from "./ui";
 import { DaysView } from "./DaysView";
 import { PlacesMap } from "./Places";
-import { Budget } from "./Budget";
 import { Info } from "./Info";
 import { TripOptions } from "./TripOptions";
-import { Manage } from "./Manage";
+import { PlanQuiz } from "./PlanQuiz";
 
 /*
  * Client shell for both the owner view and the read-only share view.
@@ -65,9 +64,8 @@ const TABS = [
   { key: "days", label: "每日行程" },
   { key: "options", label: "跨日行程方案" },
   { key: "map", label: "地圖與景點" },
-  { key: "budget", label: "預算" },
   { key: "info", label: "資訊與警示" },
-  { key: "manage", label: "版本與分享", owner: true },
+  { key: "quiz", label: "旅遊規劃小測驗", private: true },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
@@ -113,8 +111,9 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
   const url = useUrlState();
   // Only tabs this mode can show (visitors have no 版本與分享 tab) (RV-01).
   // The old 待安排景點 tab now lives on the map (?tab=pool keeps working).
-  const urlTabKey = url.tab === "pool" ? "map" : url.tab === "overview" ? "days" : url.tab;
-  const urlTab = TABS.some((t) => t.key === urlTabKey && (mode === "owner" || !("owner" in t))) ? (urlTabKey as TabKey) : null;
+  // Removed tabs (總覽, 預算, 版本與分享 — 2026-10-26) open 每日行程.
+  const urlTabKey = url.tab === "pool" ? "map" : ["overview", "budget", "manage", "versions"].includes(url.tab ?? "") ? "days" : url.tab;
+  const urlTab = TABS.some((t) => t.key === urlTabKey && (mode === "owner" || !!token || !("private" in t))) ? (urlTabKey as TabKey) : null;
   const urlDayIdx = url.day ? doc.days.findIndex((d) => d.date === url.day) : -1;
   const tab: TabKey = pickedTab ?? urlTab ?? "days";
   const todayIdx = today ? doc.days.findIndex((d) => d.date >= today) : -1;
@@ -370,7 +369,8 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
     offlineCopy: !online || fromCache,
   };
 
-  const visibleTabs = TABS.filter((t) => mode === "owner" || !("owner" in t));
+  // The quiz starts from Kai's residence: owner and share links only, not public visitors.
+  const visibleTabs = TABS.filter((t) => mode === "owner" || !!token || !("private" in t));
   const base = mode === "public" && token ? `/s/${token}` : "";
   const tabsRef = useRef<HTMLDivElement>(null);
   // Keep the selected tab visible in the scrollable tab row (mobile).
@@ -442,15 +442,12 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
         <Panel id="map" show={tab === "map"}>
           <PlacesMap active={tab === "map"} />
         </Panel>
-        <Panel id="budget" show={tab === "budget"}>
-          <Budget />
-        </Panel>
         <Panel id="info" show={tab === "info"}>
           <Info />
         </Panel>
-        {mode === "owner" && (
-          <Panel id="manage" show={tab === "manage"}>
-            <Manage />
+        {(mode === "owner" || token) && (
+          <Panel id="quiz" show={tab === "quiz"}>
+            <PlanQuiz active={tab === "quiz"} />
           </Panel>
         )}
       </main>

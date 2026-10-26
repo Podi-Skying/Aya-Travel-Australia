@@ -846,3 +846,24 @@ details.card.day-summary > summary h3 { margin: 0; }
 .lg-home { display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #faf7f0; box-shadow: 0 0 0 2px var(--vermilion); }
 .chip.lg-only { cursor: default; }
 .tonight { margin: 2px 0 4px; color: var(--ink-2); display: flex; align-items: center; gap: 4px; }
+
+/* 旅遊規劃小測驗 (2026-10-26) */
+.quiz-steps { list-style: none; margin: 8px 0 0; padding: 0; display: flex; gap: 6px; flex-wrap: wrap; }
+.quiz-steps li { display: inline-flex; align-items: center; gap: 6px; font-size: .8rem; color: var(--ink-muted); padding-right: 6px; }
+.quiz-steps li span { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--ink-muted); }
+.quiz-steps li.done span { background: var(--ink-muted); }
+.quiz-steps li.on { color: var(--ink); font-weight: 600; }
+.quiz-steps li.on span { background: var(--vermilion); border-color: var(--vermilion); }
+.quiz-step h3 { margin-top: 0; }
+.quiz-home { display: flex; align-items: center; gap: 8px; }
+.quiz-nav { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+.quiz-nav .btn { min-height: 44px; }
+.quiz-choices { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.quiz-choices .chip { min-height: 44px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--line); background: transparent; font: inherit; cursor: pointer; color: var(--ink); }
+.quiz-choices .chip.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.quiz-warn { color: var(--vermilion); }
+.quiz-route { list-style: none; padding: 0; margin: 12px 0; display: grid; gap: 10px; }
+.quiz-route li { display: block; }
+.quiz-route .home-pin { display: inline-grid; width: 28px; height: 28px; vertical-align: middle; }
+.quiz .chroma-grid { margin-top: 8px; }
+@media (max-width: 720px) { .quiz .chroma-grid { --chroma-cols: 2 !important; } }

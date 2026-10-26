@@ -1,0 +1,39 @@
+import { describe, expect, it } from "vitest";
+import { seedDoc } from "./helpers";
+import { orderStops, quizPlaces, REGIONS, km } from "@/domain/quiz";
+import { applyOp } from "@/domain/ops";
+import { parseTripDoc, type TripDoc } from "@/domain/schema";
+
+/* 旅遊規劃小測驗 (2026-10-26) */
+
+describe("planning quiz", () => {
+  it("offers only Tasmanian places with a position, each in its nearest region", () => {
+    const places = quizPlaces(seedDoc() as TripDoc);
+    expect(places.length).toBeGreaterThan(0);
+    for (const p of places) {
+      expect(p.item.lat!).toBeLessThan(-40);
+      const r = REGIONS.find((x) => x.key === p.region)!;
+      expect(km(r.center, [p.item.lat!, p.item.lng!])).toBeLessThanOrEqual(r.km);
+      expect(p.item.name.startsWith("住宿：")).toBe(false);
+    }
+  });
+
+  it("orders stops nearest-first from home", () => {
+    const s = (id: string, lat: number, lng: number) => ({ item: { id, lat, lng } });
+    const out = orderStops([-42.88, 147.33], [s("far", -43.1, 147.85), s("near", -42.89, 147.34), s("mid", -42.97, 147.31)]);
+    expect(out.map((x) => x.item.id)).toEqual(["near", "mid", "far"]);
+  });
+
+  it("adds chosen pool places to a day as pending in one version", () => {
+    const doc = seedDoc() as TripDoc;
+    const pool = doc.attractionPool.find((p) => p.seg === "tas" && p.items.length >= 2)!;
+    const date = doc.days.find((d) => d.seg === "tas")!.date;
+    const refs = pool.items.slice(0, 2).map((i) => ({ key: pool.key, itemId: i.id }));
+    const r = applyOp(doc, { op: "addQuizPlan", date, refs });
+    if (!r.ok) throw new Error(r.error);
+    const day = r.doc.days.find((d) => d.date === date)!;
+    for (const x of refs) expect(day.items.find((i) => i.id === x.itemId)?.status).toBe("pending");
+    expect(parseTripDoc(r.doc).ok).toBe(true);
+    expect(applyOp(doc, { op: "addQuizPlan", date, refs: [] }).ok).toBe(false);
+  });
+});

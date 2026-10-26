@@ -34,6 +34,7 @@ export type Op =
   | { op: "removeSkyPost"; id: string }
   | { op: "applyOption"; key: string }
   | { op: "setDayTitle"; date: string; title: string }
+  | { op: "addQuizPlan"; date: string; refs: { key: string; itemId: string }[] }
   | { op: "snapshot"; summary: string };
 
 export type ItemFields = {
@@ -509,6 +510,20 @@ export function applyOp(input: TripDoc, op: Op): OpResult {
     }
     case "applyOption":
       return applyOption(doc, op.key);
+    case "addQuizPlan": {
+      // 旅遊規劃小測驗 → 「加入這一天」: the chosen pool places join the day as pending, in one version.
+      if (!findDay(doc, op.date)) return err(404, "找不到日期");
+      if (!op.refs.length || op.refs.length > 15) return err(400, "請選 1–15 個景點");
+      let cur = doc;
+      for (const r of op.refs) {
+        const s = applyOp(cur, { op: "scheduleItem", key: r.key, itemId: r.itemId, date: op.date });
+        if (!s.ok) return s;
+        const p = applyOp(s.doc, { op: "setStatus", date: op.date, itemId: r.itemId, status: "pending" });
+        if (!p.ok) return p;
+        cur = p.doc;
+      }
+      return { ok: true, doc: cur, summary: `從小測驗加入 ${op.refs.length} 個景點到 ${fmtDay(op.date)}（待確認）` };
+    }
     case "setDayTitle": {
       // A pinned title stays as written; an empty one returns the day to its automatic title.
       const d = findDay(doc, op.date);
