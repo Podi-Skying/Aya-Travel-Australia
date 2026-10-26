@@ -91,3 +91,39 @@ describe("gallery endpoints", () => {
     expect((await H.getMedia(req("GET", "/api/media/x"), path("../package.json"))).status).toBe(404);
   });
 });
+
+describe("Google photos for share links", () => {
+  let token = "";
+  beforeEach(async () => {
+    await seededDb();
+    asOwner();
+    token = ((await (await H.postShare(req("POST", "/api/trip/share"))).json()) as { token: string }).token;
+    process.env.GOOGLE_MAPS_API_KEY = "test-key-not-real";
+  });
+
+  it("a share token gets photos only for activities in its trip, under the share sub-cap; no token gets 401", async () => {
+    const { vi } = await import("vitest");
+    const doc = seedDoc();
+    const it = doc.days.flatMap((d) => d.items).find((i) => i.lat != null)!;
+    await putLookup("place-id", it.id, { placeId: "ChIJabcdefghijk", name: it.name, lat: Math.round(it.lat! * 1e4) / 1e4, lng: Math.round(it.lng! * 1e4) / 1e4, checked: true }, "test", null);
+    const spy = vi.fn(async (url: string) =>
+      new Response(JSON.stringify(url.includes("/media") ? { photoUri: "https://lh3.googleusercontent.com/p" } : { photos: [{ name: "places/ChIJabcdefghijk/photos/a", authorAttributions: [{ displayName: "A" }] }] }), { headers: { "content-type": "application/json" } }),
+    );
+    vi.stubGlobal("fetch", spy);
+    signedOut();
+    expect((await H.getPlacePhotos(req("GET", `/api/place-photos?item=${it.id}`))).status).toBe(401);
+    expect((await H.getPlacePhotos(req("GET", `/api/place-photos?item=not-in-trip&token=${token}`))).status).toBe(401);
+    const r = await H.getPlacePhotos(req("GET", `/api/place-photos?item=${it.id}&token=${token}`));
+    const body = (await r.json()) as { photos: { photoUri: string; attributions: { name: string }[] }[] };
+    expect(body.photos[0]).toMatchObject({ photoUri: "https://lh3.googleusercontent.com/p", attributions: [{ name: "A" }] });
+    // Share sub-cap reached: no more calls for share links, the owner still has some.
+    process.env.GOOGLE_SHARE_DAILY_CAP = "0";
+    const calls = spy.mock.calls.length;
+    const capped = (await (await H.getPlacePhotos(req("GET", `/api/place-photos?item=${it.id}&token=${token}`))).json()) as { photos: unknown[] };
+    expect(capped.photos).toEqual([]);
+    expect(spy.mock.calls.length).toBe(calls);
+    delete process.env.GOOGLE_SHARE_DAILY_CAP;
+    vi.unstubAllGlobals();
+    delete process.env.GOOGLE_MAPS_API_KEY;
+  });
+});

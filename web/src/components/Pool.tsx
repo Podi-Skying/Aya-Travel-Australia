@@ -38,7 +38,7 @@ export function Pool() {
 }
 
 function PackageCard({ pkg }: { pkg: Package }) {
-  const { doc, mode, runOp, online } = useTrip();
+  const { doc, mode, runOp, online, token } = useTrip();
   const eligible = doc.days.filter((d) => d.seg === pkg.seg);
   const [date, setDate] = useState(pkg.suggestion?.date && eligible.some((d) => d.date === pkg.suggestion!.date) ? pkg.suggestion.date : (eligible[0]?.date ?? ""));
   const editable = mode === "owner" && online;
@@ -55,7 +55,7 @@ function PackageCard({ pkg }: { pkg: Package }) {
       <ul>
         {pkg.items.map((i) => (
           <li key={i.id}>
-            {mode === "owner" && !i.photo && i.lat != null && <GooglePhoto item={i} alt={i.name} className="pool-gphoto" />}
+            {(mode === "owner" || token) && !i.photo && i.lat != null && <GooglePhoto item={i} alt={i.name} className="pool-gphoto" />}
             <strong>{i.name}</strong> <Badge {...PRI[i.pri]} />
             <br />
             <span className="small muted">

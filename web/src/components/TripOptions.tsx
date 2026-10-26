@@ -178,7 +178,7 @@ function OptionDetail({ c }: { c: OptionCard }) {
                           <PhotoCredit photo={it.photo} />
                         </figcaption>
                       </figure>
-                    ) : mode === "owner" ? (
+                    ) : mode === "owner" || token ? (
                       <GooglePhoto item={it} alt={it.name} />
                     ) : (
                       <div className="plan-stop-noimg" aria-hidden="true" />

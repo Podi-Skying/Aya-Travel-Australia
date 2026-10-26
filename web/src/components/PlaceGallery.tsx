@@ -124,7 +124,7 @@ export function PlaceGallery({ item }: { item: Item }) {
     if (!open) return;
     let live = true;
     const r = { id: item.id, name: item.name, lat: item.lat, lng: item.lng };
-    void Promise.all([commonsFor(r, token), owner ? googleFor(r) : Promise.resolve([])]).then(([commons, google]) => live && setData({ id: ref, commons, google }));
+    void Promise.all([commonsFor(r, token), owner || token ? googleFor(r, token) : Promise.resolve([])]).then(([commons, google]) => live && setData({ id: ref, commons, google }));
     return () => {
       live = false;
     };

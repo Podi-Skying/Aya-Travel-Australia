@@ -29,7 +29,8 @@ export function commonsFor(r: Ref, token?: string): Promise<Photo[]> {
   return cachedCall(commonsMemo, keyOf(r, token), () => api<{ commons: Photo[] }>(`/api/photos?${qs}`).then((x) => (x.ok ? x.data.commons : [])));
 }
 
-/** Owner only: up to 6 live Google photos (one Place Details + one media call each). */
-export function googleFor(r: Ref): Promise<GoogleShot[]> {
-  return cachedCall(googleMemo, keyOf(r), () => api<{ photos: GoogleShot[] }>(`/api/place-photos?item=${encodeURIComponent(r.id)}`).then((x) => (x.ok ? x.data.photos : [])));
+/** Up to 5 live Google photos (Place Details + one media call each), for the owner or a share link. */
+export function googleFor(r: Ref, token?: string): Promise<GoogleShot[]> {
+  const qs = `item=${encodeURIComponent(r.id)}${token ? `&token=${encodeURIComponent(token)}` : ""}`;
+  return cachedCall(googleMemo, keyOf(r, token), () => api<{ photos: GoogleShot[] }>(`/api/place-photos?${qs}`).then((x) => (x.ok ? x.data.photos : [])));
 }

@@ -290,19 +290,42 @@ export async function getPhotos(req: Request) {
   }
 }
 
-/** Owner only: up to 6 live Google photos for an activity (photo names may not be cached). */
-export const getPlacePhotos = ownerRoute(async (req, owner) => {
-  const item = new URL(req.url).searchParams.get("item") ?? "";
-  if (!/^[A-Za-z0-9_-]{1,40}$/.test(item)) return fail(400, "缺少活動 id");
-  const hit = await getLookup<PlaceRef>("place-id", item).catch(() => null);
-  if (!hit?.value.placeId) return json({ photos: [] });
-  const cur = await getCurrentTrip(owner);
-  const it = cur && findIn(cur.doc, item);
-  if (!it || !sameRef(hit.value, it.name, it.lat, it.lng)) return json({ photos: [] });
-  // 5 photos: one Place Details + 5 media calls = 6 per gallery (cap 400 ≈ 66 galleries a day).
-  const photos = await placePhotos(hit.value.placeId, 5).catch(() => []);
-  return json({ photos }, 200, { "cache-control": "private, max-age=1500" });
-});
+/**
+ * Up to 5 live Google photos for an activity (photo names may not be cached). The owner, or a share
+ * link for an activity its trip shows (Kai's choice, 2026-10-26), under the share sub-cap. Public
+ * visitors without a token get none.
+ */
+export async function getPlacePhotos(req: Request) {
+  try {
+    const q = new URL(req.url).searchParams;
+    const item = q.get("item") ?? "";
+    const token = q.get("token");
+    if (!/^[A-Za-z0-9_-]{1,40}$/.test(item)) return fail(400, "缺少活動 id");
+    const hit = await getLookup<PlaceRef>("place-id", item).catch(() => null);
+    let ok = false;
+    let scope: "owner" | "share" = "owner";
+    if (token) {
+      // Share link: the activity must be in this trip at the position the place was matched for
+      // (its shown name may be redacted, so the owner-side name is not compared here).
+      const it = findIn((await getPublicTrip(token))?.doc ?? { days: [], attractionPool: [] }, item);
+      ok = !!hit?.value.placeId && !!hit.value.checked && !!it && it.lat != null && it.lng != null && sameRef(hit.value, hit.value.name ?? "", it.lat, it.lng);
+      scope = "share";
+      if (!it) return fail(401, "需要分享連結或登入");
+    } else {
+      const c = missingConfig("owner").length ? null : await checkOwner();
+      if (!c?.ok) return fail(401, "需要分享連結或登入");
+      const cur = await getCurrentTrip(c.owner);
+      const it = cur && findIn(cur.doc, item);
+      ok = !!hit?.value.placeId && !!it && sameRef(hit.value, it.name, it.lat, it.lng);
+    }
+    if (!ok) return json({ photos: [] });
+    // 5 photos: one Place Details + 5 media calls = 6 per gallery.
+    const photos = await placePhotos(hit!.value.placeId!, 5, 1200, undefined, scope).catch(() => []);
+    return json({ photos }, 200, { "cache-control": "private, max-age=1500" });
+  } catch (e) {
+    return errorResponse(e);
+  }
+}
 
 /**
  * Private photos (Kai's own, in web/media/), served only to the owner or with a valid share token,

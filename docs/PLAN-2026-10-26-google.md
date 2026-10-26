@@ -102,3 +102,9 @@ There is no Google base map.
 - **GPR-04, accepted.** When the usage queries fail, both endpoints return 503 (`usageUnavailable`) instead of zeros.
 - **GPR-05, rejected.** `next.config.ts` already sends `X-Robots-Tag: noindex, nofollow` for `/:path*`, API routes included.
 - **Review budget.** The two-round inspection budget is used up. These fixes have no third inspection; they are covered by tests.
+
+## 2026-10-26: Google photos for share links (Kai's choice)
+
+- `/api/place-photos?item=&token=` serves up to 5 live Google photos to a share link, only for activities in that trip and only at the position the place was matched for. Public visitors without a token get 401.
+- Share links have their own daily sub-cap, `GOOGLE_SHARE_DAILY_CAP` (default 300, ≈ 50 galleries). The overall cap rises to 700, so the owner keeps at least 400.
+- Attributions are shown as for the owner. Tests cover the token scope, the 401 and the sub-cap.

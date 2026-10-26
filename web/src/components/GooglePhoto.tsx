@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 import { Icon } from "./Icon";
 import { googleFor } from "@/client/photos";
+import { useTrip } from "./TripApp";
 
 /*
- * Google place photo for an activity without its own photo (owner only; docs/PLAN-2026-10-26-google.md).
+ * Google place photo for an activity without its own photo (owner and share links; docs/PLAN-2026-10-26-google.md).
  * It shares one request per activity with the gallery (client/photos.ts), and shows the attribution
  * Google requires: the photo's authors and a Google Maps link.
  */
@@ -16,13 +17,14 @@ export function GooglePhoto({ item, alt, className }: { item: Ref; alt: string; 
   const key = `${item.id}|${item.name}|${item.lat}|${item.lng}`;
   const [g, setG] = useState<{ key: string; v: Awaited<ReturnType<typeof googleFor>>[number] | null } | null>(null);
   const [broken, setBroken] = useState(false);
+  const { token } = useTrip();
   useEffect(() => {
     let live = true;
-    void googleFor({ id: item.id, name: item.name, lat: item.lat, lng: item.lng }).then((v) => live && setG({ key, v: v[0] ?? null }));
+    void googleFor({ id: item.id, name: item.name, lat: item.lat, lng: item.lng }, token).then((v) => live && setG({ key, v: v[0] ?? null }));
     return () => {
       live = false;
     };
-  }, [key, item.id, item.name, item.lat, item.lng]);
+  }, [key, item.id, item.name, item.lat, item.lng, token]);
   const v = g?.key === key ? g.v : null;
   if (!v || broken) return null;
   return (

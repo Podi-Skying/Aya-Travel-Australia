@@ -143,7 +143,7 @@ function ActNote({ text }: { text: string }) {
 }
 
 export function DaysView({ active }: { active: boolean }) {
-  const { doc, mode, currentDay, setCurrentDay, runOp, runOpUndoable, ask, online, myVotes, vote, unvote, counts, canVote } = useTrip();
+  const { doc, mode, currentDay, setCurrentDay, runOp, runOpUndoable, ask, online, myVotes, vote, unvote, counts, canVote, token } = useTrip();
   const [focusId, setFocusId] = useState<string | null>(null);
   const [viewer, setViewer] = useState<number | null>(null);
   const [addOpen, setAddOpen] = useState(false);
@@ -459,7 +459,7 @@ export function DaysView({ active }: { active: boolean }) {
                           {i.photo && i.id !== dayHero?.id && (
                             <ActPhoto id={i.id} name={i.name} photo={i.photo} caption={false} onOpen={() => setViewer(dayPhotos.findIndex((p) => p.id === i.id))} />
                           )}
-                          {!i.photo && owner && i.lat != null && <GooglePhoto item={i} alt={i.name} className="act-gphoto" />}
+                          {!i.photo && (owner || token) && i.lat != null && <GooglePhoto item={i} alt={i.name} className="act-gphoto" />}
                         </div>
                         {i.note && <ActNote text={i.note} />}
                         {i.ownerNote && (
