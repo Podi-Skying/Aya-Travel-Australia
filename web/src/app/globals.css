@@ -936,3 +936,25 @@ details.card.day-summary > summary h3 { margin: 0; }
   .btn:active, .chip:active, .pg-thumb:not(.is-static):hover, .pg-thumb:not(.is-static):active { transform: none; }
 }
 .g-probe { display: block; }
+
+/* Weather and rain plans (Kai 2026-10-26) */
+.wx-icon { flex: 0 0 auto; color: var(--ink-2); vertical-align: -3px; }
+.wx-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; background: var(--paper-raised); color: var(--ink); font-size: .8rem; font-variant-numeric: tabular-nums; vertical-align: middle; white-space: nowrap; }
+.wx-chip.none { color: var(--ink-muted); }
+.wx-chip.wet .wx-icon, .wx-chip.wet .pop { color: var(--vermilion); }
+.wx-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 8px 0; }
+.wx-warn { color: var(--vermilion); font-weight: 500; }
+.wx-note { margin: 2px 0 0; color: var(--ink-2); }
+.cal-wx { position: absolute; top: 2px; right: 3px; line-height: 0; color: var(--ink-muted); }
+.cal-wx.wet { color: var(--vermilion); }
+.cal-wx .wx-icon { vertical-align: 0; }
+.rain-plan { margin: 12px 0; border-left: 2px solid var(--vermilion); }
+.rain-plan h3 { display: flex; align-items: center; gap: 6px; }
+.rain-plan > ul { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 12px; }
+.rain-alts { margin: 4px 0 4px; padding-left: 18px; display: grid; gap: 4px; }
+.rain-alts .btn, .rain-plan .btn { min-height: 44px; margin-left: 6px; }
+.rain-swap { margin-top: 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.wx-strip ol { list-style: none; margin: 0 0 8px; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.wx-strip li { display: grid; gap: 2px; padding: 8px 10px; border-radius: 12px; background: var(--bg); }
+.wx-strip li.wet { box-shadow: inset 2px 0 0 var(--vermilion); }
+.wx-strip .d { font-weight: 500; }

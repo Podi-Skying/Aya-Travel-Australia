@@ -2,6 +2,7 @@ import { CATEGORIES, DEFAULT_PEOPLE, PEOPLE, MODES, PRIORITIES, COST_STATUS, COS
 import type { Cost, Day, Item, Package, TripDoc } from "./schema";
 import { effectiveDay } from "./effective-day";
 import { fmtDay } from "./format";
+import { isLogistics } from "./day-title";
 
 /*
  * Owner operations. Each takes the current document and returns a new document
@@ -35,6 +36,9 @@ export type Op =
   | { op: "applyOption"; key: string }
   | { op: "setDayTitle"; date: string; title: string }
   | { op: "addQuizPlan"; date: string; refs: { key: string; itemId: string }[]; nextRefs?: { key: string; itemId: string }[] }
+  | { op: "setIndoor"; itemId: string; indoor: "" | "yes" | "no" }
+  | { op: "useBackup"; date: string; itemId: string; key: string; backupId: string }
+  | { op: "swapDays"; date: string; toDate: string }
   | { op: "snapshot"; summary: string };
 
 export type ItemFields = {
@@ -531,6 +535,53 @@ export function applyOp(input: TripDoc, op: Op): OpResult {
       }
       const n = refs.length + next.length;
       return { ok: true, doc: cur, summary: next.length ? `從小測驗加入 ${n} 個景點到 ${fmtDay(op.date)}–${fmtDay(date2)}（過夜，待確認）` : `從小測驗加入 ${n} 個景點到 ${fmtDay(op.date)}（待確認）` };
+    }
+    case "setIndoor": {
+      // Rain plans (Kai 2026-10-26): the owner marks an activity indoor or outdoor, or back to automatic.
+      const it = [...doc.days.flatMap((d) => d.items), ...doc.attractionPool.flatMap((p) => p.items)].find((i) => i.id === op.itemId);
+      if (!it) return err(404, "找不到活動");
+      if (op.indoor === "") delete it.indoor;
+      else if (op.indoor === "yes" || op.indoor === "no") it.indoor = op.indoor === "yes";
+      else return err(400, "室內／戶外設定不正確");
+      return { ok: true, doc, summary: `「${it.name}」設為${op.indoor === "" ? "自動判斷" : op.indoor === "yes" ? "室內" : "戶外"}` };
+    }
+    case "useBackup": {
+      // 換成備案: the outdoor activity goes back to the pool and the indoor alternative takes its time slot.
+      const d = findDay(doc, op.date);
+      const it = d && findItem(d, op.itemId);
+      if (!d || !it) return err(404, "找不到活動");
+      const out = applyOp(doc, { op: "unscheduleItem", date: op.date, itemId: op.itemId });
+      if (!out.ok) return out;
+      const into = applyOp(out.doc, { op: "scheduleItem", key: op.key, itemId: op.backupId, date: op.date });
+      if (!into.ok) return into;
+      const day = findDay(into.doc, op.date)!;
+      const b = findItem(day, op.backupId)!;
+      b.time = it.time;
+      b.status = "pending";
+      sortItems(day);
+      return { ok: true, doc: into.doc, summary: `${fmtDay(op.date)} 雨天備案：「${it.name}」換成「${b.name}」` };
+    }
+    case "swapDays": {
+      // 和晴天對調: movable plans trade places; booked items, stays, work and transport stay where they are.
+      const a = findDay(doc, op.date);
+      const b = findDay(doc, op.toDate);
+      if (!a || !b || a === b) return err(404, "找不到日期");
+      if (a.seg !== b.seg) return err(400, "只能和同一個目的地的日子對調");
+      const inPlan = (date: string) => doc.tripOptions.some((o) => o.chosen && isRealDate(o.start) && o.days.some((_, k) => new Date(Date.parse(o.start + "T00:00:00Z") + k * 86_400_000).toISOString().slice(0, 10) === date));
+      if (inPlan(a.date) || inPlan(b.date)) return err(400, "採用中的跨日行程方案那幾天不能對調，請先換方案");
+      const movable = (i: Item) => i.status !== "confirmed" && !isLogistics(i) && !i.name.startsWith("住宿：") && !/^Kai 有工作/.test(i.name);
+      const fromA = a.items.filter(movable).map((i) => i.id);
+      const fromB = b.items.filter(movable).map((i) => i.id);
+      if (!fromA.length && !fromB.length) return err(400, "兩天都沒有可以對調的活動");
+      let cur = doc;
+      for (const [from, to, ids] of [[a.date, b.date, fromA], [b.date, a.date, fromB]] as const) {
+        for (const id of ids) {
+          const r = applyOp(cur, { op: "moveItem", date: from, itemId: id, toDate: to });
+          if (!r.ok) return r;
+          cur = r.doc;
+        }
+      }
+      return { ok: true, doc: cur, summary: `${fmtDay(a.date)} 和 ${fmtDay(b.date)} 的行程對調（天氣）` };
     }
     case "setDayTitle": {
       // A pinned title stays as written; an empty one returns the day to its automatic title.

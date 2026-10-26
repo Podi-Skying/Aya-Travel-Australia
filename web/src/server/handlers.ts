@@ -9,6 +9,7 @@ import { dailyCap, hobartDay, monthCost, noteGoogleHit, usageSince } from "./usa
 import { getLookup } from "./cache";
 import { missingConfig } from "./config";
 import { getPublicHomeTrip, publicHomeEnabled } from "./public-home";
+import { ownerTripDoc, tripWeather } from "./weather";
 import { applyOwnerOp, deleteTrip, getCurrentTrip, importDoc, listVersions, restoreVersion } from "./trips";
 import { routeQuota, sha256, createShareLink, deactivateShareLinks, getPublicTrip, interestCounts, myVotes, shareStatus, submitVote, withdrawVote } from "./sharing";
 import { alertStatus } from "@/domain/rules";
@@ -34,7 +35,7 @@ export const getTrip = ownerRoute(async (_req, owner) => {
 const OPS = new Set<Op["op"]>([
   "setPriority", "toggleVerify", "confirmDriver", "clearDriver", "setPartySize", "setParticipants",
   "editItem", "addItem", "removeItem", "schedulePackage", "scheduleItem", "unscheduleItem", "moveItem", "setStatus", "clearDay", "setPeople",
-  "addSkyLink", "removeSkyLink", "addSkyPost", "removeSkyPost", "applyOption", "setDayTitle", "addQuizPlan", "snapshot",
+  "addSkyLink", "removeSkyLink", "addSkyPost", "removeSkyPost", "applyOption", "setDayTitle", "addQuizPlan", "setIndoor", "useBackup", "swapDays", "snapshot",
 ]);
 
 export const postOp = ownerRoute(async (req, owner) => {
@@ -171,6 +172,19 @@ export async function getSky() {
 }
 
 const ROUTE_BYTES = 4_000;
+
+/** Trip weather (Open-Meteo, cached 3 h server-side): city names and forecasts only, for every viewer. */
+export async function getWeather() {
+  const cfg = publicConfigError();
+  if (cfg) return cfg;
+  try {
+    const doc = await ownerTripDoc();
+    if (!doc) return fail(404, "找不到行程");
+    return json(await tripWeather(doc), 200, { "cache-control": "public, s-maxage=900, stale-while-revalidate=3600" });
+  } catch (e) {
+    return errorResponse(e);
+  }
+}
 
 /** Road legs: the owner computes missing legs, everyone else reads the cache only. */
 export async function postRoutes(req: Request) {

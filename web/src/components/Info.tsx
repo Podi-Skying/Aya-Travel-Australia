@@ -1,6 +1,7 @@
 "use client";
 
 import { useTrip } from "./TripApp";
+import { WeatherStrip } from "./Weather";
 import { Icon } from "./Icon";
 import { Badge, PRI, STATUS, VERIFY } from "./ui";
 import { fmtDay, fmtTs } from "@/domain/format";
@@ -45,6 +46,7 @@ export function Info() {
           <p className="muted small">道路與國家公園警示沒有自動查詢，請用上面的官方連結確認。極光指數有即時資料（見下方「極光與藍眼淚」）。</p>
         </div>
       </div>
+      <WeatherStrip />
       <SkyWatch />
       {mode === "owner" && <GoogleUsage />}
       <div className="card section">

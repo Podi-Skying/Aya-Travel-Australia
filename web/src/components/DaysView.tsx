@@ -9,6 +9,9 @@ import { clearDaySplit } from "@/domain/ops";
 import { AvatarStack, PeopleToggle, peopleOf } from "./People";
 import { PEOPLE, type Person } from "@/domain/schema";
 import { DayCalendar } from "./DayCalendar";
+import { useWeather } from "@/client/weather";
+import { RainPlan, WxChip, WxLine, wxFor } from "./Weather";
+import { weatherNote } from "@/domain/weather";
 import { CATEGORY_META, distanceLabel, nearbyPlaces, type NearbyPlace } from "./Places";
 import { ActPhotoImg, PhotoViewer, mapsPhotoLink, type DayPhoto } from "./Photos";
 import { DayMap } from "./MapViews";
@@ -147,6 +150,7 @@ function ActNote({ text }: { text: string }) {
 
 export function DaysView({ active }: { active: boolean }) {
   const { doc, mode, currentDay, setCurrentDay, runOp, runOpUndoable, ask, online, myVotes, vote, unvote, counts, canVote, token } = useTrip();
+  const weather = useWeather();
   const [focusId, setFocusId] = useState<string | null>(null);
   const [viewer, setViewer] = useState<number | null>(null);
   const [addOpen, setAddOpen] = useState(false);
@@ -307,7 +311,7 @@ export function DaysView({ active }: { active: boolean }) {
           <div className="day-head">
             <div>
               <div className="day-date">
-                第 {currentDay + 1} 天・{fmtDay(d.date)}・{seg?.name}
+                第 {currentDay + 1} 天・{fmtDay(d.date)}・{seg?.name} {weather && <WxChip wx={wxFor(weather, d.date)?.wx ?? null} place={wxFor(weather, d.date)?.place} />}
               </div>
               <h2>{dayTitle(raw)}</h2>
               {night !== "none" && st.name && (
@@ -358,6 +362,18 @@ export function DaysView({ active }: { active: boolean }) {
               {d.needsDriver && <Badge t={d.driverOk ? `司機：${d.needsDriver} 已確認` : `司機：${d.needsDriver}（未確認）`} c={d.driverOk ? "b-ok" : "b-warn"} />}
             </div>
           )}
+          {weather && <WxLine day={wxFor(weather, d.date)} />}
+          <RainPlan
+            date={d.date}
+            seg={d.seg}
+            items={raw.items}
+            pool={doc}
+            w={weather}
+            owner={editable}
+            onUse={(itemId, key, backupId) => runOpUndoable({ op: "useBackup", date: d.date, itemId, key, backupId }, "已換成備案，可以按「復原」")}
+            onSwapDay={(toDate) => runOpUndoable({ op: "swapDays", date: d.date, toDate }, "已對調，可以按「復原」")}
+            onIndoor={(itemId) => runOp({ op: "setIndoor", itemId, indoor: "yes" })}
+          />
           <div className="day-facts two">
             <div className="fact">
               <div className="k">當日花費（{N} 人）</div>
@@ -458,6 +474,7 @@ export function DaysView({ active }: { active: boolean }) {
                               {!samePeople(peopleOf(i, raw), dayPeople) && <AvatarStack people={peopleOf(i, raw)} size={22} />}
                             </div>
                             <h4>{i.name}</h4>
+                            {weatherNote(i) && <p className="small wx-note">{weatherNote(i)}</p>}
                             <div className="meta">
                               <span>
                                 <Icon name={MODE_ICON[i.mode] ?? "route"} size={16} /> {MODE[i.mode]}

@@ -3,6 +3,9 @@
 import { dayTitle } from "@/domain/day-title";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { useTrip } from "./TripApp";
+import { useWeather } from "@/client/weather";
+import { WxIcon, wxFor } from "./Weather";
+import { isWet } from "@/domain/weather";
 import { useHobartToday, useReducedMotion } from "./ui";
 import { Icon } from "./Icon";
 import { dayStatus, monthGrid, moveInGrid, weekIndexOf, type DayStatus } from "@/domain/calendar";
@@ -35,6 +38,7 @@ function useNarrow() {
 
 export function DayCalendar() {
   const { doc, currentDay, setCurrentDay } = useTrip();
+  const weather = useWeather();
   const today = useHobartToday();
   const reduce = useReducedMotion();
   const narrow = useNarrow();
@@ -283,6 +287,14 @@ export function DayCalendar() {
                     onFocus={() => setFocusIdx(c.dayIdx)}
                   >
                     <span className="n">{c.day}</span>
+                    {(() => {
+                      const wx = wxFor(weather, x2.date)?.wx;
+                      return wx ? (
+                        <span className={`cal-wx${isWet(wx) ? " wet" : ""}`} aria-hidden="true">
+                          <WxIcon code={wx.code} size={12} />
+                        </span>
+                      ) : null;
+                    })()}
                     {warn[c.dayIdx] && <span className="dot" />}
                     {status[c.dayIdx] === "pending" && <span className="q" aria-hidden="true">?</span>}
                     {x2.needsDriver && (
