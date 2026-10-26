@@ -1,5 +1,6 @@
-import { and, eq, or, sql } from "drizzle-orm";
+import { and, eq, or } from "drizzle-orm";
 import { getDb, schema } from "./db/client";
+import { GOOGLE_ROUTE_TTL_MS, googleKey, googleLegs, type GFetch } from "./google";
 
 /*
  * Road legs between consecutive stops (PLAN-2026-10-26 §2). Every computed leg is stored in
@@ -68,11 +69,21 @@ async function readCached(points: Pt[], mode: string): Promise<(Leg | null)[]> {
     );
   return pairs.map(([a, b]) => {
     const r = rows.find((x) => x.fromLat === a[0] && x.fromLng === a[1] && x.toLat === b[0] && x.toLng === b[1]);
+    // Google route data is kept for at most 30 days (Maps Platform terms); older rows count as missing.
+    if (r && r.source.startsWith("google") && Date.now() - r.computedAt.getTime() > GOOGLE_ROUTE_TTL_MS) return null;
     return r ? { distanceM: r.distanceM, durationS: r.durationS, geometry: r.geometry as Pt[], source: r.source, computedAt: r.computedAt.toISOString() } : null;
   });
 }
 
-export async function getLegs(raw: Pt[], opts: { compute: boolean; refresh?: boolean; fetch?: Fetch } = { compute: false }): Promise<{ legs: (Leg | null)[]; computed: number; cached?: boolean }> {
+/**
+ * Legs for consecutive points from route_cache. Only with `compute` (owner action or backfill) are
+ * missing legs computed: Google Routes when a key is configured, OSRM otherwise. `upgrade` also
+ * recomputes cached non-Google legs once a key exists. Page views never compute.
+ */
+export async function getLegs(
+  raw: Pt[],
+  opts: { compute: boolean; refresh?: boolean; upgrade?: boolean; fetch?: Fetch; gfetch?: GFetch; provider?: "google" | "osrm" } = { compute: false },
+): Promise<{ legs: (Leg | null)[]; computed: number; cached?: boolean }> {
   const points = raw.map(roundPt);
   const mode = "driving";
   // Consecutive duplicates (two activities at one place) are zero legs, not routing work.
@@ -85,16 +96,18 @@ export async function getLegs(raw: Pt[], opts: { compute: boolean; refresh?: boo
   points.slice(1).forEach((b, i) => {
     if (same(points[i], b)) legs[i] = { distanceM: 0, durationS: 0, geometry: [b], source: "same-place", computedAt: new Date(0).toISOString() };
   });
-  const need = opts.refresh ? points.slice(1).some((b, i) => !same(points[i], b)) : legs.some((l) => !l);
+  const provider = opts.provider ?? (googleKey() ? "google" : "osrm");
+  const redo = (l: Leg | null) => !l || (opts.upgrade && provider === "google" && l.source !== "google-routes" && l.source !== "same-place");
+  const need = opts.refresh ? points.slice(1).some((b, i) => !same(points[i], b)) : legs.some(redo);
   if (!opts.compute || !need) return { legs, computed: 0 };
-  const fresh = await osrm(points, opts.fetch ?? (fetch as unknown as Fetch));
+  const fresh = provider === "google" ? await googleLegs(points, opts.gfetch) : await osrm(points, opts.fetch ?? (fetch as unknown as Fetch));
   const db = await getDb().catch(() => null);
   const now = new Date();
   let computed = 0;
   let cached = !!db;
   for (let i = 0; i < fresh.length; i++) {
     const [a, b] = [points[i], points[i + 1]];
-    if (same(a, b) || (!opts.refresh && legs[i])) continue;
+    if (same(a, b) || (!opts.refresh && !redo(legs[i]))) continue;
     const row = { fromLat: a[0], fromLng: a[1], toLat: b[0], toLng: b[1], mode, ...fresh[i], computedAt: now };
     // A failed write or no database (e.g. before the migration) still returns the computed leg.
     await db
@@ -102,7 +115,8 @@ export async function getLegs(raw: Pt[], opts: { compute: boolean; refresh?: boo
       .values(row)
       .onConflictDoUpdate({
         target: [routeCache.fromLat, routeCache.fromLng, routeCache.toLat, routeCache.toLng, routeCache.mode],
-        set: opts.refresh ? { distanceM: row.distanceM, durationS: row.durationS, geometry: row.geometry, source: row.source, computedAt: now } : { mode: sql`${routeCache.mode}` },
+        // Only missing, expired, upgraded or refreshed legs reach here, so the new result replaces the row.
+        set: { distanceM: row.distanceM, durationS: row.durationS, geometry: row.geometry, source: row.source, computedAt: now },
       })
       .catch(() => {
         cached = false;

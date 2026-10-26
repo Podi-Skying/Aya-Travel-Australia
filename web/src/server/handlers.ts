@@ -3,6 +3,9 @@ import { errorResponse, fail, HttpError, json, ownerRoute, readJson, sameOrigin 
 import { checkOwner } from "./owner";
 import { getLegs, MAX_POINTS, validPoints } from "./routes";
 import { getKpOutlook } from "./sky";
+import { googleKey, placePhoto } from "./google";
+import { dailyCap, hobartDay, monthCost, noteGoogleHit, usageSince } from "./usage";
+import { getLookup } from "./cache";
 import { missingConfig } from "./config";
 import { getPublicHomeTrip, publicHomeEnabled } from "./public-home";
 import { applyOwnerOp, deleteTrip, getCurrentTrip, importDoc, listVersions, restoreVersion } from "./trips";
@@ -185,6 +188,8 @@ export async function postRoutes(req: Request) {
     const hit = await getLegs(points, { compute: false });
     const refresh = owner && b.refresh === true;
     const missing = hit.legs.some((l) => !l);
+    // A page view answered from route_cache: counted as a cache hit, no Google call.
+    if (!missing && googleKey()) await noteGoogleHit("routes");
     if (!owner || (!missing && !refresh)) return json(hit);
     if (!(await routeQuota(`routes:${c!.ok ? c!.owner.githubId : ""}`, 30, false))) return json({ ...hit, limited: true });
     const r = await getLegs(points, { compute: true, refresh }).catch(() => null); // routing service unavailable: straight lines stay
@@ -193,3 +198,46 @@ export async function postRoutes(req: Request) {
     return errorResponse(e);
   }
 }
+
+/* ---------- Google (docs/PLAN-2026-10-26-google.md) ---------- */
+
+/** Owner-only: key configured (boolean), the last 14 days per API, month-to-date estimate. Never the key. */
+export const getGoogleStatus = ownerRoute(async () => {
+  const now = new Date();
+  const days = await usageSince(hobartDay(new Date(now.getTime() - 13 * 86_400_000))).catch(() => []);
+  const today = days.find((d) => d.date === hobartDay(now));
+  return json({ keyPresent: !!googleKey(), dailyCap: dailyCap(), callsToday: today?.calls ?? 0, days, month: await monthCost(hobartDay(now).slice(0, 7)).catch(() => ({ usd: 0, calls: {} })) });
+});
+
+/**
+ * Numbers-only daily usage for a scheduled report (no login): counts per API, cache hits and the
+ * month-to-date cost estimate. No keys, places or people. Rate limited per client.
+ */
+export async function getUsageDaily(req: Request) {
+  try {
+    const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || "unknown";
+    if (!(await routeQuota(`usage-ip:${sha256(ip)}`, 30))) return fail(429, "操作太頻繁，請稍後再試");
+    const q = new URL(req.url).searchParams.get("date");
+    const date = q && /^\d{4}-\d{2}-\d{2}$/.test(q) ? q : hobartDay();
+    const d = (await usageSince(date).catch(() => [])).find((x) => x.date === date);
+    const month = await monthCost(date.slice(0, 7)).catch(() => ({ usd: 0, calls: {} }));
+    return json({ date, apis: d?.apis ?? {}, calls: d?.calls ?? 0, cacheHits: d?.hits ?? 0, dailyCap: dailyCap(), monthToDate: { estimatedUsd: month.usd, calls: month.calls } });
+  } catch (e) {
+    return errorResponse(e);
+  }
+}
+
+/**
+ * A live Google photo for an activity whose place id was found by the backfill. Photo names may not
+ * be cached (Places terms), so each answer is resolved now; browsers keep it 30 minutes. Owner only:
+ * guests never trigger Google calls.
+ */
+export const getPlacePhoto = ownerRoute(async (req) => {
+  const item = new URL(req.url).searchParams.get("item") ?? "";
+  if (!/^[A-Za-z0-9_-]{1,40}$/.test(item)) return fail(400, "缺少活動 id");
+  const hit = await getLookup<{ placeId: string | null }>("place-id", item).catch(() => null);
+  if (!hit?.value.placeId) return fail(404, "沒有 Google 地點");
+  const p = await placePhoto(hit.value.placeId).catch(() => null);
+  if (!p) return fail(404, "沒有照片");
+  return json(p, 200, { "cache-control": "private, max-age=1800" });
+});

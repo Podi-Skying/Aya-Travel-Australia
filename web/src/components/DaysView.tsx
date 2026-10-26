@@ -17,6 +17,7 @@ import { basis, dayTotal, lineAmount, stayOf } from "@/domain/budget";
 import { fmtDay, mins, money } from "@/domain/format";
 import type { Item } from "@/domain/schema";
 import { legLabel, stopsOf, useLegs, type Leg } from "./useLegs";
+import { GooglePhoto } from "./GooglePhoto";
 
 function Legs({ travel, road }: { travel: Item["travel"]; road?: Leg | null }) {
   const parts = Object.entries(travel ?? {}).filter(([, v]) => (v ?? 0) > 0) as [string, number][];
@@ -437,6 +438,7 @@ export function DaysView({ active }: { active: boolean }) {
                           {i.photo && i.id !== dayHero?.id && (
                             <ActPhoto id={i.id} name={i.name} photo={i.photo} caption={false} onOpen={() => setViewer(dayPhotos.findIndex((p) => p.id === i.id))} />
                           )}
+                          {!i.photo && owner && i.lat != null && <GooglePhoto itemId={i.id} alt={i.name} className="act-gphoto" />}
                         </div>
                         {i.note && <ActNote text={i.note} />}
                         {i.ownerNote && (

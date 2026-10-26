@@ -108,3 +108,15 @@ export const lookupCache = pgTable(
   },
   (t) => [primaryKey({ columns: [t.kind, t.key] })],
 );
+
+/* Google Maps Platform calls per Hobart day and API (docs/PLAN-2026-10-26-google.md). Numbers only. */
+export const googleUsage = pgTable(
+  "google_usage",
+  {
+    day: text("day").notNull(),
+    api: text("api").notNull(),
+    calls: integer("calls").notNull().default(0),
+    hits: integer("hits").notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.day, t.api] })],
+);

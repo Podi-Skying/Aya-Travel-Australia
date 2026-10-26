@@ -21,6 +21,7 @@ function useNarrow(): boolean {
 import { ShareButton } from "./Share";
 import { PlanReel } from "./PlanReel";
 import { PhotoCredit } from "./Photos";
+import { GooglePhoto } from "./GooglePhoto";
 import { dayNightLabel, optionCard, optionPalette, type OptionCard } from "@/domain/options";
 import { OPTION_THEMES } from "@/domain/schema";
 import { fmtDay, fmtMD, money } from "@/domain/format";
@@ -190,6 +191,8 @@ function OptionDetail({ c }: { c: OptionCard }) {
                           <PhotoCredit photo={it.photo} />
                         </figcaption>
                       </figure>
+                    ) : mode === "owner" ? (
+                      <GooglePhoto itemId={it.id} alt={it.name} />
                     ) : (
                       <div className="plan-stop-noimg" aria-hidden="true" />
                     )}

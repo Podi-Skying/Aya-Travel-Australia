@@ -6,6 +6,7 @@ import { Badge, PRI, STATUS, VERIFY } from "./ui";
 import { fmtDay, fmtTs } from "@/domain/format";
 import { SkyWatch } from "./SkyWatch";
 import { Checklist } from "./Checklist";
+import { GoogleUsage } from "./GoogleUsage";
 
 export function Info() {
   const { doc, mode, alerts, lastSyncAt, offlineCopy, gotoDay } = useTrip();
@@ -45,6 +46,7 @@ export function Info() {
         </div>
       </div>
       <SkyWatch />
+      {mode === "owner" && <GoogleUsage />}
       <div className="card section">
         <h3>最後已知的規劃提醒</h3>
         <p className="muted small">

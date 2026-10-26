@@ -15,6 +15,13 @@
       "when": 1792944862687,
       "tag": "0001_caches",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792974566657,
+      "tag": "0002_google_usage",
+      "breakpoints": true
     }
   ]
 }
