@@ -62,7 +62,7 @@ export function PlanQuiz({ active }: { active: boolean }) {
   // or renamed place asks again, as the server does).
   const idOf = (i: Item) => `${i.id}|${i.name}|${i.lat}|${i.lng}`;
   const [commons, setCommons] = useState<Record<string, string | null>>({});
-  const needKey = shown.filter((i) => !i.photo && !i.gallery?.length && !(idOf(i) in commons)).map(idOf).join("\n");
+  const needKey = shown.filter((i) => !i.photo && !i.gallery?.length && !i.photoSources && !(idOf(i) in commons)).map(idOf).join("\n");
   useEffect(() => {
     if (!active || !needKey || !(mode === "owner" || token)) return;
     const need = shown.filter((i) => needKey.split("\n").includes(idOf(i)));

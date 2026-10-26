@@ -52,7 +52,7 @@ export function tripShots(days: { date: string; items: Item[] }[], pool: { items
   };
   const each = (i: Item, date?: string, dayIndex?: number) => {
     if (isLogistics(i) || i.name.startsWith("住宿：")) return;
-    for (const p of [i.photo, ...(i.gallery ?? []), ...(commons[i.id] ?? [])]) if (p) add(i, p, date, dayIndex);
+    for (const p of [i.photo, ...(i.gallery ?? []), ...(i.photoSources ? [] : (commons[i.id] ?? []))]) if (p) add(i, p, date, dayIndex);
   };
   days.forEach((d, k) => d.items.forEach((i) => each(i, d.date, k)));
   pool.forEach((p) => p.items.forEach((i) => each(i)));

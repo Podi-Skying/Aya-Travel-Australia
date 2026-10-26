@@ -103,6 +103,8 @@ export const itemSchema = z.object({
   cat: z.enum(CATEGORIES).optional(),
   /** Owner override for rain plans (Kai 2026-10-26): true indoor/sheltered, false outdoor; absent = inferred. */
   indoor: z.boolean().optional(),
+  /** Curated photos (Kai 2026-10-27): "own" shows only the item's photo and gallery; "own+google" adds live Google photos but no Wikimedia search results. */
+  photoSources: z.enum(["own", "own+google"]).optional(),
   /** Booking state: confirmed (locked against moves) or pending; absent = planned. Driver days add "tentative" (effective-day.ts). */
   status: z.enum(["confirmed", "pending"]).optional(),
   /** Owner-only detail (flight numbers, workplace); removed from every public document. */

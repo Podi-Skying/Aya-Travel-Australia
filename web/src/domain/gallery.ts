@@ -9,7 +9,10 @@ import type { Item, Photo } from "./schema";
 export type GoogleShot = { photoUri: string; attributions: { name: string; uri?: string }[]; mapsUri: string };
 export type GalleryPhoto = { src: string; alt: string; title: string; subtitle?: string; pos?: string; credit: { label: string; href: string; authors?: { name: string; uri?: string }[] } };
 
-export function galleryPhotos(item: Pick<Item, "name" | "photo" | "gallery">, commons: Photo[] = [], google: GoogleShot[] = []): GalleryPhoto[] {
+export function galleryPhotos(item: Pick<Item, "name" | "photo" | "gallery" | "photoSources">, commons: Photo[] = [], google: GoogleShot[] = []): GalleryPhoto[] {
+  // Curated places keep their own photos (and Google ones for "own+google"), never the Wikimedia search.
+  if (item.photoSources) commons = [];
+  if (item.photoSources === "own") google = [];
   const out: GalleryPhoto[] = [];
   const seen = new Set<string>();
   const add = (g: GalleryPhoto) => {

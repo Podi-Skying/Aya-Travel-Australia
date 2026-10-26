@@ -94,7 +94,8 @@ export function PlaceGallery(props: { item: Item; className?: string; empty?: "t
 function PlaceGalleryInner({ item, className = "", empty = "hide" }: { item: Item; className?: string; empty?: "tile" | "hide" }) {
   const { mode, token } = useTrip();
   const privateView = mode === "owner" || !!token;
-  const googleOk = privateView && item.lat != null && !isLogistics(item) && !item.name.startsWith("住宿：");
+  const googleOk = privateView && item.lat != null && !isLogistics(item) && !item.name.startsWith("住宿：") && item.photoSources !== "own";
+  const commonsOk = privateView && !item.photoSources;
   const ref = `${item.id}|${item.name}|${item.lat}|${item.lng}`;
   const r = useMemo(() => ({ id: item.id, name: item.name, lat: item.lat, lng: item.lng }), [item.id, item.name, item.lat, item.lng]);
   const [commons, setCommons] = useState<{ id: string; list: Photo[] } | null>(null);
@@ -110,7 +111,8 @@ function PlaceGalleryInner({ item, className = "", empty = "hide" }: { item: Ite
   const swipe = useRef<{ x: number; y: number; used: boolean } | null>(null);
 
   const own = galleryPhotos(item, undefined, undefined).length;
-  const c = commons?.id === ref ? commons.list : undefined;
+  // Curated places skip the Wikimedia list entirely.
+  const c = !commonsOk && privateView ? [] : commons?.id === ref ? commons.list : undefined;
   const g = google?.id === ref ? google.list : undefined;
 
   useEffect(() => {
@@ -128,7 +130,7 @@ function PlaceGalleryInner({ item, className = "", empty = "hide" }: { item: Ite
     return () => io.disconnect();
   }, [seen]);
   useEffect(() => {
-    if (!seen || !privateView) return;
+    if (!seen || !commonsOk) return;
     let live = true;
     void commonsFor(r, token).then((list) => {
       if (!live) return;
@@ -138,21 +140,23 @@ function PlaceGalleryInner({ item, className = "", empty = "hide" }: { item: Ite
     return () => {
       live = false;
     };
-  }, [seen, privateView, ref, r, token, own]);
+  }, [seen, privateView, commonsOk, ref, r, token, own]);
+  // A curated place with no photo of its own asks Google as soon as it is on screen.
+  const wantG = wantGoogle || (seen && privateView && !commonsOk && !own);
   useEffect(() => {
-    if (!wantGoogle || !googleOk) return;
+    if (!wantG || !googleOk) return;
     let live = true;
     void googleFor(r, token).then((list) => live && setGoogle({ id: ref, list }));
     return () => {
       live = false;
     };
-  }, [wantGoogle, googleOk, ref, r, token]);
+  }, [wantG, googleOk, ref, r, token]);
 
   // Photos that failed to load drop out; when none is left the category tile shows.
   const photos = galleryPhotos(item, c, g).filter((x) => !broken.has(x.src));
   const commonsPending = privateView && c === undefined;
-  const googlePending = googleOk && wantGoogle && g === undefined;
-  const more = googleOk && g === undefined && !wantGoogle; // Google may add photos at the end
+  const googlePending = googleOk && wantG && g === undefined;
+  const more = googleOk && g === undefined && !wantG; // Google may add photos at the end
   const cur = photos.length ? Math.min(idx, photos.length - 1) : 0;
   const p = photos[cur];
 
