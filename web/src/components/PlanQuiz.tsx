@@ -87,6 +87,8 @@ export function PlanQuiz({ active }: { active: boolean }) {
           <h3 id="q1">想去塔州哪個區域？</h3>
           <ChromaGrid
             theme="light"
+            grayscale={0}
+            dim={0}
             columns={3}
             radius={260}
             selectedLabel="選這裡"
@@ -99,7 +101,7 @@ export function PlanQuiz({ active }: { active: boolean }) {
             items={regions.map(({ r, list }) => ({
               image: photoOf(list.find((p) => p.item.photo)?.item ?? list[0].item),
               title: r.name,
-              subtitle: [`${list.length} 個景點`, r.car ? "需要開車" : "公車可到", r.far].filter(Boolean).join("・"),
+              subtitle: [`${list.length} 個景點`, r.car ? "需要開車" : "公車可到", r.note, r.far].filter(Boolean).join("・"),
               accent: accentFor(r.key),
             }))}
           />
@@ -113,6 +115,8 @@ export function PlanQuiz({ active }: { active: boolean }) {
           {reg.far && <p className="small quiz-warn">{reg.far}</p>}
           <ChromaGrid
             theme="light"
+            grayscale={0}
+            dim={0}
             columns={3}
             radius={260}
             selected={inRegion.map((p) => picked.includes(p.item.id))}

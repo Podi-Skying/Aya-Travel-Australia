@@ -672,7 +672,7 @@ details.card.day-summary > summary h3 { margin: 0; }
 .act-main .top .avatars { margin-left: auto; }
 .people-toggle { display: flex; flex-wrap: wrap; gap: 6px; flex-basis: 100%; }
 .people-toggle .person { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 12px 0 6px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); color: var(--ink-2); font: inherit; font-size: .82rem; cursor: pointer; }
-.people-toggle .person img { width: 28px; height: 28px; border-radius: 50%; opacity: .45; filter: grayscale(.6); transition: opacity 120ms ease-out, filter 120ms ease-out; }
+.people-toggle .person img { width: 28px; height: 28px; border-radius: 50%; opacity: .45; transition: opacity 120ms ease-out; }
 .people-toggle .person.on { border-color: var(--ink); color: var(--ink); }
 .people-toggle .person.on img { opacity: 1; filter: none; }
 .people-toggle .person:disabled { cursor: default; }

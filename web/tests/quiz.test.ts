@@ -13,9 +13,17 @@ describe("planning quiz", () => {
     for (const p of places) {
       expect(p.item.lat!).toBeLessThan(-40);
       const r = REGIONS.find((x) => x.key === p.region)!;
-      expect(km(r.center, [p.item.lat!, p.item.lng!])).toBeLessThanOrEqual(r.km);
+      expect(r.areas.some((a) => km(a.center, [p.item.lat!, p.item.lng!]) <= a.km)).toBe(true);
       expect(p.item.name.startsWith("住宿：")).toBe(false);
     }
+  });
+
+  it("puts kunanyi and MONA under 荷巴特", () => {
+    const at = (lat: number, lng: number) => quizPlaces({ days: [], attractionPool: [{ key: "k", seg: "tas", items: [{ id: "x", name: "x", lat, lng }] }] } as unknown as TripDoc)[0]?.region;
+    expect(at(-42.8956, 147.2370)).toBe("hobart"); // kunanyi summit
+    expect(at(-42.8128, 147.2622)).toBe("hobart"); // MONA
+    expect(REGIONS.find((r) => r.key === "hobart")!.name).toBe("荷巴特");
+    expect(REGIONS.some((r) => r.key === "kunanyi" || r.key === "mona")).toBe(false);
   });
 
   it("orders stops nearest-first from home", () => {
