@@ -12,6 +12,7 @@ export type Region = { key: string; name: string; center: [number, number]; km: 
 export const REGIONS: Region[] = [
   { key: "hobart", name: "荷巴特市區", center: [-42.8826, 147.329], km: 5, car: false },
   { key: "kunanyi", name: "kunanyi／威靈頓山", center: [-42.896, 147.237], km: 4, car: true },
+  { key: "mona", name: "MONA 與北郊", center: [-42.825, 147.27], km: 7, car: false },
   { key: "south", name: "Kingston 與南邊海灘", center: [-42.98, 147.31], km: 9, car: false },
   { key: "richmond", name: "Richmond／Coal Valley", center: [-42.735, 147.44], km: 14, car: true },
   { key: "tasman", name: "塔斯曼半島", center: [-43.08, 147.85], km: 32, car: true },

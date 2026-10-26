@@ -109,7 +109,7 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
   const [pickedTab, setPickedTab] = useState<TabKey | null>(null);
   const [pickedDay, setPickedDay] = useState<number | null>(null);
   const url = useUrlState();
-  // Only tabs this mode can show (visitors have no 版本與分享 tab) (RV-01).
+  // Only tabs this mode can show (RV-01); the quiz is private.
   // The old 待安排景點 tab now lives on the map (?tab=pool keeps working).
   // Removed tabs (總覽, 預算, 版本與分享 — 2026-10-26) open 每日行程.
   const urlTabKey = url.tab === "pool" ? "map" : ["overview", "budget", "manage", "versions"].includes(url.tab ?? "") ? "days" : url.tab;
@@ -295,7 +295,7 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
             applyServerDoc(u.data.doc, u.data.versionNo);
             toast(`已復原（存成 v${u.data.versionNo}）`);
             void reloadVersions();
-          } else toast(u.status === 409 ? "行程已有其他修改，請到「版本與分享」手動還原" : u.error);
+          } else toast(u.status === 409 ? "行程已有其他修改，無法自動復原；請重新整理後查看最新內容" : u.error);
         },
       });
       return true;

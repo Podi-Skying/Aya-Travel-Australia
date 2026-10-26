@@ -37,3 +37,12 @@ describe("planning quiz", () => {
     expect(applyOp(doc, { op: "addQuizPlan", date, refs: [] }).ok).toBe(false);
   });
 });
+
+describe("quiz coverage", () => {
+  it("includes MONA itself", () => {
+    const doc = seedDoc() as TripDoc;
+    const mona = [...doc.days.flatMap((d) => d.items), ...doc.attractionPool.flatMap((p) => p.items)].find((i) => i.id === "a16")!;
+    Object.assign(mona, { lat: -42.81254, lng: 147.26146 });
+    expect(quizPlaces(doc).some((p) => p.item.id === "a16")).toBe(true);
+  });
+});

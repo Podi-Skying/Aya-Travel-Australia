@@ -235,7 +235,7 @@ function Result({
   // Legs: home → stops → home, estimated from straight-line distance (the map draws cached roads where known).
   const pts: [number, number][] = [[home.lat, home.lng], ...stops.map((s) => [s.item.lat!, s.item.lng!] as [number, number]), [home.lat, home.lng]];
   const legMin = pts.slice(1).map((p, k) => driveMinutes(km(pts[k], p)));
-  const stayMin = stops.reduce((a, s) => a + (s.item.dur || 60), 0);
+  const stayMin = stops.reduce((a, s) => a + (s.item.dur ?? 60), 0);
   const total = legMin.reduce((a, b) => a + b, 0) + stayMin;
   const [h, m] = start.split(":").map(Number);
   const backAt = h * 60 + m + total;
@@ -258,7 +258,7 @@ function Result({
             <strong>
               {k + 1}. {s.item.name}
             </strong>{" "}
-            <span className="small muted">停留約 {mins(s.item.dur || 60)}</span>
+            <span className="small muted">停留約 {mins(s.item.dur ?? 60)}</span>
           </li>
         ))}
         <li>

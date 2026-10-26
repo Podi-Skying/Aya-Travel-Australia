@@ -866,4 +866,4 @@ details.card.day-summary > summary h3 { margin: 0; }
 .quiz-route li { display: block; }
 .quiz-route .home-pin { display: inline-grid; width: 28px; height: 28px; vertical-align: middle; }
 .quiz .chroma-grid { margin-top: 8px; }
-@media (max-width: 720px) { .quiz .chroma-grid { --chroma-cols: 2 !important; } }
+@media (max-width: 720px) { .quiz .chroma-grid { --chroma-cols: 2 !important; --chroma-min: 120px !important; } }

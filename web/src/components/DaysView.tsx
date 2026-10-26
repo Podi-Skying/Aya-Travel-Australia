@@ -257,7 +257,7 @@ export function DaysView({ active }: { active: boolean }) {
               <>「{it.name}」會從行程裡刪掉，不會放回待安排景點。想之後再排，請改用「移回待安排」。</>
             )}
           </p>
-          <p className="small muted">刪除後 5 秒內可以按「復原」，之後也能從「版本與分享」還原。</p>
+          <p className="small muted">刪除後 5 秒內可以按「復原」。</p>
         </>
       ),
       fields: isMust ? [{ name: "confirm", label: "活動名稱", required: true }] : [],
