@@ -112,7 +112,7 @@ function MoveTo({ item, date, disabled }: { item: Item; date: string; disabled: 
           <option value="">選擇日期…</option>
           {days.map((d) => (
             <option key={d.date} value={d.date}>
-              {fmtDay(d.date)} {d.items.length ? d.title : "（可安排）"}
+              {fmtDay(d.date)} {d.items.length ? dayTitle(d) : "（可安排）"}
             </option>
           ))}
         </select>

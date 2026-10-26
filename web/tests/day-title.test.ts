@@ -48,3 +48,11 @@ describe("day titles", () => {
     for (const n of ["Mina", ...Object.keys(doc.drivers), "KwanHo"]) expect(titles).not.toContain(n);
   });
 });
+
+describe("day title review fixes", () => {
+  it("shows a pinned title in full and skips check-in steps", () => {
+    const long = "這是一個超過十八個字的自訂標題，用來測試不會被截斷的情況";
+    expect(dayTitle({ title: long, titlePinned: true, items: [] })).toBe(long);
+    expect(dayTitle({ title: "x", items: [mk("飯店入住"), mk("雪梨歌劇院")] })).toBe("雪梨歌劇院");
+  });
+});

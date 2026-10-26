@@ -25,3 +25,10 @@ Kai: "每日行程裡的標題會依據當日摘要來做變更，而不是固�
 
 - Tests: an empty day reads 「未規劃」, main stops are used, length limits hold, pin/unpin works, 清空這天 releases the pin, and guest titles contain no driver, friend or employer names.
 - tsc, lint, tests and build all pass.
+
+## Inspection 1: dispositions (all accepted)
+
+- **DT-001.** Applying a plan keeps a pinned title instead of overwriting it.
+- **DT-002.** The 「移到…」 date picker and the map popups use the derived title.
+- **DT-003.** Pinned titles are shown in full (the editor allows up to 60 characters).
+- **DT-004.** Check-in and check-out steps (入住, check-in, 寄放行李) count as logistics.

@@ -14,7 +14,7 @@ const MAX = 18;
 export const isPlan = (i: Pick<Item, "name">) => !i.name.startsWith("住宿：");
 
 /** Getting somewhere (taxis, trains, check-in, going back to the hotel) is not what a day is about. */
-const LOGISTICS = /(^|\s)搭|^(叫|前往|回到?|機場|從|退房|早餐、|Aya 國際線|雪梨機場：)|已在|飛抵|報到/;
+const LOGISTICS = /(^|\s)搭|^(叫|前往|回到?|機場|從|退房|早餐、|Aya 國際線|雪梨機場：)|已在|飛抵|報到|入住|退房|check[- ]?(in|out)|寄放行李/i;
 export const isLogistics = (i: Pick<Item, "name">) => LOGISTICS.test(i.name);
 
 /** Short place name: no bracketed notes; a long mixed name keeps its Chinese part (with one English word if short), at most 14 characters. */
@@ -32,7 +32,7 @@ export function shortName(name: string): string {
 const clip = (s: string) => ([...s].length > MAX ? [...s].slice(0, MAX - 1).join("") + "…" : s);
 
 export function dayTitle(d: Pick<Day, "title" | "items"> & { titlePinned?: boolean }): string {
-  if (d.titlePinned && d.title.trim()) return clip(d.title.trim());
+  if (d.titlePinned && d.title.trim()) return d.title.trim(); // shown as the owner wrote it (≤ 60)
   const plans = d.items.filter(isPlan);
   if (!plans.length) return UNPLANNED;
   const doing = plans.filter((i) => !isLogistics(i));

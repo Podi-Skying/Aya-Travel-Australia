@@ -221,7 +221,8 @@ function applyOption(doc: TripDoc, key: string): OpResult {
     }
     // The option describes the whole day: its activities carry their own costs, and old flags go.
     const day = findDay(cur, date)!;
-    day.title = od.title;
+    // A title the owner pinned stays; otherwise the shown title follows the new activities.
+    if (!day.titlePinned) day.title = od.title;
     day.stay = od.stay;
     day.driveHrs = od.driveHrs;
     for (const k of ["costs", "transfer", "alt", "ferry", "hike"] as const) delete day[k];

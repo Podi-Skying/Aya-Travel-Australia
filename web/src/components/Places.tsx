@@ -260,7 +260,7 @@ export function PlacesMap({ active }: { active: boolean }) {
         const ink = cssVar("--ink", "#292823");
         const red = cssVar("--vermilion", "#b83a2e");
         const popup = (d: ReturnType<typeof effectiveDay>, i: Item, idx: number) =>
-          `<div class="stop-pop">${i.photo ? `<img src="${esc(i.photo.url)}" alt="" referrerpolicy="no-referrer" loading="lazy">` : ""}<div><div class="d">${fmtDay(d.date)}・${esc(d.title)}</div><strong>${esc(i.name)}</strong><a href="#" data-goto="${idx}">查看當天行程 →</a>${i.photo ? `<a class="src credit-link" href="${esc(i.photo.page)}" target="_blank" rel="noopener noreferrer" aria-label="圖片來源：${esc(i.photo.site)}" title="${esc(i.photo.site)}">${iconSvg("link")}</a>` : ""}</div></div>`;
+          `<div class="stop-pop">${i.photo ? `<img src="${esc(i.photo.url)}" alt="" referrerpolicy="no-referrer" loading="lazy">` : ""}<div><div class="d">${fmtDay(d.date)}・${esc(dayTitle(d))}</div><strong>${esc(i.name)}</strong><a href="#" data-goto="${idx}">查看當天行程 →</a>${i.photo ? `<a class="src credit-link" href="${esc(i.photo.page)}" target="_blank" rel="noopener noreferrer" aria-label="圖片來源：${esc(i.photo.site)}" title="${esc(i.photo.site)}">${iconSvg("link")}</a>` : ""}</div></div>`;
         if (f.days)
           doc.days.forEach((raw, idx) => {
             if (f.seg !== "all" && raw.seg !== f.seg) return;
