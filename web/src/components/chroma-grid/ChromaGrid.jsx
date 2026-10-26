@@ -117,7 +117,7 @@ export const ChromaGrid = ({
   frame = false,
   theme = 'dark',
   className = '',
-  // Local extension (2026-10-26): selectable cards for the planning quiz.
+  // Local extension (2026-10-26): selectable cards for the planning quiz; items may carry a corner inset map.
   selected,
   onToggle,
   selectedLabel = '已選'
@@ -254,11 +254,13 @@ export const ChromaGrid = ({
                 <img className="chroma-mono" src={item.image} alt={item.alt ?? item.title ?? ''} loading="lazy" referrerPolicy="no-referrer" />
                 <img className="chroma-color" src={item.image} alt="" aria-hidden="true" loading="lazy" referrerPolicy="no-referrer" />
                 <span className="chroma-media-rim" aria-hidden="true" />
+                {item.inset && <span className="chroma-inset" aria-hidden="true">{item.inset}</span>}
               </div>
               {showInfo && (item.title || item.subtitle) && (
                 <div className="chroma-info">
                   {item.title && <span className="chroma-title">{item.title}</span>}
                   {item.subtitle && <span className="chroma-subtitle">{item.subtitle}</span>}
+                  {item.insetLabel && <span className="sr-only">{item.insetLabel}</span>}
                 </div>
               )}
               <span className="chroma-card-rim" aria-hidden="true" />

@@ -864,4 +864,12 @@ details.card.day-summary > summary h3 { margin: 0; }
 .quiz-route li { display: block; }
 .quiz-route .home-pin { display: inline-grid; width: 28px; height: 28px; vertical-align: middle; }
 .quiz .chroma-grid { margin-top: 8px; }
+.chroma-inset { position: absolute; top: 8px; left: 8px; z-index: 3; width: 60px; height: 60px; padding: 4px; border-radius: 8px; background: rgba(250, 247, 240, .82); border: 1px solid rgba(41, 40, 35, .45); pointer-events: none; }
+.mini-map { display: block; width: 100%; height: 100%; }
+.mini-map .mm-land { fill: #e4dccb; stroke: #292823; stroke-width: 1.2; stroke-linejoin: round; }
+.mini-map .mm-water { fill: none; stroke: #8fb3c4; stroke-width: 9; stroke-linecap: round; stroke-linejoin: round; }
+.mini-map .mm-home { fill: #292823; }
+.mini-map .mm-dot { fill: #d2483a; stroke: #fff; stroke-width: 1.2; }
+@media (max-width: 720px) { .chroma-inset { width: 48px; height: 48px; padding: 3px; } }
+.quiz-badge { color: var(--vermilion); font-weight: 600; }
 @media (max-width: 720px) { .quiz .chroma-grid { --chroma-cols: 2 !important; --chroma-min: 120px !important; } }

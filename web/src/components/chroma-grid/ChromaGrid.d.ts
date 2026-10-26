@@ -1,7 +1,7 @@
 // Types for the vendored React Bits ChromaGrid (JS-CSS variant) with the local selection extension.
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 
-export type ChromaItem = { image: string; title?: string; subtitle?: string; accent?: string; url?: string; alt?: string };
+export type ChromaItem = { image: string; title?: string; subtitle?: string; accent?: string; url?: string; alt?: string; inset?: ReactNode; insetLabel?: string };
 
 export type ChromaGridProps = {
   items?: ChromaItem[];

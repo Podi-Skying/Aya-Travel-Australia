@@ -34,7 +34,7 @@ export type Op =
   | { op: "removeSkyPost"; id: string }
   | { op: "applyOption"; key: string }
   | { op: "setDayTitle"; date: string; title: string }
-  | { op: "addQuizPlan"; date: string; refs: { key: string; itemId: string }[] }
+  | { op: "addQuizPlan"; date: string; refs: { key: string; itemId: string }[]; nextRefs?: { key: string; itemId: string }[] }
   | { op: "snapshot"; summary: string };
 
 export type ItemFields = {
@@ -511,18 +511,26 @@ export function applyOp(input: TripDoc, op: Op): OpResult {
     case "applyOption":
       return applyOption(doc, op.key);
     case "addQuizPlan": {
-      // 旅遊規劃小測驗 → 「加入這一天」: the chosen pool places join the day as pending, in one version.
+      // 旅遊規劃小測驗 → 「加入某一天」: the chosen pool places join the day as pending, in one version.
+      // An overnight plan (Kai 2026-10-26) puts its second day's places on the following day.
       if (!findDay(doc, op.date)) return err(404, "找不到日期");
-      if (!op.refs.length || op.refs.length > 15) return err(400, "請選 1–15 個景點");
+      const next = Array.isArray(op.nextRefs) ? op.nextRefs : [];
+      const refs = Array.isArray(op.refs) ? op.refs : [];
+      if (refs.length + next.length === 0 || refs.length + next.length > 15) return err(400, "請選 1–15 個景點");
+      const date2 = new Date(Date.parse(op.date + "T00:00:00Z") + 86_400_000).toISOString().slice(0, 10);
+      if (next.length && !findDay(doc, date2)) return err(400, "隔天不在行程內");
       let cur = doc;
-      for (const r of op.refs) {
-        const s = applyOp(cur, { op: "scheduleItem", key: r.key, itemId: r.itemId, date: op.date });
-        if (!s.ok) return s;
-        const p = applyOp(s.doc, { op: "setStatus", date: op.date, itemId: r.itemId, status: "pending" });
-        if (!p.ok) return p;
-        cur = p.doc;
+      for (const [date, list] of [[op.date, refs], [date2, next]] as const) {
+        for (const r of list) {
+          const s = applyOp(cur, { op: "scheduleItem", key: r.key, itemId: r.itemId, date });
+          if (!s.ok) return s;
+          const p = applyOp(s.doc, { op: "setStatus", date, itemId: r.itemId, status: "pending" });
+          if (!p.ok) return p;
+          cur = p.doc;
+        }
       }
-      return { ok: true, doc: cur, summary: `從小測驗加入 ${op.refs.length} 個景點到 ${fmtDay(op.date)}（待確認）` };
+      const n = refs.length + next.length;
+      return { ok: true, doc: cur, summary: next.length ? `從小測驗加入 ${n} 個景點到 ${fmtDay(op.date)}–${fmtDay(date2)}（過夜，待確認）` : `從小測驗加入 ${n} 個景點到 ${fmtDay(op.date)}（待確認）` };
     }
     case "setDayTitle": {
       // A pinned title stays as written; an empty one returns the day to its automatic title.

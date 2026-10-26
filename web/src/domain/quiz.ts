@@ -84,3 +84,50 @@ export const driveMinutes = (straightKm: number) => Math.max(5, Math.round((stra
 export function quizCost(items: Item[], party: number): number {
   return items.reduce((a, i) => a + (i.cost ? lineAmount(i.cost, party) : 0), 0);
 }
+
+/* Long drives (Kai 2026-10-26): more than 3 hours one way from home asks whether to stay overnight. */
+export const LONG_DRIVE_MIN = 180;
+export const LONG_DAY_DRIVE_MIN = 360;
+
+export const minutesFrom = (from: [number, number], item: { lat?: number; lng?: number }) => driveMinutes(km(from, [item.lat!, item.lng!]));
+
+/** Towns to suggest for a night when no stay of the trip is near (positions are town centres). */
+export const OVERNIGHT_TOWNS: { name: string; at: [number, number] }[] = [
+  { name: "朗塞斯頓 Launceston", at: [-41.4388, 147.1347] },
+  { name: "Bicheno", at: [-41.874, 148.302] },
+  { name: "St Helens", at: [-41.32, 148.24] },
+  { name: "Swansea", at: [-42.123, 148.074] },
+  { name: "Coles Bay", at: [-42.124, 148.287] },
+  { name: "搖籃山 Cradle Mountain", at: [-41.596, 145.93] },
+  { name: "Stanley", at: [-40.76, 145.295] },
+  { name: "Devonport", at: [-41.18, 146.35] },
+  { name: "Burnie", at: [-41.055, 145.905] },
+  { name: "Strahan", at: [-42.153, 145.327] },
+  { name: "Deloraine", at: [-41.524, 146.656] },
+];
+
+export type Overnight = { name: string; lat: number; lng: number; stayKey?: string; needsBooking: boolean };
+
+/** Where to sleep near a place: a stay of the trip within 30 km, else the nearest listed town (stay to be found). */
+export function overnightNear(doc: Pick<TripDoc, "stays">, near: [number, number]): Overnight {
+  const stays = Object.entries(doc.stays)
+    .filter(([, s]) => !s.home && s.lat != null && s.lng != null)
+    .map(([k, s]) => ({ k, s, d: km(near, [s.lat!, s.lng!]) }))
+    .sort((a, b) => a.d - b.d);
+  if (stays[0] && stays[0].d <= 30) return { name: stays[0].s.name, lat: stays[0].s.lat!, lng: stays[0].s.lng!, stayKey: stays[0].k, needsBooking: false };
+  const t = [...OVERNIGHT_TOWNS].sort((a, b) => km(near, a.at) - km(near, b.at))[0];
+  return { name: t.name, lat: t.at[0], lng: t.at[1], needsBooking: true };
+}
+
+/**
+ * Two-day split of ordered stops: day 1 runs to the farthest stop and sleeps nearby; day 2 visits the rest
+ * on the way home.
+ */
+export function splitTwoDays<T extends { item: { lat?: number; lng?: number } }>(home: [number, number], stops: T[]): [T[], T[]] {
+  if (!stops.length) return [[], []];
+  let far = 0;
+  stops.forEach((s, k) => {
+    if (km(home, [s.item.lat!, s.item.lng!]) > km(home, [stops[far].item.lat!, stops[far].item.lng!])) far = k;
+  });
+  return [stops.slice(0, far + 1), stops.slice(far + 1)];
+}

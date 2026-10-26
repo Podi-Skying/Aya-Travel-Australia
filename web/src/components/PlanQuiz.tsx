@@ -1,15 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useTrip } from "./TripApp";
 import { Icon } from "./Icon";
 import { PendingButton } from "./ui";
 import { DayMap } from "./MapViews";
 import { CATEGORY_META } from "./Places";
 import ChromaGrid from "./chroma-grid/ChromaGrid";
-import { driveMinutes, km, orderStops, quizCost, quizPlaces, REGIONS, type QuizPlace } from "@/domain/quiz";
+import { driveMinutes, km, LONG_DAY_DRIVE_MIN, LONG_DRIVE_MIN, minutesFrom, orderStops, overnightNear, quizCost, quizPlaces, REGIONS, splitTwoDays, type QuizPlace } from "@/domain/quiz";
+import { MiniMap } from "./MiniMap";
 import { homeStayKey } from "@/domain/stay";
-import { stayPin } from "@/domain/home-pins";
+import { stayPin, type StayPin } from "@/domain/home-pins";
 import { effectiveDay } from "@/domain/effective-day";
 import { PALETTES, INK_PALETTE } from "@/domain/options";
 import { fmtDay, mins, money } from "@/domain/format";
@@ -31,6 +32,8 @@ const PLACEHOLDER =
 
 const photoOf = (i: Item) => i.photo?.url ?? i.gallery?.[0]?.url ?? PLACEHOLDER;
 const accents = [...PALETTES.map((p) => p.deep), INK_PALETTE.deep];
+const hours = (m: number) => `${Math.round(m / 30) / 2} 小時`;
+const at = (i: Item): [number, number] => [i.lat!, i.lng!];
 const accentFor = (k: string) => accents[[...k].reduce((a, c) => a + c.charCodeAt(0), 0) % accents.length];
 
 export function PlanQuiz({ active }: { active: boolean }) {
@@ -49,6 +52,9 @@ export function PlanQuiz({ active }: { active: boolean }) {
   const inRegion = places.filter((p) => p.region === region);
   const chosen = inRegion.filter((p) => picked.includes(p.item.id));
   const reg = REGIONS.find((r) => r.key === region);
+  const homeAt: [number, number] | null = home ? [home.lat, home.lng] : null;
+  const oneWay = (i: Item) => (homeAt ? minutesFrom(homeAt, i) : 0);
+  const zoomOf = (key: string) => (key === "hobart" ? "hobart" : "tas") as "hobart" | "tas";
 
   const back = () => setStep((s) => Math.max(0, s - 1));
   const go = (s: number) => setStep(s);
@@ -98,12 +104,17 @@ export function PlanQuiz({ active }: { active: boolean }) {
               if (key !== region) setPicked([]);
               setRegion(key);
             }}
-            items={regions.map(({ r, list }) => ({
-              image: photoOf(list.find((p) => p.item.photo)?.item ?? list[0].item),
-              title: r.name,
-              subtitle: [`${list.length} 個景點`, r.car ? "需要開車" : "公車可到", r.note, r.far].filter(Boolean).join("・"),
-              accent: accentFor(r.key),
-            }))}
+            items={regions.map(({ r, list }) => {
+              const long = list.filter((p) => oneWay(p.item) > LONG_DRIVE_MIN).length > list.length / 2;
+              return {
+                image: photoOf(list.find((p) => p.item.photo)?.item ?? list[0].item),
+                title: r.name,
+                subtitle: [`${list.length} 個景點`, r.car ? "需要開車" : "公車可到", r.note, long ? "建議過夜" : "", r.far].filter(Boolean).join("・"),
+                accent: accentFor(r.key),
+                inset: <MiniMap places={list.map((p) => at(p.item))} home={homeAt} zoom={zoomOf(r.key)} />,
+                insetLabel: `位置：${r.name}`,
+              };
+            })}
           />
           <QuizNav onBack={back} next={region ? () => go(2) : undefined} />
         </section>
@@ -124,12 +135,17 @@ export function PlanQuiz({ active }: { active: boolean }) {
               const id = inRegion[k].item.id;
               setPicked((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
             }}
-            items={inRegion.map((p) => ({
-              image: photoOf(p.item),
-              title: p.item.name,
-              subtitle: [p.item.cat ? CATEGORY_META[p.item.cat].t : "", p.date ? `已排在 ${fmtDay(p.date)}` : ""].filter(Boolean).join("・"),
-              accent: accentFor(p.item.cat ?? "other"),
-            }))}
+            items={inRegion.map((p) => {
+              const m = oneWay(p.item);
+              return {
+                image: photoOf(p.item),
+                title: p.item.name,
+                subtitle: [p.item.cat ? CATEGORY_META[p.item.cat].t : "", p.date ? `已排在 ${fmtDay(p.date)}` : "", m > LONG_DRIVE_MIN ? `單程約 ${hours(m)}・建議過夜` : ""].filter(Boolean).join("・"),
+                accent: accentFor(p.item.cat ?? "other"),
+                inset: <MiniMap places={[at(p.item)]} home={homeAt} zoom={zoomOf(reg.key)} />,
+                insetLabel: `位置：${reg.name}`,
+              };
+            })}
           />
           <p className="small" role="status">
             已選 {chosen.length} 個
@@ -180,7 +196,8 @@ export function PlanQuiz({ active }: { active: boolean }) {
           }}
           onBack={back}
           owner={mode === "owner" && online}
-          addToDay={async (date, refs) => runOpUndoable({ op: "addQuizPlan", date, refs }, "已加入，可以按「復原」")}
+          addToDay={async (date, refs, nextRefs) => runOpUndoable({ op: "addQuizPlan", date, refs, nextRefs }, "已加入，可以按「復原」")}
+          stays={doc.stays}
           ask={ask}
           days={doc.days.filter((d) => d.seg === "tas")}
           party={doc.partySize}
@@ -207,6 +224,18 @@ function QuizNav({ onBack, next, nextLabel = "下一步" }: { onBack: () => void
   );
 }
 
+type Stop = QuizPlace;
+const clock = (t: number) => `${String(Math.floor(t / 60) % 24).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+
+/** One day of the route: legs from `from` through the stops to `to`, with times. */
+function dayPlan(from: [number, number], stops: Stop[], to: [number, number], startMin: number) {
+  const pts: [number, number][] = [from, ...stops.map((s) => at(s.item)), to];
+  const legs = pts.slice(1).map((p, k) => driveMinutes(km(pts[k], p)));
+  const drive = legs.reduce((a, b) => a + b, 0);
+  const total = drive + stops.reduce((a, s) => a + (s.item.dur ?? 60), 0);
+  return { legs, drive, total, end: startMin + total };
+}
+
 function Result({
   active,
   home,
@@ -221,9 +250,10 @@ function Result({
   ask,
   days,
   party,
+  stays,
 }: {
   active: boolean;
-  home: { key: string; name: string; lat: number; lng: number; home: boolean };
+  home: StayPin;
   homeName: string;
   stops: QuizPlace[];
   travel: "drive" | "transit";
@@ -231,76 +261,164 @@ function Result({
   onRestart: () => void;
   onBack: () => void;
   owner: boolean;
-  addToDay: (date: string, refs: { key: string; itemId: string }[]) => Promise<boolean>;
+  addToDay: (date: string, refs: { key: string; itemId: string }[], nextRefs?: { key: string; itemId: string }[]) => Promise<boolean>;
   ask: ReturnType<typeof useTrip>["ask"];
   days: Day[];
   party: number;
+  stays: Parameters<typeof overnightNear>[0]["stays"];
 }) {
-  // Legs: home → stops → home, estimated from straight-line distance (the map draws cached roads where known).
-  const pts: [number, number][] = [[home.lat, home.lng], ...stops.map((s) => [s.item.lat!, s.item.lng!] as [number, number]), [home.lat, home.lng]];
-  const legMin = pts.slice(1).map((p, k) => driveMinutes(km(pts[k], p)));
-  const stayMin = stops.reduce((a, s) => a + (s.item.dur ?? 60), 0);
-  const total = legMin.reduce((a, b) => a + b, 0) + stayMin;
+  const homeAt: [number, number] = [home.lat, home.lng];
   const [h, m] = start.split(":").map(Number);
-  const backAt = h * 60 + m + total;
-  const fakeDay = effectiveDay({ date: "quiz", seg: "tas", title: "", stay: "", driveHrs: 0, items: stops.map((s) => ({ ...s.item, mode: travel === "drive" ? "drive" : "bus" })) } as Day);
+  const startMin = h * 60 + m;
+  const oneDay = dayPlan(homeAt, stops, homeAt, startMin);
+  // Long drives (Kai 2026-10-26): a place over 3 h one way, or over 6 h of driving in the day, asks first.
+  const long = stops.some((s) => minutesFrom(homeAt, s.item) > LONG_DRIVE_MIN) || oneDay.drive > LONG_DAY_DRIVE_MIN;
+  const [choice, setChoice] = useState<"day" | "overnight" | null>(null);
+  const mode = long ? choice : "day";
+  const icon = travel === "drive" ? "car" : "bus";
   const addable = stops.filter((s) => s.pkg);
+  const cost = <p className="small">門票等花費約 <strong>{money(quizCost(stops.map((s) => s.item), party))}</strong>（{party} 人，估計）</p>;
+  const ref = (s: Stop) => ({ key: s.pkg!, itemId: s.item.id });
+
+  const [d1, d2] = splitTwoDays(homeAt, stops);
+  const far = d1.at(-1);
+  const night = far ? overnightNear({ stays }, at(far.item)) : null;
+  const nightPin: StayPin | null = night ? { key: "quiz-night", name: night.name, lat: night.lat, lng: night.lng, home: false } : null;
+
+  const mapDay = (list: Stop[]) => effectiveDay({ date: "quiz", seg: "tas", title: "", stay: "", driveHrs: 0, items: list.map((s) => ({ ...s.item, mode: travel === "drive" ? "drive" : "bus" })) } as Day);
+  const route = (list: Stop[], legs: number[], from: ReactNode, to: ReactNode) => (
+    <ol className="quiz-route">
+      <li>{from}</li>
+      {list.map((s, k) => (
+        <li key={s.item.id}>
+          <span className="small muted">
+            <Icon name={icon} size={14} /> 約 {mins(legs[k])}（估計）
+          </span>
+          <br />
+          <strong>
+            {k + 1}. {s.item.name}
+          </strong>{" "}
+          <span className="small muted">停留約 {mins(s.item.dur ?? 60)}</span>
+        </li>
+      ))}
+      <li>
+        <span className="small muted">
+          <Icon name={icon} size={14} /> 約 {mins(legs.at(-1) ?? 0)}（估計）
+        </span>
+        <br />
+        {to}
+      </li>
+    </ol>
+  );
+  const homeMark = <span className="home-pin" aria-hidden="true" dangerouslySetInnerHTML={{ __html: HOUSE }} />;
+
+  const addButton = (overnight: boolean) =>
+    owner && addable.length > 0 && (
+      <PendingButton
+        className="btn"
+        pendingLabel="加入中…"
+        onAction={async () => {
+          const choices = overnight ? days.filter((d, k) => days[k + 1] && Date.parse(days[k + 1].date) - Date.parse(d.date) === 86_400_000) : days;
+          const v = await ask(overnight ? "從哪一天開始？" : "加入哪一天？", {
+            body: (
+              <p className="small muted">
+                {overnight ? `第一天的景點加入那天、第二天的加入隔天，狀態是「待確認」；${night?.needsBooking ? `住宿（${night.name}附近）還沒訂。` : ""}` : `會把 ${addable.length} 個待安排景點加入那天，狀態是「待確認」；`}已排在別天的景點不會移動。
+              </p>
+            ),
+            fields: [{ name: "date", label: "日期", type: "select", value: choices[0]?.date, options: choices.map((d) => ({ value: d.date, label: fmtDay(d.date) })) }],
+          });
+          if (!v) return null;
+          return overnight ? addToDay(v.date, d1.filter((s) => s.pkg).map(ref), d2.filter((s) => s.pkg).map(ref)) : addToDay(v.date, addable.map(ref));
+        }}
+      >
+        {overnight ? "加入連續兩天" : "加入某一天"}
+      </PendingButton>
+    );
+  const nav = (overnight: boolean) => (
+    <div className="quiz-nav">
+      <button type="button" className="btn ghost" onClick={onBack}>
+        ← 上一步
+      </button>
+      <button type="button" className="btn ghost" onClick={onRestart}>
+        重新規劃
+      </button>
+      {long && mode && (
+        <button type="button" className="btn ghost" onClick={() => setChoice(null)}>
+          改成{mode === "day" ? "過夜" : "當天來回"}
+        </button>
+      )}
+      {addButton(overnight)}
+    </div>
+  );
+
+  if (!mode) {
+    return (
+      <section className="card section quiz-step quiz-result" aria-labelledby="q4">
+        <h3 id="q4">這趟要過夜嗎？</h3>
+        <p>
+          {stops.filter((s) => minutesFrom(homeAt, s.item) > LONG_DRIVE_MIN).map((s) => s.item.name).join("、") || "這些景點"}
+          單程開車超過 3 小時；一天來回總共要開約 <strong>{mins(oneDay.drive)}</strong>。
+        </p>
+        <div className="quiz-choices" role="group" aria-label="過夜或當天來回">
+          <button type="button" className="chip" onClick={() => setChoice("day")}>
+            當天來回
+          </button>
+          <button type="button" className="chip" onClick={() => setChoice("overnight")}>
+            安排過夜（兩天）
+          </button>
+        </div>
+        <div className="quiz-nav">
+          <button type="button" className="btn ghost" onClick={onBack}>
+            ← 上一步
+          </button>
+        </div>
+      </section>
+    );
+  }
+
+  if (mode === "overnight" && night && nightPin) {
+    const p1 = dayPlan(homeAt, d1, [night.lat, night.lng], startMin);
+    const p2 = dayPlan([night.lat, night.lng], d2, homeAt, startMin);
+    const nightLabel = (
+      <>
+        <strong>在 {night.name} 過夜</strong> <span className="small muted">{night.needsBooking ? "（待找住宿）" : "（行程裡的住宿）"}</span>
+      </>
+    );
+    return (
+      <section className="card section quiz-step quiz-result" aria-labelledby="q4">
+        <h3 id="q4">你的兩天一夜路線</h3>
+        <h4>第一天</h4>
+        <DayMap day={mapDay(d1)} active={active} focusId={null} ends={{ start: home, end: nightPin }} />
+        {route(d1, p1.legs, <>{homeMark} {start} 從{homeName}出發</>, <>約 {clock(p1.end)} {nightLabel}</>)}
+        <h4>第二天</h4>
+        <DayMap day={mapDay(d2)} active={active} focusId={null} ends={{ start: nightPin, end: home }} />
+        {route(d2, p2.legs, <>{start} 從 {night.name} 出發</>, <>{homeMark} 約 {clock(p2.end)} 回到{homeName}</>)}
+        <p className="small">
+          開車：第一天約 <strong>{mins(p1.drive)}</strong>、第二天約 <strong>{mins(p2.drive)}</strong>
+        </p>
+        {cost}
+        <p className="muted small">車程依直線距離估算。{night.needsBooking ? "過夜的城鎮是建議，住宿還沒訂。" : ""}</p>
+        {nav(true)}
+      </section>
+    );
+  }
+
   return (
     <section className="card section quiz-step quiz-result" aria-labelledby="q4">
       <h3 id="q4">你的一日路線</h3>
-      <DayMap day={fakeDay} active={active} focusId={null} ends={{ start: home, end: home }} />
-      <ol className="quiz-route">
-        <li>
-          <span className="home-pin" aria-hidden="true" dangerouslySetInnerHTML={{ __html: HOUSE }} /> {start} 從{homeName}出發
-        </li>
-        {stops.map((s, k) => (
-          <li key={s.item.id}>
-            <span className="small muted">
-              <Icon name={travel === "drive" ? "car" : "bus"} size={14} /> 約 {mins(legMin[k])}（估計）
-            </span>
-            <br />
-            <strong>
-              {k + 1}. {s.item.name}
-            </strong>{" "}
-            <span className="small muted">停留約 {mins(s.item.dur ?? 60)}</span>
-          </li>
-        ))}
-        <li>
-          <span className="small muted">
-            <Icon name={travel === "drive" ? "car" : "bus"} size={14} /> 約 {mins(legMin.at(-1) ?? 0)}（估計）
-          </span>
-          <br />
-          <span className="home-pin" aria-hidden="true" dangerouslySetInnerHTML={{ __html: HOUSE }} /> 約 {String(Math.floor(backAt / 60) % 24).padStart(2, "0")}:{String(backAt % 60).padStart(2, "0")} 回到{homeName}
-        </li>
-      </ol>
+      {long && (
+        <p className="small quiz-warn" role="note">
+          當天來回要開約 {mins(oneDay.drive)}，約 {clock(oneDay.end)} 才回到{homeName}；請注意疲勞駕駛和夜間動物。
+        </p>
+      )}
+      <DayMap day={mapDay(stops)} active={active} focusId={null} ends={{ start: home, end: home }} />
+      {route(stops, oneDay.legs, <>{homeMark} {start} 從{homeName}出發</>, <>{homeMark} 約 {clock(oneDay.end)} 回到{homeName}</>)}
       <p className="small">
-        全程約 <strong>{mins(total)}</strong>・門票等花費約 <strong>{money(quizCost(stops.map((s) => s.item), party))}</strong>（{party} 人，估計）
+        全程約 <strong>{mins(oneDay.total)}</strong>
       </p>
+      {cost}
       <p className="muted small">車程依直線距離估算；地圖上已算過的路段會沿實際道路畫出。{travel === "transit" ? "大眾運輸的時間可能更長，出發前請查班次。" : ""}</p>
-      <div className="quiz-nav">
-        <button type="button" className="btn ghost" onClick={onBack}>
-          ← 上一步
-        </button>
-        <button type="button" className="btn ghost" onClick={onRestart}>
-          重新規劃
-        </button>
-        {owner && addable.length > 0 && (
-          <PendingButton
-            className="btn"
-            pendingLabel="加入中…"
-            onAction={async () => {
-              const v = await ask("加入哪一天？", {
-                body: <p className="small muted">會把 {addable.length} 個待安排景點加入那天，狀態是「待確認」；已排在別天的景點不會移動。</p>,
-                fields: [{ name: "date", label: "日期", type: "select", value: days[0]?.date, options: days.map((d) => ({ value: d.date, label: fmtDay(d.date) })) }],
-              });
-              if (!v) return null;
-              return addToDay(v.date, addable.map((s) => ({ key: s.pkg!, itemId: s.item.id })));
-            }}
-          >
-            加入某一天
-          </PendingButton>
-        )}
-      </div>
+      {nav(false)}
     </section>
   );
 }

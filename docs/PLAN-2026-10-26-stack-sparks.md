@@ -35,3 +35,21 @@
 - **R1, plan corrected.** The vendored Stack keeps its own reduced-motion behaviour: a 0.2 s ease with no springs, tilt or press. The component stays verbatim, and the plan text now describes this behaviour.
 - **R2, plan corrected.** Stack handles Enter, Space, ArrowRight and ArrowDown. The component stays verbatim, and the plan text now lists those keys.
 - **R3, accepted.** The whole gallery (Stack, counter and credit) is now keyed by the photo sources, so the counter resets when the list changes.
+
+# 2026-10-26: quiz long drives and corner maps (Kai)
+
+- **Long drives:**
+  - A place more than 3 h one way from home (straight-line estimate, ×1.3 at 70 km/h) shows 「單程約 X 小時・建議過夜」.
+  - A region where most places are like that shows 「建議過夜」.
+- **Result step:** when a stop is over 3 h one way, or the day's driving is over 6 h, the quiz first asks 「當天來回」 or 「安排過夜（兩天）」.
+  - **當天來回:** a warning with the total drive time and the late return time.
+  - **安排過夜:**
+    - Day 1 runs to the farthest stop and sleeps at a trip stay within 30 km, else at the nearest listed town, marked 「待找住宿」.
+    - Day 2 visits the rest on the way home.
+    - There are two maps; the home base marker appears only at the start of day 1 and the end of day 2.
+    - The owner's 「加入連續兩天」 calls `addQuizPlan` with `nextRefs`: one version, with the second day's places on the following day.
+- **Corner maps:**
+  - Every quiz card shows a 60 px SVG map (48 px on phones): Tasmania, or the Derwent around Greater Hobart for the 荷巴特 region.
+  - Places are vermilion dots and home is a small house.
+  - The map is aria-hidden, with screen-reader text 「位置：<region>」. There is no Leaflet and no API call.
+- **Not done:** cached Google road times are not used for the 3 h check, which uses the same estimate as the rest of the quiz.
