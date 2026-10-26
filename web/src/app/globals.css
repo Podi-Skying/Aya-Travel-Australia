@@ -959,3 +959,13 @@ details.card.day-summary > summary h3 { margin: 0; }
 .act-thumb .pg-frame, .act-thumb .ph-tile { aspect-ratio: 4 / 3; }
 .pg-frame .ph-tile { position: absolute; inset: 0; border-radius: 0; }
 .pg-img.is-loading { opacity: 0; }
+
+/* Day route from and to the stay, legs and navigation (Kai 2026-10-26) */
+.act-end .body { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; min-height: 44px; }
+.pin.home { display: grid; place-items: center; }
+.leg-nav { display: inline-flex; align-items: center; gap: 4px; min-height: 32px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--ink); text-decoration: none; font-size: .78rem; }
+.leg-nav:hover { border-color: var(--ink-2); }
+.day-nav-links { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.day-nav-links .btn { min-height: 44px; display: inline-flex; align-items: center; gap: 4px; text-decoration: none; }
+.map-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
+.map-tools .toggle { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; }

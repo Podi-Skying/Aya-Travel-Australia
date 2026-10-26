@@ -6,7 +6,7 @@ import type * as Leaflet from "leaflet";
 import { PRI, useReducedMotion } from "./ui";
 import type { EffectiveDay } from "@/domain/effective-day";
 import { iconSvg } from "./Icon";
-import { routeCredit, stopsOf, useLegs } from "./useLegs";
+import { routeCredit, routeStops, useLegs } from "./useLegs";
 import { HOUSE_SVG, type StayPin } from "@/domain/home-pins";
 
 /*
@@ -86,13 +86,16 @@ export function DayMap({
     nearbyRef.current = nearby;
     addRef.current = onAdd;
   });
-  // Road legs from the route cache (drive legs only); straight segments otherwise.
-  const legs = useLegs(stopsOf(day.items));
+  // The day's route from last night's stay to tonight's; road legs from the route cache (drive legs only).
+  const stops = routeStops(day.items, ends);
+  const legs = useLegs(stops);
   const legsRef = useRef(legs);
+  const stopsRef = useRef(stops);
   useEffect(() => {
     legsRef.current = legs;
+    stopsRef.current = stops;
   });
-  const legsKey = legs ? legs.map((l) => (l ? l.durationS : "-")).join(",") : "";
+  const legsKey = (legs ? legs.map((l) => (l ? l.durationS : "-")).join(",") : "") + "|" + stops.map((s) => `${s.pt}:${s.drive ? 1 : 0}`).join(";");
   const sig = `${endsKey}|${legsKey}|${day.date}|${day.seg}|${day.items.map((i) => `${i.id}:${i.lat}:${i.lng}:${i.time}:${i.name}:${i.pri}`).join(",")}|${nearby.map((n) => [n.id, n.key, n.lat, n.lng, n.name, n.sub, n.photo ?? "", n.icon ?? ""].join("~")).join(",")}|${onAdd ? 1 : 0}`;
 
   useEffect(() => {
@@ -133,14 +136,18 @@ export function DayMap({
             .bindPopup(`<strong>${esc(i.time)} ${esc(i.name)}</strong><br>${esc(i.en ?? "")}<br>${PRI[i.pri].t}`);
           markers.current.set(i.id, m);
         });
-        const path: [number, number][] = [];
-        pts.forEach((p, k) => {
-          const leg = k ? legsRef.current?.[k - 1] : null;
-          if (leg?.geometry.length) path.push(...leg.geometry);
-          else path.push(p);
-        });
-        if (path.length > 1) L.polyline(path, { color: cssVar("--vermilion", "#b83a2e"), weight: 4, opacity: 0.9, className: legsRef.current?.some(Boolean) ? "" : "route-anim" }).addTo(layer.current).bringToBack();
-        // The day starts at last night's stay and ends at tonight's (dashed, not a computed route).
+        // Driven legs follow the road once computed; walking, transit and not-yet-computed legs are dashed.
+        const rs = stopsRef.current;
+        const road: [number, number][][] = [];
+        const straight: [number, number][][] = [];
+        for (let k = 1; k < rs.length; k++) {
+          const leg = legsRef.current?.[k - 1];
+          if (leg?.geometry.length) road.push(leg.geometry);
+          else straight.push([rs[k - 1].pt, rs[k].pt]);
+        }
+        const red = cssVar("--vermilion", "#b83a2e");
+        if (road.length) L.polyline(road, { color: red, weight: 4, opacity: 0.9 }).addTo(layer.current).bringToBack();
+        if (straight.length) L.polyline(straight, { color: red, weight: 2.5, opacity: 0.7, dashArray: "3 7" }).addTo(layer.current).bringToBack();
         const { start, end } = endsRef.current;
         for (const p of [start, end].filter((x, k, a): x is StayPin => !!x && a.findIndex((y) => y?.key === x.key) === k)) {
           L.marker([p.lat, p.lng], { icon: L.divIcon({ className: "home-hit", html: `<span class="home-pin${p.home ? " base" : ""}">${HOUSE_SVG}</span>`, iconSize: [44, 44] }), keyboard: true, title: p.home ? "住處" : `住宿：${p.name}`, zIndexOffset: 800 })
@@ -148,11 +155,6 @@ export function DayMap({
             .bindPopup(`<strong>${p.home ? "住處" : "住宿"}</strong><br>${esc(p.name)}`);
           pts.push([p.lat, p.lng]);
         }
-        const first = path[0] ?? null;
-        const last = path.at(-1) ?? null;
-        const dash = { color: cssVar("--vermilion", "#b83a2e"), weight: 2, opacity: 0.6, dashArray: "2 6" };
-        if (start && first) L.polyline([[start.lat, start.lng], first], dash).addTo(layer.current!);
-        if (end && last) L.polyline([last, [end.lat, end.lng]], dash).addTo(layer.current!);
         nearbyRef.current.forEach((n) => {
           const add = addRef.current ? `<button type="button" class="btn small" data-add-key="${esc(n.key)}" data-add-id="${esc(n.id)}">加入這天</button>` : "";
           // 44px hit area around a 26px ring.

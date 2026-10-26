@@ -124,3 +124,32 @@ export function routeCredit(legs: (Leg | null)[]): string {
   const src = new Set(legs.map((l) => l?.source));
   return [src.has("google-routes") && "路線 © Google", src.has("osrm-demo") && ROUTE_CREDIT].filter(Boolean).join("；");
 }
+
+export type RouteStop = Stop & { kind: "start" | "item" | "end"; name: string; mode: string; itemId?: string };
+
+/**
+ * A day as a route (Kai 2026-10-26): from last night's stay, through the stops with a position, back to
+ * tonight's stay. The first and last legs are driven when the day's first or last stop is reached by car.
+ * Stay notes (「住宿：」) are not stops; the stay itself is the end.
+ */
+export function routeStops<T extends { id: string; name: string; lat?: number; lng?: number; mode: string }>(
+  items: T[],
+  ends: { start: { lat: number; lng: number; name: string } | null; end: { lat: number; lng: number; name: string } | null },
+): RouteStop[] {
+  const out: RouteStop[] = [];
+  if (ends.start) out.push({ pt: [ends.start.lat, ends.start.lng], drive: false, kind: "start", name: ends.start.name, mode: "start" });
+  let gap = false;
+  for (const i of items) {
+    if (i.name.startsWith("住宿：")) continue;
+    if (i.lat == null || i.lng == null) {
+      gap = true;
+      continue;
+    }
+    out.push({ pt: [i.lat, i.lng], drive: i.mode === "drive" && !gap && out.length > 0, kind: "item", name: i.name, mode: i.mode, itemId: i.id });
+    gap = false;
+  }
+  const lastItem = [...out].reverse().find((s) => s.kind === "item");
+  if (ends.end) out.push({ pt: [ends.end.lat, ends.end.lng], drive: lastItem?.mode === "drive", kind: "end", name: ends.end.name, mode: lastItem?.mode ?? "walk" });
+  // A stay and the first/last stop at the same spot make no leg.
+  return out.filter((s, k) => k === 0 || s.pt[0] !== out[k - 1].pt[0] || s.pt[1] !== out[k - 1].pt[1]);
+}

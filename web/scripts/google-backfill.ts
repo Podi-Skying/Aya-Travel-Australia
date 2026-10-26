@@ -3,7 +3,8 @@ import type { Owner } from "../src/server/owner";
 import { getLookup } from "../src/server/cache";
 import { findPlaceId, googleKey, sameRef, type PlaceRef } from "../src/server/google";
 import { getLegs, type Pt } from "../src/server/routes";
-import { stopsOf } from "../src/components/useLegs";
+import { routeStops, stopsOf, type Stop } from "../src/components/useLegs";
+import { dayEnds } from "../src/domain/home-pins";
 import { listPrice } from "../src/server/usage";
 
 /*
@@ -36,12 +37,13 @@ async function main() {
   // Scheduled days, plus each recommended plan's days so their routes are ready when a plan is applied.
   const all = [...doc.days.flatMap((d) => d.items), ...doc.attractionPool.flatMap((p) => p.items)];
   const dayLists = [
-    ...doc.days.map((d) => ({ seg: d.seg, items: d.items })),
-    ...(doc.tripOptions ?? []).flatMap((o) => o.days.map((od) => ({ seg: "tas", items: od.itemIds.map((id) => all.find((i) => i.id === id)).filter((i): i is (typeof all)[number] => !!i).sort((x, y) => x.time.localeCompare(y.time)) }))),
+    ...doc.days.map((d) => ({ seg: d.seg, items: d.items, date: d.date as string | undefined })),
+    ...(doc.tripOptions ?? []).flatMap((o) => o.days.map((od) => ({ seg: "tas", items: od.itemIds.map((id) => all.find((i) => i.id === id)).filter((i): i is (typeof all)[number] => !!i).sort((x, y) => x.time.localeCompare(y.time)), date: undefined }))),
   ];
   const runs: Pt[][] = [];
   for (const d of dayLists) {
-    const stops = stopsOf(d.items, (i) => i.lat! > -40 === (d.seg === "syd"));
+    // Scheduled days run from last night's stay to tonight's (Kai 2026-10-26), so those legs are stored too.
+    const stops: Stop[] = d.date ? routeStops(d.items, dayEnds(doc, d.date)) : stopsOf(d.items, (i) => i.lat! > -40 === (d.seg === "syd"));
     let run: Pt[] = [];
     stops.forEach((s, k) => {
       if (k && s.drive) {

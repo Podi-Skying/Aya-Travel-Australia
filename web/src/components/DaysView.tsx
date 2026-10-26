@@ -1,7 +1,7 @@
 "use client";
 
 import { dayTitle } from "@/domain/day-title";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTrip } from "./TripApp";
 import { Icon, MODE_ICON } from "./Icon";
 import { Badge, LEG, MODE, PendingButton, PRI, STATUS, VERIFY } from "./ui";
@@ -20,27 +20,42 @@ import { checks, feasibility } from "@/domain/rules";
 import { basis, dayTotal, lineAmount, stayOf } from "@/domain/budget";
 import { fmtDay, mins, money } from "@/domain/format";
 import type { Item } from "@/domain/schema";
-import { computeLegs, legLabel, stopsOf, useLegs, type Leg } from "./useLegs";
+import { computeLegs, legLabel, routeStops, useLegs, type Leg } from "./useLegs";
+import { dayNavUrls, navMode, navUrl, type NavPoint } from "@/domain/nav";
 import { nightStay } from "@/domain/stay";
 import { dayEnds } from "@/domain/home-pins";
 import { PlaceGallery } from "./PlaceGallery";
 import { isLogistics } from "@/domain/day-title";
 
-function Legs({ travel, road }: { travel: Item["travel"]; road?: Leg | null }) {
+/**
+ * One line per leg (Kai 2026-10-26): the road-computed time and distance when known, else the estimate.
+ * `nav` adds a 「導航」 link that opens Google Maps directions for the leg.
+ */
+function Legs({ travel, road, nav }: { travel?: Item["travel"]; road?: Leg | null; nav?: string | null }) {
   const parts = Object.entries(travel ?? {}).filter(([, v]) => (v ?? 0) > 0) as [string, number][];
-  // The cached road leg (OSRM, stored in the database) is shown as computed, never re-estimated here.
-  const roadRow = road && road.durationS > 0 ? <span className="leg-road">開車 {legLabel(road)}（道路計算）</span> : null;
-  if (!parts.length) return roadRow ? <li className="leg">{roadRow}</li> : null;
+  const link = nav ? (
+    <a className="leg-nav" href={nav} target="_blank" rel="noopener noreferrer">
+      <Icon name="route" size={14} /> 導航
+    </a>
+  ) : null;
+  if (road && road.durationS > 0)
+    return (
+      <li className="leg">
+        <span className="leg-road">
+          <Icon name="car" size={16} /> 開車 {legLabel(road)}
+        </span>
+        {link}
+      </li>
+    );
+  if (!parts.length) return link ? <li className="leg">{link}</li> : null;
   const total = parts.reduce((a, [, v]) => a + v, 0);
+  const [k, v] = parts.length === 1 ? parts[0] : [null, total];
   return (
     <li className="leg">
-      {parts.map(([k, v]) => (
-        <span key={k}>
-          <Icon name={MODE_ICON[k] ?? "route"} size={16} /> {LEG[k] ?? k} {mins(v)}
-        </span>
-      ))}
-      <span>・約 {mins(total)}（估計）</span>
-      {roadRow}
+      <span>
+        <Icon name={k ? (MODE_ICON[k] ?? "route") : "route"} size={16} /> {k ? `${LEG[k] ?? k} ` : ""}約 {mins(v as number)}（估計）
+      </span>
+      {link}
     </li>
   );
 }
@@ -150,6 +165,7 @@ function ActNote({ text }: { text: string }) {
 export function DaysView({ active }: { active: boolean }) {
   const { doc, mode, currentDay, setCurrentDay, runOp, runOpUndoable, ask, online, myVotes, vote, unvote, counts, canVote, token } = useTrip();
   const weather = useWeather();
+  const [showNearby, setShowNearby] = useState(false);
   const [focusId, setFocusId] = useState<string | null>(null);
   const [viewer, setViewer] = useState<number | null>(null);
   const [addOpen, setAddOpen] = useState(false);
@@ -169,12 +185,34 @@ export function DaysView({ active }: { active: boolean }) {
   const dayPhotos: DayPhoto[] = d.items.flatMap((i) => (i.photo ? [{ id: i.id, name: i.name, photo: i.photo }] : []));
   // Everyone who takes part in at least one of the day's activities (Kai + Aya when the day is empty).
   // Road legs between consecutive stops with coordinates, on driving days (chictrip review P2-a).
-  const located = d.items.map((i, k) => ({ i, k })).filter(({ i }) => i.lat != null && i.lng != null);
-  const roadLegs = useLegs(stopsOf(d.items));
-  const roadBefore = (k: number) => {
-    const pos = located.findIndex((x) => x.k === k);
+  // The day as a route: last night's stay → stops → tonight's stay (Kai 2026-10-26), with road legs.
+  const ends = dayEnds(doc, d.date);
+  const route = routeStops(d.items, ends);
+  const roadLegs = useLegs(route);
+  const posOf = (id: string) => route.findIndex((s) => s.itemId === id);
+  const roadBefore = (id: string) => {
+    const pos = posOf(id);
     return pos > 0 ? (roadLegs?.[pos - 1] ?? null) : null;
   };
+  // Navigation: the residence is never put in a URL as text; share links start from the viewer's location.
+  const navPt = (s: (typeof route)[number]): NavPoint => (s.kind === "start" && ends.start?.home && !owner ? null : { lat: s.pt[0], lng: s.pt[1] });
+  const navTo = (s: (typeof route)[number]): Exclude<NavPoint, null> =>
+    s.kind === "end" && ends.end?.home && !owner ? { query: doc.stays[nightStay(doc, raw)]?.name ?? "Hobart" } : { lat: s.pt[0], lng: s.pt[1] };
+  const canNav = owner || !!token;
+  const navBefore = (pos: number) => (canNav && pos > 0 ? navUrl(navPt(route[pos - 1]), navTo(route[pos]), navMode(route[pos].mode)) : null);
+  const dayNav = canNav && route.length >= 2 ? dayNavUrls(route.slice(1).map(navTo), navMode(route.some((s) => s.drive) ? "drive" : (route[1]?.mode ?? "walk")), navPt(route[0])) : [];
+  // The owner's view computes missing driving legs once (within the daily Google cap); they are stored.
+  const autoAsked = useRef(new Set<string>());
+  useEffect(() => {
+    if (!editable || !active || !roadLegs) return;
+    if (!route.slice(1).some((s, k) => s.drive && !roadLegs[k])) return;
+    const key = JSON.stringify(route.map((s) => [s.pt, s.drive]));
+    if (autoAsked.current.has(key)) return;
+    autoAsked.current.add(key);
+    void computeLegs(route);
+    // route is derived from the day; its key guards the request.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editable, active, roadLegs, d.date]);
   const dayPeople: Person[] = PEOPLE.filter((p) => (raw.items.length ? raw.items.some((i) => peopleOf(i, raw).includes(p)) : peopleOf({}, raw).includes(p)));
   // The day's headline picture: its first major stop with a photo, else any photo.
   const dayHero = d.items.find((i) => i.photo && i.major) ?? d.items.find((i) => i.photo);
@@ -442,13 +480,32 @@ export function DaysView({ active }: { active: boolean }) {
           {owner && !online && <p className="small muted">離線中：可以查看，但修改需要網路連線。</p>}
           {d.items.length ? (
             <ol className="acts">
+              {route[0]?.kind === "start" && (
+                <li className="act act-end">
+                  <div className={`pin home ${d.seg}`} aria-hidden="true">
+                    <Icon name="home" size={14} />
+                  </div>
+                  <div className="body">
+                    <strong>出發</strong> <span className="muted">從{ends.start?.home ? "住處" : ends.start?.name}出發</span>
+                    {dayNav.length > 0 && (
+                      <span className="day-nav-links">
+                        {dayNav.map((u, k) => (
+                          <a key={u} className="btn ghost small" href={u} target="_blank" rel="noopener noreferrer">
+                            <Icon name="route" size={14} /> 全日導航{dayNav.length > 1 ? `（${k + 1}/${dayNav.length}）` : ""}
+                          </a>
+                        ))}
+                      </span>
+                    )}
+                  </div>
+                </li>
+              )}
               {d.items.map((i, k) => {
                 const tent = isTentative(d, i);
                 const voted = myVotes.find((v) => v.itemId === i.id && v.dayDate === d.date);
                 const cnt = countOf(i.id);
                 return (
                   <FragmentItem key={i.id}>
-                    <Legs travel={i.travel} road={roadBefore(k)} />
+                    {posOf(i.id) !== 0 && <Legs travel={i.travel} road={roadBefore(i.id)} nav={posOf(i.id) > 0 ? navBefore(posOf(i.id)) : null} />}
                     <li className={`act ${focusId === i.id ? "active" : ""}`}>
                       <div className={`pin ${d.seg}`} aria-hidden="true">
                         {k + 1}
@@ -615,6 +672,19 @@ export function DaysView({ active }: { active: boolean }) {
                   </FragmentItem>
                 );
               })}
+              {route.at(-1)?.kind === "end" && route.length > 1 && (
+                <>
+                  <Legs travel={undefined} road={roadLegs?.[route.length - 2] ?? null} nav={navBefore(route.length - 1)} />
+                  <li className="act act-end">
+                    <div className={`pin home ${d.seg}`} aria-hidden="true">
+                      <Icon name="home" size={14} />
+                    </div>
+                    <div className="body">
+                      <strong>{ends.end?.home ? "回到住處" : `入住 ${ends.end?.name}`}</strong>
+                    </div>
+                  </li>
+                </>
+              )}
             </ol>
           ) : (
             <div className="empty-day">
@@ -662,10 +732,10 @@ export function DaysView({ active }: { active: boolean }) {
         <aside className="day-map-wrap">
           <DayMap
             day={d}
-            ends={dayEnds(doc, d.date)}
+            ends={ends}
             active={active}
             focusId={focusId}
-            nearby={nearby
+            nearby={(showNearby ? nearby : [])
               .filter((n) => n.i.lat != null && n.i.lng != null)
               .slice(0, 8)
               .map((n) => ({
@@ -680,12 +750,20 @@ export function DaysView({ active }: { active: boolean }) {
               }))}
             onAdd={editable ? (key, id) => runOp({ op: "scheduleItem", key, itemId: id, date: d.date }) : undefined}
           />
-          {editable && roadLegs && stopsOf(d.items).slice(1).some((s, k) => s.drive && !roadLegs[k]) && (
-            <PendingButton className="btn ghost small" pendingLabel="計算中…" onAction={() => computeLegs(stopsOf(d.items))}>
-              計算道路路線（只算一次，存在後台）
-            </PendingButton>
-          )}
-          <p className="map-note">開車路段若已計算過會沿實際道路畫出，其他路段是點對點直線示意；實際路線與時間請以導航為準。</p>
+          <div className="map-tools">
+            <label className="toggle small">
+              <input type="checkbox" checked={showNearby} onChange={(e) => setShowNearby(e.target.checked)} /> 顯示附近的待安排景點
+            </label>
+            {editable && roadLegs && route.slice(1).some((s, k) => s.drive && !roadLegs[k]) && (
+              <PendingButton className="btn ghost small" pendingLabel="計算中…" onAction={() => computeLegs(route)}>
+                重新計算道路路線
+              </PendingButton>
+            )}
+          </div>
+          <p className="map-note">
+            實線是已算好的開車路線；虛線是步行、大眾運輸，或還沒算好的開車路段（直線示意）。
+            {roadLegs && route.slice(1).some((s, k) => s.drive && !roadLegs[k]) ? "有開車路段還沒算出道路路線（可能是今天的 Google 用量上限到了），明天會自動補上。" : ""}
+          </p>
         </aside>
       </div>
     </div>
