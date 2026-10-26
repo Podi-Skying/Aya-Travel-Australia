@@ -64,8 +64,13 @@ export type PlacePhoto = { photoUri: string; attributions: { name: string; uri?:
 
 /** A live photo for a place: Place Details (photos) then the photo media URI. Not cached server side. */
 export async function placePhoto(placeId: string, maxWidthPx = 1200, f: GFetch = defaultFetch): Promise<PlacePhoto | null> {
+  return (await placePhotos(placeId, 1, maxWidthPx, f))[0] ?? null;
+}
+
+/** Up to `n` live photos for a place: one Place Details call plus one media call per photo. */
+export async function placePhotos(placeId: string, n: number, maxWidthPx = 1200, f: GFetch = defaultFetch): Promise<PlacePhoto[]> {
   const key = googleKey();
-  if (!key || !/^[A-Za-z0-9_-]{10,300}$/.test(placeId)) return null;
+  if (!key || !/^[A-Za-z0-9_-]{10,300}$/.test(placeId)) return [];
   // Field mask `photos` only (Essentials); each photo carries its own Google Maps link.
   const det = await call<{ photos?: { name: string; googleMapsUri?: string; authorAttributions?: { displayName?: string; uri?: string }[] }[] }>(
     "place_details",
@@ -73,21 +78,24 @@ export async function placePhoto(placeId: string, maxWidthPx = 1200, f: GFetch =
     { headers: { "X-Goog-Api-Key": key, "X-Goog-FieldMask": "photos" } },
     f,
   );
-  const p = det.photos?.[0];
-  if (!p?.name) return null;
-  const media = await call<{ photoUri?: string }>(
-    "place_photo",
-    `https://places.googleapis.com/v1/${p.name}/media?maxWidthPx=${maxWidthPx}&skipHttpRedirect=true`,
-    { headers: { "X-Goog-Api-Key": key } },
-    f,
-  );
-  if (!media.photoUri?.startsWith("https://")) return null;
-  return {
-    photoUri: media.photoUri,
-    attributions: (p.authorAttributions ?? []).filter((a) => a.displayName).map((a) => ({ name: a.displayName!, uri: httpsUri(a.uri) })),
-    // Users must always be able to open the photo on Google Maps; fall back to the place's page.
-    mapsUri: httpsUri(p.googleMapsUri) ?? `https://www.google.com/maps/place/?q=place_id:${placeId}`,
-  };
+  const out: PlacePhoto[] = [];
+  for (const p of (det.photos ?? []).slice(0, n)) {
+    if (!p?.name) continue;
+    const media = await call<{ photoUri?: string }>(
+      "place_photo",
+      `https://places.googleapis.com/v1/${p.name}/media?maxWidthPx=${maxWidthPx}&skipHttpRedirect=true`,
+      { headers: { "X-Goog-Api-Key": key } },
+      f,
+    ).catch(() => null);
+    if (!media?.photoUri?.startsWith("https://")) continue;
+    out.push({
+      photoUri: media.photoUri,
+      attributions: (p.authorAttributions ?? []).filter((a) => a.displayName).map((a) => ({ name: a.displayName!, uri: httpsUri(a.uri) })),
+      // Users must always be able to open the photo on Google Maps; fall back to the place's page.
+      mapsUri: httpsUri(p.googleMapsUri) ?? `https://www.google.com/maps/place/?q=place_id:${placeId}`,
+    });
+  }
+  return out;
 }
 
 /* ---------------------------------------------------------------- Routes */

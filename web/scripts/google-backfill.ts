@@ -10,7 +10,7 @@ import { listPrice } from "../src/server/usage";
  * One-time Google backfill (docs/PLAN-2026-10-26-google.md), run by hand after the key is set:
  *   npx tsx --env-file=.env.local scripts/google-backfill.ts           # dry run: counts and estimate
  *   npx tsx --env-file=.env.local scripts/google-backfill.ts --write   # calls Google, within the daily cap
- * Finds place ids for activities without a photo, and stores every driving leg of the scheduled days
+ * Finds place ids for activities with a position, and stores every driving leg of the scheduled days
  * and of the recommended plans in route_cache.
  */
 
@@ -23,7 +23,8 @@ async function main() {
   const doc = cur.doc;
 
   // Places: activities (days and pool) with coordinates but no photo of their own.
-  const items = [...doc.days.flatMap((d) => d.items), ...doc.attractionPool.flatMap((p) => p.items)].filter((i) => !i.photo && i.lat != null && i.lng != null);
+  // Every activity with a position (galleries add Google photos even where an own photo exists).
+  const items = [...doc.days.flatMap((d) => d.items), ...doc.attractionPool.flatMap((p) => p.items)].filter((i) => i.lat != null && i.lng != null);
   const todo: typeof items = [];
   // Missing mappings, and mappings made for an old name or position.
   for (const i of items) {
@@ -64,7 +65,7 @@ async function main() {
     if (r.legs.some((l) => !l || (l.source !== "google-routes" && l.source !== "same-place"))) pending.push(c);
   }
 
-  console.log(`trip v${cur.versionNo}: ${todo.length} activities need a place id (of ${items.length} without photos); ${pending.length} of ${chunks.length} driving runs need Google routes`);
+  console.log(`trip v${cur.versionNo}: ${todo.length} activities need a place id (of ${items.length} with a position); ${pending.length} of ${chunks.length} driving runs need Google routes`);
   console.log(`estimated list price: places search US$${listPrice("places_search", todo.length)} (IDs-only search is free), routes US$${listPrice("routes", pending.length)} before free monthly calls`);
   if (!write) return console.log("dry run: add --write to call Google");
 

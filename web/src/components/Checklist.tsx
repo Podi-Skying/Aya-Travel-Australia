@@ -31,7 +31,7 @@ export function Checklist() {
   if (paid.length) todo.push(`預訂需付費住宿（${paid.length} 晚：${paidAreas.join("、")}）`);
   if (flights.length) todo.push(`確認並預訂航班：${flights.join("；")}`);
   todo.push("出發前查看國家公園、道路與天氣警示（見下方官方來源）");
-  if (openDays.length) todo.push(`${openDays.length} 天尚未安排，可保留休息或從「推薦行程方案」「地圖與景點」加入`);
+  if (openDays.length) todo.push(`${openDays.length} 天尚未安排，可保留休息或從「跨日行程方案」「地圖與景點」加入`);
   if (poolCount) todo.push(`待安排景點還有 ${poolCount} 個活動`);
 
   return (

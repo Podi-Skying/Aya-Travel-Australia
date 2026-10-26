@@ -26,16 +26,13 @@ function srcSet(p: Photo): string | undefined {
     .join(", ");
 }
 
+/** Photo source as a small link icon (Kai, 2026-10-26); the site shows on hover and to screen readers. */
 export function PhotoCredit({ photo }: { photo: Photo }) {
+  const what = [photo.site, photo.credit, photo.license].filter(Boolean).join("・");
   return (
-    <>
-      圖片來源：
-      <a href={photo.page} target="_blank" rel="noopener noreferrer">
-        {photo.site}
-      </a>
-      {photo.credit ? `・${photo.credit}` : ""}
-      {photo.license ? `（${photo.license}）` : ""}
-    </>
+    <a className="credit-link" href={photo.page} target="_blank" rel="noopener noreferrer" aria-label={`圖片來源：${what}`} title={what}>
+      <Icon name="link" size={16} />
+    </a>
   );
 }
 

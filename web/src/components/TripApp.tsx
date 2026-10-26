@@ -1,11 +1,12 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { TripDoc } from "@/domain/schema";
 import type { Op } from "@/domain/ops";
 import { alertStatus } from "@/domain/rules";
 import { dayDiff, fmtDay, fmtMD, fmtTs } from "@/domain/format";
 import { regionsOf, tripTags } from "@/domain/regions";
+import { withMediaToken } from "@/domain/media";
 import { api, registerServiceWorker } from "@/client/api";
 import { keyFor, loadSnapshot, saveSnapshot, mergeVersions, type VersionMeta } from "@/client/offline";
 import { SiteHeader } from "./SiteHeader";
@@ -64,7 +65,7 @@ export function useTrip(): Ctx {
 
 const TABS = [
   { key: "days", label: "每日行程" },
-  { key: "options", label: "推薦行程方案" },
+  { key: "options", label: "跨日行程方案" },
   { key: "map", label: "地圖與景點" },
   { key: "budget", label: "預算" },
   { key: "info", label: "資訊與警示" },
@@ -98,6 +99,8 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
   const canVote = mode === "public" && !!token;
   const storeKey = home ? "trip:home" : keyFor(mode, token);
   const [doc, setDoc] = useState<TripDoc>(props.initial.doc);
+  // Share pages reach private photos (/api/media) with their token.
+  const viewDoc = useMemo(() => (props.token ? withMediaToken(doc, props.token) : doc), [doc, props.token]);
   const [versionNo, setVersionNo] = useState(props.initial.versionNo);
   const [lastSyncAt, setLastSyncAt] = useState(props.initial.syncedAt);
   const [alerts, setAlerts] = useState<Alerts>(() => alertStatus(props.initial.doc, { showWindow: props.mode === "owner" }));
@@ -346,7 +349,7 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
   const ctx: Ctx = {
     runOpUndoable,
     mode,
-    doc,
+    doc: viewDoc,
     versionNo,
     online,
     token,

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/client/api";
+import { Icon } from "./Icon";
 
 /*
  * Google place photo for an activity without its own photo (owner only; docs/PLAN-2026-10-26-google.md).
@@ -53,9 +54,8 @@ export function GooglePhoto({ itemId, alt, className }: { itemId: string; alt: s
               </span>
             ))
           : "Google 使用者"}
-        ・
-        <a href={v.mapsUri} target="_blank" rel="noopener noreferrer">
-          Google 地圖
+        <a className="credit-link" href={v.mapsUri} target="_blank" rel="noopener noreferrer" aria-label="在 Google 地圖查看這張照片" title="Google 地圖">
+          <Icon name="link" size={16} />
         </a>
       </figcaption>
     </figure>

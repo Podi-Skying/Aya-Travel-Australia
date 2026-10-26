@@ -18,6 +18,7 @@ import { fmtDay, mins, money } from "@/domain/format";
 import type { Item } from "@/domain/schema";
 import { computeLegs, legLabel, stopsOf, useLegs, type Leg } from "./useLegs";
 import { GooglePhoto } from "./GooglePhoto";
+import { PlaceGallery } from "./PlaceGallery";
 
 function Legs({ travel, road }: { travel: Item["travel"]; road?: Leg | null }) {
   const parts = Object.entries(travel ?? {}).filter(([, v]) => (v ?? 0) > 0) as [string, number][];
@@ -486,6 +487,7 @@ export function DaysView({ active }: { active: boolean }) {
                               </li>
                             )}
                           </ul>
+                          <PlaceGallery item={i} />
                         </details>
                         <div className="tools">
                           <button className="btn ghost small" type="button" onClick={() => setFocusId(i.id)}>

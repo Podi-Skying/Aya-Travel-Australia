@@ -3,7 +3,8 @@ import { errorResponse, fail, HttpError, json, ownerRoute, readJson, sameOrigin 
 import { checkOwner } from "./owner";
 import { getLegs, MAX_POINTS, validPoints } from "./routes";
 import { getKpOutlook } from "./sky";
-import { googleKey, placePhoto, sameRef, type PlaceRef } from "./google";
+import { googleKey, placePhoto, placePhotos, sameRef, type PlaceRef } from "./google";
+import { commonsPhotos } from "./commons";
 import { dailyCap, hobartDay, monthCost, noteGoogleHit, usageSince } from "./usage";
 import { getLookup } from "./cache";
 import { missingConfig } from "./config";
@@ -256,3 +257,76 @@ export const getPlacePhoto = ownerRoute(async (req, owner) => {
   if (!p) return fail(404, "沒有照片");
   return json(p, 200, { "cache-control": "private, max-age=1800" });
 });
+
+/* ---------- gallery photos (docs/PLAN-2026-10-26-galleries.md) ---------- */
+
+/** Finds an activity by id in a trip document (days and pool). */
+const findIn = (doc: { days: { items: { id: string; name: string; lat?: number; lng?: number }[] }[]; attractionPool: { items: { id: string; name: string; lat?: number; lng?: number }[] }[] }, id: string) =>
+  [...doc.days.flatMap((d) => d.items), ...doc.attractionPool.flatMap((p) => p.items)].find((i) => i.id === id);
+
+/**
+ * Cached Commons photos for an activity. Photos are for the owner and share-link viewers only (as in
+ * the trip document), so a share token or the owner session is required. Never calls out.
+ */
+export async function getPhotos(req: Request) {
+  try {
+    const q = new URL(req.url).searchParams;
+    const item = q.get("item") ?? "";
+    const token = q.get("token");
+    if (!/^[A-Za-z0-9_-]{1,40}$/.test(item)) return fail(400, "缺少活動 id");
+    let doc: Parameters<typeof findIn>[0] | null = null;
+    if (token) doc = (await getPublicTrip(token))?.doc ?? null;
+    else {
+      const c = missingConfig("owner").length ? null : await checkOwner();
+      if (c?.ok) doc = (await getCurrentTrip(c.owner))?.doc ?? null;
+    }
+    if (!doc) return fail(401, "需要分享連結或登入");
+    const it = findIn(doc, item);
+    if (!it || it.lat == null || it.lng == null) return json({ commons: [] });
+    const commons = (await commonsPhotos(item, it.name, it.lat, it.lng, { search: false }).catch(() => null)) ?? [];
+    return json({ commons }, 200, { "cache-control": "private, max-age=600" });
+  } catch (e) {
+    return errorResponse(e);
+  }
+}
+
+/** Owner only: up to 6 live Google photos for an activity (photo names may not be cached). */
+export const getPlacePhotos = ownerRoute(async (req, owner) => {
+  const item = new URL(req.url).searchParams.get("item") ?? "";
+  if (!/^[A-Za-z0-9_-]{1,40}$/.test(item)) return fail(400, "缺少活動 id");
+  const hit = await getLookup<PlaceRef>("place-id", item).catch(() => null);
+  if (!hit?.value.placeId) return json({ photos: [] });
+  const cur = await getCurrentTrip(owner);
+  const it = cur && findIn(cur.doc, item);
+  if (!it || !sameRef(hit.value, it.name, it.lat, it.lng)) return json({ photos: [] });
+  const photos = await placePhotos(hit.value.placeId, 6).catch(() => []);
+  return json({ photos }, 200, { "cache-control": "private, max-age=1500" });
+});
+
+/**
+ * Private photos (Kai's own, in web/media/), served only to the owner or with a valid share token,
+ * like every photo in the trip document. Paths are restricted to web/media.
+ */
+export async function getMedia(req: Request, ctx: { params: Promise<{ path: string[] }> }) {
+  try {
+    const { path: parts } = await ctx.params;
+    const rel = parts.join("/");
+    if (!/^[a-z0-9/_-]+\.(webp|jpg|png)$/.test(rel) || rel.includes("..")) return fail(404, "找不到");
+    const token = new URL(req.url).searchParams.get("token");
+    let ok = false;
+    if (token) ok = !!(await getPublicTrip(token));
+    else {
+      const c = missingConfig("owner").length ? null : await checkOwner();
+      ok = !!c?.ok;
+    }
+    if (!ok) return fail(401, "需要分享連結或登入");
+    const { readFile } = await import("node:fs/promises");
+    const path = await import("node:path");
+    const buf = await readFile(path.join(process.cwd(), "media", rel)).catch(() => null);
+    if (!buf) return fail(404, "找不到");
+    const type = rel.endsWith(".webp") ? "image/webp" : rel.endsWith(".png") ? "image/png" : "image/jpeg";
+    return new Response(new Uint8Array(buf), { headers: { "content-type": type, "cache-control": "private, max-age=86400", "x-robots-tag": "noindex" } });
+  } catch (e) {
+    return errorResponse(e);
+  }
+}

@@ -53,10 +53,11 @@ export const packageContextSchema = z.object({
  */
 export const PHOTO_KINDS = ["og", "commons", "custom"] as const;
 export const photoSchema = z.object({
-  url: z.url({ protocol: /^https$/ }),
+  /** https, or a private photo the site serves through /api/media/ (owner and share links only). */
+  url: z.union([z.url({ protocol: /^https$/ }), z.string().regex(/^\/api\/media\/[a-z0-9/_-]+\.(webp|jpg|png)$/)]),
   w: z.number().int().min(1).max(20000).optional(),
   h: z.number().int().min(1).max(20000).optional(),
-  page: z.url({ protocol: /^https?$/ }),
+  page: z.union([z.url({ protocol: /^https?$/ }), z.string().regex(/^\/api\/media\/[a-z0-9/_-]+\.(webp|jpg|png)$/)]),
   site: shortText(80),
   kind: z.enum(PHOTO_KINDS),
   credit: shortText(200).optional(),
@@ -95,6 +96,8 @@ export const itemSchema = z.object({
   originPackage: shortText(40).optional(),
   packageContext: packageContextSchema.optional(),
   photo: photoSchema.optional(),
+  /** More photos of the place for the gallery (owner-supplied; same visibility as `photo`). */
+  gallery: z.array(photoSchema).max(12).optional(),
   cat: z.enum(CATEGORIES).optional(),
   /** Booking state: confirmed (locked against moves) or pending; absent = planned. Driver days add "tentative" (effective-day.ts). */
   status: z.enum(["confirmed", "pending"]).optional(),

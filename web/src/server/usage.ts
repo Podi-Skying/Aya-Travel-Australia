@@ -22,7 +22,8 @@ export type GoogleApi = keyof typeof GOOGLE_APIS;
 
 export const hobartDay = (d = new Date()) => new Intl.DateTimeFormat("en-CA", { timeZone: "Australia/Hobart" }).format(d);
 
-export const dailyCap = () => Math.max(0, Number(process.env.GOOGLE_DAILY_CAP ?? 200) || 0);
+// 400: a gallery is 7 calls (details + 6 photos); about 50 owner galleries a day stay within it.
+export const dailyCap = () => Math.max(0, Number(process.env.GOOGLE_DAILY_CAP ?? 400) || 0);
 
 async function bump(api: GoogleApi, field: "calls" | "hits", now: Date) {
   const db = await getDb();
