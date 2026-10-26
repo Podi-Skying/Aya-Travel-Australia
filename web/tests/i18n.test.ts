@@ -42,4 +42,23 @@ describe("languages", () => {
     expect(p0.tr?.ja?.name).toBe("宿泊先 にチェックイン");
     if (driver) expect(p0.tr?.en?.note).toBe("a friend drives");
   });
+
+  it("never lets a translation of private text reach a public or share view", () => {
+    const doc = seedDoc() as TripDoc;
+    const home = Object.values(doc.stays).find((s) => (s as { home?: boolean }).home) as { address: string };
+    home.address = "999 Secretplace Rd, Hobart TAS 7000";
+    const driver = Object.keys(doc.drivers)[0] ?? "Zayden";
+    doc.textTr = [
+      { zh: home.address, en: "999 Secretplace Rd", ja: "999 Secretplace Rd" },
+      { zh: `${driver} 可開車`, en: `${driver} can drive`, ja: "x" },
+      { zh: "塔斯馬尼亞", en: "Tasmania", ja: "タスマニア" },
+    ];
+    for (const photos of [false, true]) {
+      const pub = toPublicDoc(doc, { photos });
+      const json = JSON.stringify(pub);
+      expect(json).not.toContain("Secretplace");
+      expect(json).not.toContain(driver);
+    }
+  });
 });
+

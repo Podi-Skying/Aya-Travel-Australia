@@ -114,6 +114,18 @@ export function toPublicDoc(doc: TripDoc, opts: { photos?: boolean } = {}) {
       tripOptions: (out.tripOptions ?? []).map((o) => ({ ...o, days: o.days.map((od) => ({ ...od, stay: re(od.stay) })) })),
     };
   }
+  // Translations of other text only for text that is still shown here: a pair whose source was removed
+  // (an address, a driver's hours, an owner note) is dropped with it.
+  if (out.textTr?.length) {
+    const shown = new Set<string>();
+    const collect = (v: unknown): void => {
+      if (typeof v === "string") shown.add(v.trim());
+      else if (Array.isArray(v)) v.forEach(collect);
+      else if (v && typeof v === "object") for (const [k, x] of Object.entries(v)) if (k !== "textTr" && k !== "tr") collect(x);
+    };
+    collect(out);
+    out = { ...out, textTr: out.textTr.filter((p) => shown.has(p.zh.trim())) };
+  }
   assertPublicSafe(out, doc);
   return out;
 }
