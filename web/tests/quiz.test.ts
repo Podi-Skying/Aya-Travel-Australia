@@ -24,6 +24,8 @@ describe("planning quiz", () => {
     expect(at(-42.8128, 147.2622)).toBe("hobart"); // MONA
     expect(REGIONS.find((r) => r.key === "hobart")!.name).toBe("荷巴特");
     expect(REGIONS.some((r) => r.key === "kunanyi" || r.key === "mona")).toBe(false);
+    expect(at(-42.58, 148.07)).toBe("east"); // Maria Island (Darlington) is part of the East Coast trip
+    expect(REGIONS.some((r) => r.key === "maria")).toBe(false);
   });
 
   it("orders stops nearest-first from home", () => {

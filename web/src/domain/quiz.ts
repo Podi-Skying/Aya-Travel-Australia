@@ -31,8 +31,17 @@ export const REGIONS: Region[] = [
   { key: "bruny", name: "布魯尼島", areas: area([-43.3, 147.32], 30), car: true },
   { key: "huon", name: "Huon Valley", areas: area([-43.05, 146.95], 28), car: true },
   { key: "mtfield", name: "Mount Field", areas: area([-42.68, 146.62], 16), car: true },
-  { key: "maria", name: "瑪麗亞島", areas: area([-42.6, 148.05], 16), car: true },
-  { key: "east", name: "東海岸", areas: area([-42.1, 148.2], 55), car: true, far: "單程約 2.5 小時以上，比較適合過夜" },
+  // 東海岸 includes 瑪麗亞島 (Kai 2026-10-27): they make one overnight trip together.
+  {
+    key: "east",
+    name: "東海岸與瑪麗亞島",
+    areas: [
+      { center: [-42.1, 148.2], km: 55 },
+      { center: [-42.6, 148.05], km: 16 },
+    ],
+    car: true,
+    far: "單程約 2.5 小時以上，比較適合過夜；瑪麗亞島可以排在去東海岸的路上",
+  },
   { key: "north", name: "朗塞斯頓與北部", areas: area([-41.4, 147.15], 45), car: true, far: "單程約 2.5 小時，比較適合過夜" },
   { key: "northwest", name: "搖籃山與西北", areas: area([-41.4, 145.9], 90), car: true, far: "單程 4 小時以上，請用跨日行程方案" },
 ];
