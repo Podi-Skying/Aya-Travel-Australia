@@ -12,9 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
-    // Vendored React Bits component, kept verbatim (adapted in PlaceGallery.tsx).
-    "src/components/flex-carousel/**",
+    // Vendored React Bits components, kept verbatim except where their header comment says.
     "src/components/chroma-grid/**",
+    "src/components/stack/**",
+    "src/components/click-spark/**",
   ]),
 ]);
 

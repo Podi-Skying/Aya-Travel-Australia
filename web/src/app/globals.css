@@ -807,15 +807,13 @@ details.card.day-summary > summary h3 { margin: 0; }
 
 /* Gallery with React Bits FlexCarousel (docs/PLAN-2026-10-26-galleries.md) */
 .gallery { display: grid; gap: 6px; margin-top: 8px; }
-.gallery-stage { width: 100%; height: 560px; position: relative; border-radius: 16px; overflow: hidden; background: var(--paper-raised); color: var(--ink); }
-@media (max-width: 720px) { .gallery-stage { height: 360px; } }
+/* React Bits Stack (fan), Kai's 230×230 box; extra room so the fanned cards are not clipped */
+.gallery-stack { width: 230px; height: 230px; position: relative; margin: 16px auto 20px; }
+.gallery-stack img { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+.gallery-meta { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0; font-variant-numeric: tabular-nums; }
 .gallery-credits { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0 10px; align-items: center; }
 .gallery-credits li { display: inline-flex; align-items: center; gap: 2px; }
 .place-gallery { margin-top: 6px; }
-.gallery-strip { list-style: none; margin: 0; padding: 0; display: flex; gap: 8px; overflow-x: auto; scroll-snap-type: x mandatory; }
-.gallery-strip li { flex: 0 0 80%; scroll-snap-align: center; }
-.gallery-strip img { width: 100%; height: 320px; object-fit: cover; border-radius: 12px; }
-.gallery-strip:focus-visible { outline: 3px solid var(--vermilion); outline-offset: 2px; }
 .title-pin { margin: 2px 0 4px; color: var(--ink-muted); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 
 

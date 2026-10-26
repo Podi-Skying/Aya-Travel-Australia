@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState } from "react";
 import { useTrip } from "./TripApp";
 import { Icon } from "./Icon";
 import { commonsFor, googleFor } from "@/client/photos";
@@ -10,100 +10,61 @@ import {
   type GoogleShot,
 } from "@/domain/gallery";
 import type { Item, Photo } from "@/domain/schema";
-import FlexCarousel from "./flex-carousel/FlexCarousel";
+import Stack from "./stack/Stack";
 
 /*
- * Photo gallery for an activity (docs/PLAN-2026-10-26-galleries.md) with React Bits FlexCarousel in
- * Kai's configuration. It mounts only when opened (each one is a WebGL canvas). Every photo's source
- * is a link icon below; Google photos keep their authors' names as Google requires.
+ * Photo gallery for an activity (docs/PLAN-2026-10-26-galleries.md): React Bits Stack (replaced the
+ * FlexCarousel on 2026-10-26, Kai's choice). It mounts only when opened. The front photo's source is a
+ * link icon; Google photos keep their authors' names as Google requires.
  */
 
-/** FlexCarousel needs WebGL2; without it the gallery is a plain scrolling strip. */
-let webgl2: boolean | null = null;
-const hasWebGL2 = () =>
-  (webgl2 ??= !!document.createElement("canvas").getContext("webgl2"));
-
-export function Carousel({
-  photos,
-  label,
-}: {
-  photos: GalleryPhoto[];
-  label: string;
-}) {
-  const gl = useSyncExternalStore(
-    () => () => {},
-    hasWebGL2,
-    () => true,
-  );
+/**
+ * Stack of photo cards (React Bits Stack, fan layout, 230×230): click, Enter or Space sends the front
+ * card to the back. The counter and the credit follow the front card.
+ */
+export function Carousel({ photos, label }: { photos: GalleryPhoto[]; label: string }) {
+  const [top, setTop] = useState(0);
+  const front = photos[top] ?? photos[0];
   return (
     <div className="gallery">
-      {!gl ? (
-        <ul className="gallery-strip" aria-label={label} role="region" tabIndex={0}>
-          {photos.map((p) => (
-            <li key={p.src}>
-              {/* eslint-disable-next-line @next/next/no-img-element -- photos from several hosts */}
-              <img
-                src={p.src}
-                alt={p.alt}
-                loading="lazy"
-                referrerPolicy="no-referrer"
-              />
-            </li>
+      <div className="gallery-stack" role="group" aria-label={`${label}：按一下、Enter 或空白鍵換下一張`}>
+        <Stack
+          key={photos.map((p) => p.src).join("|")}
+          layout="fan"
+          sendToBackOnClick
+          onChange={setTop}
+          cards={photos.map((p) => (
+            // eslint-disable-next-line @next/next/no-img-element -- photos from several hosts
+            <img key={p.src} src={p.src} alt={p.alt} draggable={false} referrerPolicy="no-referrer" />
           ))}
-        </ul>
-      ) : (
-        <div className="gallery-stage" role="group" aria-label={label}>
-          <FlexCarousel
-            key={photos.map((p) => p.src).join("|")}
-            items={photos.map(({ src, alt, title, subtitle }) => ({
-              src,
-              alt,
-              title,
-              subtitle,
-            }))}
-            preset="liquid"
-            intro="rise"
-            cardHeight={0.5}
-            gap={12}
-            squeeze={0.2}
-            focusOnClick
-            captions
-          />
-        </div>
-      )}
-      <ol className="gallery-credits">
-        {photos.map((p, i) => (
-          <li key={p.src}>
-            <span className="small muted">{i + 1}</span>
-            {p.credit.authors?.length ? (
-              <span className="small">
-                {p.credit.authors.map((a, k) => (
-                  <span key={k}>
-                    {k ? "、" : ""}
-                    {a.uri ? (
-                      <a href={a.uri} target="_blank" rel="noopener noreferrer">
-                        {a.name}
-                      </a>
-                    ) : (
-                      a.name
-                    )}
-                  </span>
-                ))}
+        />
+      </div>
+      <p className="gallery-meta">
+        <span aria-live="polite">
+          {Math.min(top + 1, photos.length)} / {photos.length}
+        </span>
+        {front?.credit.authors?.length ? (
+          <span className="small">
+            {front.credit.authors.map((a, k) => (
+              <span key={k}>
+                {k ? "、" : ""}
+                {a.uri ? (
+                  <a href={a.uri} target="_blank" rel="noopener noreferrer">
+                    {a.name}
+                  </a>
+                ) : (
+                  a.name
+                )}
               </span>
-            ) : null}
-            <a
-              className="credit-link"
-              href={p.credit.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={`第 ${i + 1} 張圖片來源：${p.credit.label}`}
-              title={p.credit.label}
-            >
-              <Icon name="link" size={16} />
-            </a>
-          </li>
-        ))}
-      </ol>
+            ))}
+          </span>
+        ) : null}
+        {front && (
+          <a className="credit-link" href={front.credit.href} target="_blank" rel="noopener noreferrer" aria-label={`圖片來源：${front.credit.label}`} title={front.credit.label}>
+            <Icon name="link" size={16} />
+          </a>
+        )}
+      </p>
     </div>
   );
 }
