@@ -2,7 +2,7 @@
 
 ## Route model
 
-- `routeStops(items, dayEnds)` builds each day as last night's stay → stops with a position → tonight's stay. The stay is UTAS by default; after an overnight it is the out-of-town stay, and in Sydney it is Riverwood. 「住宿：」 notes are not stops: the stay itself is the end.
+- `routeStops(items, dayEnds)` builds each day as last night's stay → stops with a position → tonight's stay. The stay is UTAS by default; after an overnight it is the out-of-town stay, and in Sydney it is the Sydney hotel. 「住宿：」 notes are not stops: the stay itself is the end.
 - **Leg modes:**
   - The first leg is driven when the first stop is reached by car; the last leg when the last stop was.
   - Walking and transit days keep walking or transit legs.

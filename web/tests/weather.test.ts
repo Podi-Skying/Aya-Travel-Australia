@@ -75,7 +75,7 @@ describe("weather", () => {
     const act = { id: "x", name: "Mount Wellington 步道", lat: -42.89, lng: 147.3 } as never;
     const pool = { attractionPool: [{ key: "r", seg: "tas", items: [{ id: "m", name: "TMAG 博物館", cat: "history", lat: -42.8818, lng: 147.3313 }, { id: "far", name: "QVMAG 博物館", cat: "history", lat: -41.42, lng: 147.14 }] }] } as never;
     expect(backupsFor(pool, act, "tas").map((b) => b.item.id)).toEqual(["m"]);
-    expect(outdoorPlans({ items: [{ name: "搭 T8 到 Riverwood" }, { name: "住宿：Bicheno" }, { name: "Bay of Fires 海灘", cat: "beach" }] as never }).map((i) => i.name)).toEqual(["Bay of Fires 海灘"]);
+    expect(outdoorPlans({ items: [{ name: "搭 T8 到飯店" }, { name: "住宿：Bicheno" }, { name: "Bay of Fires 海灘", cat: "beach" }] as never }).map((i) => i.name)).toEqual(["Bay of Fires 海灘"]);
   });
 
   it("swaps an outdoor plan for a backup, toggles indoor, and trades movable plans between days", () => {

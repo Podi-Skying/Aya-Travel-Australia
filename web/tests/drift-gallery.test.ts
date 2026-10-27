@@ -9,7 +9,7 @@ const mk = (id: string, name: string, photo?: Photo, gallery: Photo[] = []) => (
 
 describe("drift gallery", () => {
   it("lists each photo once, skips logistics and stay notes, and keeps the day for scheduled places", () => {
-    const days = [{ date: "2026-11-09", items: [mk("a", "Wineglass Bay", ph("/x.webp"), [ph("/y.webp")]), mk("b", "搭 T8 到 Riverwood", ph("/t.webp")), mk("c", "住宿：Bicheno", ph("/s.webp"))] }];
+    const days = [{ date: "2026-11-09", items: [mk("a", "Wineglass Bay", ph("/x.webp"), [ph("/y.webp")]), mk("b", "搭 T8 到飯店", ph("/t.webp")), mk("c", "住宿：Bicheno", ph("/s.webp"))] }];
     const pool = [{ items: [mk("d", "Bruny", ph("/x.webp"))] }];
     const commons = { a: [ph("https://upload.wikimedia.org/a/b/1920px-F.jpg", "commons")] };
     const shots = tripShots(days, pool, commons);
