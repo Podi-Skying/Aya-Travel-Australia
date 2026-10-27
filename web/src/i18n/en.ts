@@ -379,7 +379,7 @@ export const EN: Record<string, string> = {
   "待確認（": "Pending (",
   "後一天": "Next day",
   "後一天 →": "Next day →",
-  "從": "From",
+  "從": "From ",
   "從哪一天開始？": "Start on which day?",
   "從小測驗加入 {0} 個景點到 {1}–{2}（過夜，待確認）": "Added {0} places from the quiz to {1}–{2} (overnight, pending)",
   "從小測驗加入 {0} 個景點到 {1}（待確認）": "Added {0} places from the quiz to {1} (pending)",
