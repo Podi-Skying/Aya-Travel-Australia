@@ -280,8 +280,8 @@ const findIn = (doc: { days: { items: { id: string; name: string; lat?: number; 
   [...doc.days.flatMap((d) => d.items), ...doc.attractionPool.flatMap((p) => p.items)].find((i) => i.id === id);
 
 /**
- * Cached Commons photos for an activity. Photos are for the owner and share-link viewers only (as in
- * the trip document), so a share token or the owner session is required. Never calls out.
+ * Cached Commons photos for an activity: the owner, share-link viewers, and public visitors when the public
+ * home is on (places in the redacted document only). Only Wikimedia Commons, only from the cache: never calls out.
  */
 export async function getPhotos(req: Request) {
   try {
@@ -294,6 +294,8 @@ export async function getPhotos(req: Request) {
     else {
       const c = missingConfig("owner").length ? null : await checkOwner();
       if (c?.ok) doc = (await getCurrentTrip(c.owner))?.doc ?? null;
+      // Public visitors (the quiz, Kai 2026-10-27): cached Wikimedia Commons photos of places in the public document.
+      else doc = (await getPublicHomeTrip())?.doc ?? null;
     }
     if (!doc) return fail(401, "需要分享連結或登入");
     const it = findIn(doc, item);

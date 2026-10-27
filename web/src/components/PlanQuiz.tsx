@@ -11,8 +11,8 @@ import { CATEGORY_META } from "./Places";
 import ChromaGrid from "./chroma-grid/ChromaGrid";
 import { driveMinutes, km, LONG_DAY_DRIVE_MIN, LONG_DRIVE_MIN, minutesFrom, orderStops, overnightNear, quizCost, quizPlaces, REGIONS, splitTwoDays, type QuizPlace } from "@/domain/quiz";
 import { MiniMap } from "./MiniMap";
-import { homeStayKey } from "@/domain/stay";
-import { stayPin, type StayPin } from "@/domain/home-pins";
+import { type StayPin } from "@/domain/home-pins";
+import { guestPhotoUrl, quizStart } from "@/domain/quiz-start";
 import { effectiveDay } from "@/domain/effective-day";
 import { PALETTES, INK_PALETTE } from "@/domain/options";
 import { fmtDay, mins, money } from "@/domain/format";
@@ -49,9 +49,9 @@ export function PlanQuiz({ active }: { active: boolean }) {
   const [travel, setTravel] = useState<"drive" | "transit">("drive");
   const [start, setStart] = useState("09:00");
 
-  const homeKey = homeStayKey(doc);
-  const home = homeKey ? stayPin(doc, homeKey) : null;
-  const homeName = home?.name === "住處" || !homeKey ? "住處" : (doc.stays[homeKey]?.name ?? "住處");
+  // Guests use the quiz too (Kai 2026-10-27): the public site starts from Hobart city centre, never the home base.
+  const who = mode === "owner" ? "owner" : token ? "share" : "public";
+  const { pin: home, name: homeName } = quizStart(doc, who);
   const places = useMemo(() => quizPlaces(doc), [doc]);
   const reduce = useReducedMotion();
   const regions = REGIONS.map((r) => ({ r, list: places.filter((p) => p.region === r.key) })).filter((x) => x.list.length);
@@ -62,9 +62,11 @@ export function PlanQuiz({ active }: { active: boolean }) {
   // or renamed place asks again, as the server does).
   const idOf = (i: Item) => `${i.id}|${i.name}|${i.lat}|${i.lng}`;
   const [commons, setCommons] = useState<Record<string, string | null>>({});
-  const needKey = shown.filter((i) => !i.photo && !i.gallery?.length && !i.photoSources && !(idOf(i) in commons)).map(idOf).join("\n");
+  // Guests see Wikimedia Commons photos only; the owner also sees the trip's own photos.
+  const ownPhoto = (i: Item) => (who === "owner" ? (i.photo?.url ?? i.gallery?.[0]?.url ?? null) : guestPhotoUrl(i));
+  const needKey = shown.filter((i) => !ownPhoto(i) && !i.photoSources && !(idOf(i) in commons)).map(idOf).join("\n");
   useEffect(() => {
-    if (!active || !needKey || !(mode === "owner" || token)) return;
+    if (!active || !needKey) return;
     const need = shown.filter((i) => needKey.split("\n").includes(idOf(i)));
     void (async () => {
       for (let k = 0; k < need.length; k += 6) {
@@ -75,19 +77,19 @@ export function PlanQuiz({ active }: { active: boolean }) {
     })();
     // needKey names exactly the cards still to ask for; commonsFor shares one request per place.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, needKey, mode, token]);
+  }, [active, needKey, token]);
   // Each photo is loaded off-screen first: the card shows the camera until it arrives, the category if it fails
   // or takes longer than 12 s.
   const [probe, setProbe] = useState<Record<string, "ok" | "err">>({});
   const wanted = (i: Item) => {
-    const own = i.photo?.url ?? i.gallery?.[0]?.url;
+    const own = ownPhoto(i);
     const c = commons[idOf(i)];
     return own ? cardSrc(own) : c ? cardSrc(c) : null;
   };
   const photoOf = (i: Item) => {
     const url = wanted(i);
     if (url) return probe[url] === "ok" ? url : probe[url] === "err" ? "" /* no photo found: no picture (Kai 2026-10-27) */ : loadingImg(reduce);
-    return commons[idOf(i)] === undefined && (mode === "owner" || token) ? loadingImg(reduce) : "" /* no photo found: no picture (Kai 2026-10-27) */;
+    return commons[idOf(i)] === undefined && !i.photoSources ? loadingImg(reduce) : "" /* no photo found: no picture (Kai 2026-10-27) */;
   };
   const toProbe = shown.map(wanted).filter((u): u is string => !!u && !(u in probe));
   const probeKey = toProbe.join("|");
@@ -125,7 +127,7 @@ export function PlanQuiz({ active }: { active: boolean }) {
     <div className="quiz">
       <div className="card">
         <h2>旅遊規劃小測驗</h2>
-        <p className="muted small">回答幾個問題，排出從住處出發、回到住處的一日行程。</p>
+        <p className="muted small">{who === "public" ? "回答幾個問題，排出從荷巴特市中心出發、回到市中心的一日行程。" : "回答幾個問題，排出從住處出發、回到住處的一日行程。"}</p>
         <ol className="quiz-steps" aria-label="步驟">
           {STEPS.map((s, k) => (
             <li key={s} className={k === step ? "on" : k < step ? "done" : ""} aria-current={k === step ? "step" : undefined}>
@@ -184,7 +186,7 @@ export function PlanQuiz({ active }: { active: boolean }) {
 
       {step === 2 && reg && (
         <section className="card section quiz-step" aria-labelledby="q2">
-          <h3 id="q2">在{reg.name}想去哪些景點？（可多選）</h3>
+          <h3 id="q2">{`在${reg.name}想去哪些景點？（可多選）`}</h3>
           {reg.far && <p className="small quiz-warn">{reg.far}</p>}
           <ChromaGrid
             theme="light"

@@ -15,7 +15,7 @@
 .site-header a, .site-account { transition: transform .1s ease-out; }
 @media (max-width: 380px) { .site-logo span { display: none; } }
 /* Labels never wrap; on phones the header tightens so logo, language switch, links and sign-in fit one row. */
-.site-header nav a, .site-account, .lang-switch button { white-space: nowrap; }
+.site-header nav a, .site-account, .lang-btn { white-space: nowrap; }
 @media (max-width: 480px) {
   .site-header { padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(12px, env(safe-area-inset-right)); }
   .site-header nav { gap: 0; }

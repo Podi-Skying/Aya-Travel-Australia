@@ -59,12 +59,16 @@ describe("gallery endpoints", () => {
     token = ((await (await H.postShare(req("POST", "/api/trip/share"))).json()) as { token: string }).token;
   });
 
-  it("/api/photos needs the owner or a share token, and only reads the cache", async () => {
+  it("/api/photos needs the owner, a share token or the public site, and only reads the cache", async () => {
     const doc = seedDoc();
     const it = doc.days.flatMap((d) => d.items).find((i) => i.lat != null)!;
     await putLookup("commons-photos", it.id, { name: it.name, lat: it.lat, lng: it.lng, photos: parseCommons(commonsBody) }, "test", null);
     signedOut();
+    // Public visitors (the guest quiz) read cached Commons photos while the public site is on; never when it is off.
+    process.env.PUBLIC_HOME = "0";
     expect((await H.getPhotos(req("GET", `/api/photos?item=${it.id}`))).status).toBe(401);
+    delete process.env.PUBLIC_HOME;
+    expect((await H.getPhotos(req("GET", `/api/photos?item=${it.id}`))).status).toBe(200);
     const viaToken = await H.getPhotos(req("GET", `/api/photos?item=${it.id}&token=${token}`));
     expect(((await viaToken.json()) as { commons: unknown[] }).commons).toHaveLength(2);
     asOwner();

@@ -902,4 +902,7 @@ export const EN: Record<string, string> = {
   "降雨機率 {0}%": "chance of rain {0}%",
   "近 Cataract Gorge": "near Cataract Gorge",
   "第 {n} 天": "Day {n}",
+  "荷巴特市中心": "Hobart city centre",
+  "回答幾個問題，排出從荷巴特市中心出發、回到市中心的一日行程。": "Answer a few questions to plan a day out from Hobart city centre and back.",
+  "在{0}想去哪些景點？（可多選）": "Which places in {0} would you like to see? (choose any)",
 };

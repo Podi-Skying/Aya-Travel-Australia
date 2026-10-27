@@ -70,7 +70,7 @@ const TABS = [
   { key: "options", label: "行程方案" },
   { key: "map", label: "地圖與景點" },
   { key: "info", label: "資訊與警示" },
-  { key: "quiz", label: "旅遊規劃小測驗", private: true },
+  { key: "quiz", label: "旅遊規劃小測驗" }, // open to guests too (Kai 2026-10-27; public start: Hobart city centre)
   { key: "gallery", label: "畫廊", private: true },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
@@ -118,7 +118,7 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
   const [pickedTab, setPickedTab] = useState<TabKey | null>(null);
   const [pickedDay, setPickedDay] = useState<number | null>(null);
   const url = useUrlState();
-  // Only tabs this mode can show (RV-01); the quiz is private.
+  // Only tabs this mode can show (RV-01); the gallery is private.
   // The old 待安排景點 tab now lives on the map (?tab=pool keeps working).
   // Removed tabs (總覽, 預算, 版本與分享 — 2026-10-26) open 每日行程.
   const urlTabKey = url.tab === "pool" ? "map" : ["overview", "budget", "manage", "versions"].includes(url.tab ?? "") ? "days" : url.tab;
@@ -378,7 +378,7 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
     offlineCopy: !online || fromCache,
   };
 
-  // The quiz starts from Kai's residence: owner and share links only, not public visitors.
+  // The gallery stays private; the quiz is for everyone (the public version never uses the home base).
   const visibleTabs = TABS.filter((t) => mode === "owner" || !!token || !("private" in t));
   const base = mode === "public" && token ? `/s/${token}` : "";
   const tabsRef = useRef<HTMLDivElement>(null);
