@@ -4,7 +4,8 @@ import { useRef, useState, type KeyboardEvent } from "react";
 
 /*
  * Photo reel for 推薦行程方案 (docs/PLAN-2026-10-26-plan-reel.md): a row of photo slices; the selected
- * slice swells open into the full image and a hovered one swells a little. On phones it becomes a
+ * slice swells open into the full image and a hovered one swells a little. Closed slices are photo only
+ * (Kai 2026-10-27): slightly dimmed, full colour on hover or focus; the title and badges show on the open one. On phones it becomes a
  * vertical stack. Kept self-contained behind this props API so a different reel component can
  * replace it without touching the page.
  */
@@ -14,7 +15,7 @@ export type ReelSlice = {
   title: string;
   /** Short line under the title on the open slice, e.g. 「3天2夜・東海岸・11/9–11/11」. */
   caption: string;
-  /** Status shown on the slice whether open or not, e.g. 「目前採用」. */
+  /** Status shown on the open slice, e.g. 「目前採用」 (closed slices carry it in their accessible name). */
   badge?: string;
   image?: string;
   /** CSS object-position for the photo (keep the subject in frame when cropped). */
@@ -69,6 +70,7 @@ export function PlanReel({
             id={`reel-${s.key}`}
             aria-selected={on}
             aria-controls={panelId}
+            aria-label={s.badge ? `${s.title}（${s.badge}）` : s.title}
             tabIndex={on ? 0 : -1}
             className={`reel-slice${on ? " on" : ""}`}
             style={{ ["--deep" as string]: s.deep }}
@@ -84,10 +86,6 @@ export function PlanReel({
                 <path d="M0 136 C30 130 60 140 90 134 S150 128 180 136 S260 142 320 132" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" opacity=".6" />
               </svg>
             )}
-            <span className="reel-spine" aria-hidden={on}>
-              {s.title}
-              {s.badge && !on ? `（${s.badge}）` : ""}
-            </span>
             <span className="reel-caption" aria-hidden={!on}>
               {s.badge && <span className="reel-badge">{s.badge}</span>}
               <strong>{s.title}</strong>

@@ -758,23 +758,26 @@ details.card.day-summary > summary h3 { margin: 0; }
 .plan-stage .card { background: color-mix(in srgb, var(--bg) 72%, transparent); }
 .plan-reel { display: flex; gap: 8px; height: 380px; }
 .reel-slice { position: relative; flex: 1 1 0; min-width: 56px; overflow: hidden; border: 0; padding: 0; border-radius: 16px; background: var(--deep); color: #fff; cursor: pointer; font: inherit; text-align: left;
-  transition: flex-grow .65s cubic-bezier(.34, 1.4, .64, 1), box-shadow .2s var(--ease); }
-.reel-slice:hover:not(.on), .reel-slice:focus-visible:not(.on) { flex-grow: 2; }
+  -webkit-tap-highlight-color: transparent; transition: flex-grow .5s cubic-bezier(.22, 1, .36, 1), box-shadow .2s var(--ease); }
+.reel-slice:hover:not(.on), .reel-slice:focus-visible:not(.on) { flex-grow: 1.6; }
 .reel-slice.on { flex-grow: 6; box-shadow: 0 0 0 3px var(--plan-deep, var(--ink)); }
+.reel-slice:active:not(.on) { transform: scale(.98); transition: flex-grow .5s cubic-bezier(.22, 1, .36, 1), transform .1s ease-out; }
 .reel-slice:focus-visible { outline: 3px solid var(--vermilion); outline-offset: 2px; }
 .reel-slice img, .reel-slice .reel-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+/* Closed slices are photo only, set back a little; hover, focus and the open one come up to full colour. */
+.reel-slice img { filter: saturate(.8) brightness(.84); transition: filter .35s var(--ease), transform .6s cubic-bezier(.22, 1, .36, 1); }
+.reel-slice:hover img, .reel-slice:focus-visible img, .reel-slice.on img { filter: none; }
+.reel-slice:hover:not(.on) img { transform: scale(1.03); }
 .reel-slice .reel-art { color: rgba(255, 255, 255, .55); }
-.reel-slice::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, rgba(0, 0, 0, .7), rgba(0, 0, 0, .05) 55%); }
-.reel-spine { position: absolute; z-index: 1; left: 50%; top: 16px; transform: translateX(-50%); writing-mode: vertical-rl; font-weight: 600; font-size: .95rem; letter-spacing: .08em; max-height: calc(100% - 32px); overflow: hidden; transition: opacity .25s var(--ease);
-  /* Solid backing so the title stays readable over any photo (AA: white on rgba(0,0,0,.72) over white ≥ 9:1). */
-  background: rgba(0, 0, 0, .72); padding: 8px 4px; border-radius: 8px; }
+/* Scrim only under the open slice's text. */
+.reel-slice::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, rgba(0, 0, 0, .74), rgba(0, 0, 0, .28) 38%, transparent 62%); opacity: 0; transition: opacity .3s var(--ease); pointer-events: none; }
+.reel-slice.on::after { opacity: 1; }
 .reel-credit { margin: 6px 0 0; font-size: .75rem; color: var(--ink-muted); }
-.reel-slice.on .reel-spine { opacity: 0; }
-.reel-caption { position: absolute; z-index: 1; left: 18px; right: 18px; bottom: 16px; display: grid; gap: 4px; opacity: 0; transform: translateY(8px); transition: opacity .3s var(--ease) .15s, transform .3s var(--ease) .15s; }
-.reel-slice.on .reel-caption { opacity: 1; transform: none; }
-.reel-caption strong { font-size: 1.35rem; line-height: 1.25; }
+.reel-caption { position: absolute; z-index: 1; left: 20px; right: 20px; bottom: 18px; display: grid; gap: 6px; opacity: 0; transform: translateY(8px); transition: opacity .2s var(--ease), transform .2s var(--ease); pointer-events: none; }
+.reel-slice.on .reel-caption { opacity: 1; transform: none; transition: opacity .3s var(--ease) .18s, transform .4s cubic-bezier(.22, 1, .36, 1) .18s; }
+.reel-caption strong { font-size: 1.35rem; line-height: 1.2; letter-spacing: -.01em; text-shadow: 0 1px 12px rgba(0, 0, 0, .35); }
 .reel-caption span { font-size: .9rem; opacity: .92; }
-.reel-badge { justify-self: start; background: var(--vermilion); border-radius: 999px; padding: 2px 10px; font-size: .78rem !important; opacity: 1 !important; }
+.reel-badge { justify-self: start; background: var(--vermilion); border-radius: 999px; padding: 2px 10px; font-size: .78rem !important; font-weight: 600; opacity: 1 !important; }
 .plan-detail h3 { margin: 0; font-size: 1.3rem; }
 .plan-detail .opt-days { list-style: none; padding: 0; gap: 14px; }
 .plan-detail .opt-days h4 { margin: 0 0 6px; font-size: 1rem; }
@@ -787,13 +790,16 @@ details.card.day-summary > summary h3 { margin: 0; }
 @media (max-width: 720px) {
   .plan-stage { margin: 0 -8px; padding: 8px; }
   .plan-reel { flex-direction: column; height: auto; }
-  .reel-slice { flex: 0 0 auto; height: 64px; min-width: 0; transition: height .55s cubic-bezier(.34, 1.3, .64, 1); }
+  .reel-slice { flex: 0 0 auto; height: 56px; min-width: 0; border-radius: 14px; transition: height .5s cubic-bezier(.22, 1, .36, 1), box-shadow .2s var(--ease); }
   .reel-slice:hover:not(.on), .reel-slice:focus-visible:not(.on) { flex-grow: 0; }
   .reel-slice.on { height: 260px; }
-  .reel-spine { writing-mode: horizontal-tb; left: 12px; right: auto; max-width: calc(100% - 40px); top: 50%; transform: translateY(-50%); max-height: none; white-space: nowrap; text-overflow: ellipsis; padding: 4px 10px; }
+  .reel-caption { left: 16px; right: 16px; bottom: 14px; }
+  .reel-caption strong { font-size: 1.2rem; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .plan-stage, .reel-slice, .reel-caption, .reel-spine { transition: none; }
+  .plan-stage, .reel-slice, .reel-caption, .reel-slice.on .reel-caption, .reel-slice::after { transition: opacity .2s ease; }
+  .reel-slice img, .reel-slice:hover:not(.on) img { transition: filter .2s ease; transform: none; }
+  .reel-slice:active:not(.on), .reel-caption { transform: none; }
 }
 @media (max-width: 480px) { .hero-facts { gap: 8px 20px; } .hero-facts div { padding: 0; border-left: 0; } }
 
