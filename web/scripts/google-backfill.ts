@@ -12,12 +12,14 @@ import { listPrice } from "../src/server/usage";
  * One-time Google backfill (docs/PLAN-2026-10-26-google.md), run by hand after the key is set:
  *   npx tsx --env-file=.env.local scripts/google-backfill.ts           # dry run: counts and estimate
  *   npx tsx --env-file=.env.local scripts/google-backfill.ts --write   # calls Google, within the daily cap
+ *   add --routes-only to skip place searches (route legs only)
  * Finds place ids for activities with a position, and stores every driving leg of the scheduled days
  * and of the recommended plans in route_cache.
  */
 
 async function main() {
   const write = process.argv.includes("--write");
+  const routesOnly = process.argv.includes("--routes-only");
   if (!googleKey()) throw new Error("GOOGLE_MAPS_API_KEY is not set");
   const owner = { githubId: (process.env.OWNER_GITHUB_IDS ?? "").split(",")[0].trim() } as Owner;
   const cur = await getCurrentTrip(owner);
@@ -101,7 +103,7 @@ async function main() {
     found = 0,
     routes = 0,
     legs = 0;
-  for (const i of todo) {
+  for (const i of routesOnly ? [] : todo) {
     try {
       const id = await findPlaceId(i.id, i.name, i.lat!, i.lng!);
       places++;
