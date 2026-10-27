@@ -74,3 +74,10 @@ describe("on-screen translation", () => {
     expect(makeTranslate("ja")("11/6 雪梨 → 荷巴特（11:45 → 13:35）")).not.toContain("雪梨");
   });
 });
+
+describe("on-screen translation of labels", () => {
+  it("keeps a trailing colon before the next text", async () => {
+    const { makeTranslate } = await import("@/i18n/translate");
+    expect(makeTranslate("en")("雪梨：")).toBe("Sydney: ");
+  });
+});

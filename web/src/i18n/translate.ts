@@ -109,8 +109,10 @@ export function makeTranslate(lang: Exclude<Lang, "zh">, content?: Record<string
           const parts = splitOutside(s, sep);
           if (parts.length < 2) continue;
           const t = parts.map((p) => (p.trim() ? translate(p.trim(), depth + 1) : p));
-          if (t.some((x, i) => x !== parts[i].trim() && parts[i].trim()))
-            return t.filter((x, i) => x || i < t.length - 1).join(SEP[sep] ?? sep).replace(/\s+$/, "");
+          if (!t.some((x, i) => x !== parts[i].trim() && parts[i].trim())) continue;
+          // A trailing separator stays: 「雪梨：」 before the next text reads "Sydney: …", 「…確認。」 ends with a full stop.
+          const joined = t.join(SEP[sep] ?? sep);
+          return /[：，、]/.test(sep) ? joined : joined.replace(/\s+$/, "");
         }
         return null;
       };
