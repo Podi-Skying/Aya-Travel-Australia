@@ -456,15 +456,13 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
         <Panel id="info" show={tab === "info"}>
           <Info />
         </Panel>
+        <Panel id="quiz" show={tab === "quiz"}>
+          <PlanQuiz active={tab === "quiz"} />
+        </Panel>
         {(mode === "owner" || token) && (
-          <>
-            <Panel id="quiz" show={tab === "quiz"}>
-              <PlanQuiz active={tab === "quiz"} />
-            </Panel>
-            <Panel id="gallery" show={tab === "gallery"}>
-              <DriftGallery active={tab === "gallery"} />
-            </Panel>
-          </>
+          <Panel id="gallery" show={tab === "gallery"}>
+            <DriftGallery active={tab === "gallery"} />
+          </Panel>
         )}
       </main>
       <footer className="foot">
