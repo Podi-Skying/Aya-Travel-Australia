@@ -1010,4 +1010,10 @@ details.card.day-summary > summary h3 { margin: 0; }
 .site-header.dark .lang-switch { border-color: rgba(255,255,255,.4); }
 .site-header.dark .lang-switch button { color: #fff; }
 .site-header.dark .lang-switch button[aria-pressed="true"] { background: #fff; color: var(--ink); }
-@media (max-width: 720px) { .lang-switch button { min-width: 40px; padding: 0 7px; } }
+@media (max-width: 720px) { .lang-switch button { min-width: 44px; padding: 0 6px; } }
+/* Phones: the site name stays on one line next to the language switch (the logo link still carries the full name). */
+@media (max-width: 560px) {
+  .site-header .site-logo { min-width: 0; }
+  .site-header.with-tabs .site-logo span { display: block; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+}
+@media (max-width: 400px) { .site-header.with-tabs .site-logo span { display: none; } }
