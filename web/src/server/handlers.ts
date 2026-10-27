@@ -194,7 +194,7 @@ export async function postRoutes(req: Request) {
     // Same-origin JSON only, checked before any quota is charged (share-link viewers are same-origin).
     if (!sameOrigin(req)) return fail(403, "來源不符");
     if (!(req.headers.get("content-type") ?? "").startsWith("application/json")) return fail(415, "需要 JSON");
-    const b = (await readJson(req, ROUTE_BYTES)) as { points?: unknown; refresh?: unknown; compute?: unknown; mode?: unknown };
+    const b = (await readJson(req, ROUTE_BYTES)) as { points?: unknown; refresh?: unknown; compute?: unknown; mode?: unknown; quiz?: unknown };
     const mode = b.mode === "walking" || b.mode === "transit" ? b.mode : "driving";
     const points = validPoints(b.points);
     if (!points) return fail(400, `需要 2–${MAX_POINTS} 個座標`);
@@ -208,6 +208,14 @@ export async function postRoutes(req: Request) {
     const missing = hit.legs.some((l) => !l);
     // A page view answered from route_cache: counted as a cache hit, no Google call.
     if (!missing && googleKey()) await noteGoogleHit("routes");
+    // The planning quiz for guests (Kai 2026-10-27): a missing drive leg is routed once with the free
+    // OpenStreetMap router (never Google) and stored, under a per-visitor limit.
+    if (!owner && b.quiz === true && b.compute === true && missing && mode === "driving") {
+      // 20 per visitor and 200 for everyone per 10 minutes, within the free router's fair use.
+      if (!(await routeQuota(`quiz-ip:${sha256(ip)}`, 20, false)) || !(await routeQuota("quiz-all", 200, false))) return json({ ...hit, limited: true });
+      const r = await getLegs(points, { compute: true, mode, provider: "osrm" }).catch(() => null);
+      return json(r ?? { ...hit, unavailable: true });
+    }
     // Page views only read route_cache; computing takes an explicit owner action (compute: true) or the backfill.
     if (!owner || b.compute !== true || (!missing && !refresh)) return json(hit);
     if (!(await routeQuota(`routes:${c!.ok ? c!.owner.githubId : ""}`, 30, false))) return json({ ...hit, limited: true });

@@ -16,6 +16,8 @@ import { guestPhotoUrl, quizStart } from "@/domain/quiz-start";
 import { effectiveDay } from "@/domain/effective-day";
 import { PALETTES, INK_PALETTE } from "@/domain/options";
 import { fmtDay, mins, money } from "@/domain/format";
+import { dayNavUrls, navUrl } from "@/domain/nav";
+import { useRoadLegs, type Leg } from "./useLegs";
 import type { Day, Item } from "@/domain/schema";
 
 /*
@@ -47,7 +49,8 @@ export function PlanQuiz({ active }: { active: boolean }) {
   const [region, setRegion] = useState<string | null>(null);
   const [picked, setPicked] = useState<string[]>([]);
   const [travel, setTravel] = useState<"drive" | "transit">("drive");
-  const [start, setStart] = useState("09:00");
+  // The day starts at 09:00 (Kai 2026-10-27: no departure-time question).
+  const start = "09:00";
 
   // Guests use the quiz too (Kai 2026-10-27): the public site starts from Hobart city centre, never the home base.
   const who = mode === "owner" ? "owner" : token ? "share" : "public";
@@ -223,7 +226,7 @@ export function PlanQuiz({ active }: { active: boolean }) {
 
       {step === 3 && (
         <section className="card section quiz-step" aria-labelledby="q3">
-          <h3 id="q3">怎麼去？幾點出發？</h3>
+          <h3 id="q3">怎麼去？</h3>
           <div className="quiz-choices" role="radiogroup" aria-label="交通方式">
             {(
               [
@@ -237,13 +240,6 @@ export function PlanQuiz({ active }: { active: boolean }) {
             ))}
           </div>
           {travel === "transit" && reg?.car && <p className="small quiz-warn">{reg.name}大多要開車；公車班次少或到不了，結果僅供參考。</p>}
-          <div className="quiz-choices" role="radiogroup" aria-label="出發時間">
-            {["08:00", "09:00", "10:00"].map((t) => (
-              <button key={t} type="button" role="radio" aria-checked={start === t} className={`chip${start === t ? " on" : ""}`} onClick={() => setStart(t)}>
-                {t} 出發
-              </button>
-            ))}
-          </div>
           <QuizNav onBack={back} next={() => go(4)} nextLabel="排出路線" />
         </section>
       )}
@@ -295,9 +291,10 @@ type Stop = QuizPlace;
 const clock = (t: number) => `${String(Math.floor(t / 60) % 24).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
 
 /** One day of the route: legs from `from` through the stops to `to`, with times. */
-function dayPlan(from: [number, number], stops: Stop[], to: [number, number], startMin: number) {
+function dayPlan(from: [number, number], stops: Stop[], to: [number, number], startMin: number, road?: (Leg | null)[] | null) {
   const pts: [number, number][] = [from, ...stops.map((s) => at(s.item)), to];
-  const legs = pts.slice(1).map((p, k) => driveMinutes(km(pts[k], p)));
+  // Road minutes where the leg was routed, else the straight-line estimate.
+  const legs = pts.slice(1).map((p, k) => (road?.[k] ? Math.max(1, Math.round(road[k]!.durationS / 60)) : driveMinutes(km(pts[k], p))));
   const drive = legs.reduce((a, b) => a + b, 0);
   const total = drive + stops.reduce((a, s) => a + (s.item.dur ?? 60), 0);
   return { legs, drive, total, end: startMin + total };
@@ -337,7 +334,10 @@ function Result({
   const homeAt: [number, number] = [home.lat, home.lng];
   const [h, m] = start.split(":").map(Number);
   const startMin = h * 60 + m;
-  const oneDay = dayPlan(homeAt, stops, homeAt, startMin);
+  // Road legs for the whole loop (Kai 2026-10-27: real driving times and distances, and 導航).
+  const loop: [number, number][] = [homeAt, ...stops.map((s) => at(s.item)), homeAt];
+  const road = useRoadLegs(travel === "drive" ? loop : null);
+  const oneDay = dayPlan(homeAt, stops, homeAt, startMin, road);
   // Long drives (Kai 2026-10-26): a place over 3 h one way, or over 6 h of driving in the day, asks first.
   const long = stops.some((s) => minutesFrom(homeAt, s.item) > LONG_DRIVE_MIN) || oneDay.drive > LONG_DAY_DRIVE_MIN;
   const [choice, setChoice] = useState<"day" | "overnight" | null>(null);
@@ -353,14 +353,31 @@ function Result({
   const nightPin: StayPin | null = night ? { key: "quiz-night", name: night.name, lat: night.lat, lng: night.lng, home: false } : null;
 
   const mapDay = (list: Stop[]) => effectiveDay({ date: "quiz", seg: "tas", title: "", stay: "", driveHrs: 0, items: list.map((s) => ({ ...s.item, mode: travel === "drive" ? "drive" : "bus" })) } as Day);
-  const route = (list: Stop[], legs: number[], from: ReactNode, to: ReactNode) => (
+  const navMode = travel === "drive" ? "driving" : "transit";
+  const legLine = (k: number, legs: number[], pts: [number, number][], real: (Leg | null)[] | null) => {
+    const l = real?.[k];
+    return (
+      <span className="small muted quiz-leg">
+        <Icon name={icon} size={14} /> {l ? `${mins(legs[k])}・${l.distanceM >= 10000 ? Math.round(l.distanceM / 1000) : (l.distanceM / 1000).toFixed(1)} 公里` : `約 ${mins(legs[k])}（估計）`}{" "}
+        <a href={navUrl({ lat: pts[k][0], lng: pts[k][1] }, { lat: pts[k + 1][0], lng: pts[k + 1][1] }, navMode)} target="_blank" rel="noopener noreferrer">
+          導航
+        </a>
+      </span>
+    );
+  };
+  const route = (list: Stop[], legs: number[], from: ReactNode, to: ReactNode, pts: [number, number][], real: (Leg | null)[] | null = null) => (
     <ol className="quiz-route">
-      <li>{from}</li>
+      <li>
+        {from}{" "}
+        {dayNavUrls(pts.slice(1).map(([lat, lng]) => ({ lat, lng })), navMode, { lat: pts[0][0], lng: pts[0][1] }).map((u, k, all) => (
+          <a key={u} className="quiz-daynav" href={u} target="_blank" rel="noopener noreferrer">
+            全日導航{all.length > 1 ? ` ${k + 1}` : ""}
+          </a>
+        ))}
+      </li>
       {list.map((s, k) => (
         <li key={s.item.id}>
-          <span className="small muted">
-            <Icon name={icon} size={14} /> 約 {mins(legs[k])}（估計）
-          </span>
+          {legLine(k, legs, pts, real)}
           <br />
           <strong>
             {k + 1}. {s.item.name}
@@ -369,9 +386,7 @@ function Result({
         </li>
       ))}
       <li>
-        <span className="small muted">
-          <Icon name={icon} size={14} /> 約 {mins(legs.at(-1) ?? 0)}（估計）
-        </span>
+        {legLine(list.length, legs, pts, real)}
         <br />
         {to}
       </li>
@@ -456,10 +471,10 @@ function Result({
         <h3 id="q4">你的兩天一夜路線</h3>
         <h4>第一天</h4>
         <DayMap day={mapDay(d1)} active={active} focusId={null} ends={{ start: home, end: nightPin }} />
-        {route(d1, p1.legs, <>{homeMark} {start} 從{homeName}出發</>, <>約 {clock(p1.end)} {nightLabel}</>)}
+        {route(d1, p1.legs, <>{homeMark} {start} 從{homeName}出發</>, <>約 {clock(p1.end)} {nightLabel}</>, [homeAt, ...d1.map((s) => at(s.item)), [night.lat, night.lng]])}
         <h4>第二天</h4>
         <DayMap day={mapDay(d2)} active={active} focusId={null} ends={{ start: nightPin, end: home }} />
-        {route(d2, p2.legs, <>{start} 從 {night.name} 出發</>, <>{homeMark} 約 {clock(p2.end)} 回到{homeName}</>)}
+        {route(d2, p2.legs, <>{start} 從 {night.name} 出發</>, <>{homeMark} 約 {clock(p2.end)} 回到{homeName}</>, [[night.lat, night.lng], ...d2.map((s) => at(s.item)), homeAt])}
         <p className="small">
           開車：第一天約 <strong>{mins(p1.drive)}</strong>、第二天約 <strong>{mins(p2.drive)}</strong>
         </p>
@@ -479,12 +494,12 @@ function Result({
         </p>
       )}
       <DayMap day={mapDay(stops)} active={active} focusId={null} ends={{ start: home, end: home }} />
-      {route(stops, oneDay.legs, <>{homeMark} {start} 從{homeName}出發</>, <>{homeMark} 約 {clock(oneDay.end)} 回到{homeName}</>)}
+      {route(stops, oneDay.legs, <>{homeMark} {start} 從{homeName}出發</>, <>{homeMark} 約 {clock(oneDay.end)} 回到{homeName}</>, loop, road)}
       <p className="small">
         全程約 <strong>{mins(oneDay.total)}</strong>
       </p>
       {cost}
-      <p className="muted small">車程依直線距離估算；地圖上已算過的路段會沿實際道路畫出。{travel === "transit" ? "大眾運輸的時間可能更長，出發前請查班次。" : ""}</p>
+      <p className="muted small">{travel === "drive" ? (road && road.every(Boolean) ? "車程與距離依實際道路計算（OpenStreetMap 路網），實際以導航為準。" : "正在依實際道路計算車程；算好之前先用直線距離估算。") : "大眾運輸的時間依直線距離估算，可能更長，出發前請查班次。"}</p>
       {nav(false)}
     </section>
   );

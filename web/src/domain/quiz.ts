@@ -29,7 +29,16 @@ export const REGIONS: Region[] = [
   { key: "richmond", name: "Richmond／Coal Valley", areas: area([-42.735, 147.44], 14), car: true },
   { key: "tasman", name: "塔斯曼半島", areas: area([-43.08, 147.85], 32), car: true },
   { key: "bruny", name: "布魯尼島", areas: area([-43.3, 147.32], 30), car: true },
-  { key: "huon", name: "Huon Valley", areas: area([-43.05, 146.95], 28), car: true },
+  // Huon Valley reaches down to Hastings Caves and the thermal springs (Kai 2026-10-27).
+  {
+    key: "huon",
+    name: "Huon Valley",
+    areas: [
+      { center: [-43.05, 146.95], km: 28 },
+      { center: [-43.41, 146.86], km: 10 },
+    ],
+    car: true,
+  },
   { key: "mtfield", name: "Mount Field", areas: area([-42.68, 146.62], 16), car: true },
   // 東海岸 includes 瑪麗亞島 (Kai 2026-10-27): they make one overnight trip together.
   {

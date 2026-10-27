@@ -177,3 +177,36 @@ export function routeStops<T extends { id: string; name: string; lat?: number; l
   // A stay and the first/last stop at the same spot make no leg.
   return out.filter((s, k) => k === 0 || s.pt[0] !== out[k - 1].pt[0] || s.pt[1] !== out[k - 1].pt[1]);
 }
+
+/**
+ * Road legs for a whole route (the planning quiz, Kai 2026-10-27): cached legs first; missing ones are routed
+ * once on the server (Google for the owner, the free OpenStreetMap router for guests) and stored, then the
+ * maps redraw along the roads. Null while loading; a leg stays null if no router answered.
+ */
+export function useRoadLegs(points: Pt[] | null): (Leg | null)[] | null {
+  const key = points && points.length >= 2 ? JSON.stringify(points.map((p) => p.map((n) => Math.round(n * 1e5) / 1e5))) : "";
+  const [state, setState] = useState<{ key: string; legs: (Leg | null)[] } | null>(null);
+  useEffect(() => {
+    if (!key) return;
+    let live = true;
+    const pts = JSON.parse(key) as Pt[];
+    void (async () => {
+      const legs: (Leg | null)[] = [];
+      for (let a = 0; a < pts.length - 1; a += MAX_POINTS - 1) {
+        const part = pts.slice(a, a + MAX_POINTS);
+        const r = await api<{ legs: (Leg | null)[] }>("/api/routes", { method: "POST", body: { points: part, compute: true, quiz: true } });
+        legs.push(...(r.ok ? r.data.legs : part.slice(1).map(() => null)));
+      }
+      if (!live) return;
+      setState({ key, legs });
+      if (legs.some(Boolean)) {
+        memo.clear();
+        dispatchEvent(new Event(LEGS_EVENT));
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [key]);
+  return state && state.key === key ? state.legs : null;
+}

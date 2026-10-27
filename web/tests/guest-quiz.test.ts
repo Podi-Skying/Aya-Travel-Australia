@@ -68,4 +68,13 @@ describe("guest quiz: no outside calls (no Google, no Wikimedia search)", () => 
     expect(legs.status).toBe(200);
     expect(calls).toEqual([]);
   });
+
+  it("the guest quiz routes a missing leg with the free OpenStreetMap router only, never Google", async () => {
+    process.env.GOOGLE_MAPS_API_KEY = "test-key-not-real";
+    const r = await H.postRoutes(req("POST", "/api/routes", { points: [[-42.8826, 147.3286], [-43.0, 147.0]], compute: true, quiz: true }));
+    expect(r.status).toBe(200);
+    expect(calls.length).toBeGreaterThan(0);
+    expect(calls.every((u) => u.startsWith("https://router.project-osrm.org/"))).toBe(true);
+    delete process.env.GOOGLE_MAPS_API_KEY;
+  });
 });

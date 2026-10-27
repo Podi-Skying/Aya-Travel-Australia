@@ -70,9 +70,10 @@ export function TripOptions() {
               label="行程方案"
               panelId="plan-detail"
               active={tour ? tour.key : current!.option.key}
-              onSelect={(k, via) => {
+              onSelect={(k) => {
+                // A tap opens the photo in place (Kai 2026-10-27); the page stays where it is.
                 setPicked(k);
-                setJump(via === "click" ? { key: k, n: (jump?.n ?? 0) + 1 } : null);
+                setJump(null);
               }}
               slices={shown.map((c) => ({
                 key: c.option.key,
@@ -95,6 +96,13 @@ export function TripOptions() {
               )}
             />
           </div>
+          {!tour && (
+            <p className="reel-more">
+              <button type="button" className="btn ghost" onClick={() => setJump({ key: current!.option.key, n: (jump?.n ?? 0) + 1 })}>
+                看行程 ↓
+              </button>
+            </p>
+          )}
           {tour ? <TourDetail key={tour.key} item={tour.item} /> : <OptionDetail key={current!.option.key} c={current!} jump={jump?.key === current!.option.key ? jump.n : 0} />}
         </>
       )}

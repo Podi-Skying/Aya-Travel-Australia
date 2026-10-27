@@ -775,6 +775,7 @@ details.card.day-summary > summary h3 { margin: 0; }
 /* Scrim only under the open slice's text. */
 .reel-slice::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, rgba(0, 0, 0, .74), rgba(0, 0, 0, .28) 38%, transparent 62%); opacity: 0; transition: opacity .3s var(--ease); pointer-events: none; }
 .reel-slice.on::after { opacity: 1; }
+.reel-more { margin: 8px 0 0; display: flex; justify-content: flex-end; }
 .reel-credit { margin: 6px 0 0; font-size: .75rem; color: var(--ink-muted); }
 .reel-caption { position: absolute; z-index: 1; left: 20px; right: 20px; bottom: 18px; display: grid; gap: 6px; opacity: 0; transform: translateY(8px); transition: opacity .2s var(--ease), transform .2s var(--ease); pointer-events: none; }
 .reel-slice.on .reel-caption { opacity: 1; transform: none; transition: opacity .3s var(--ease) .18s, transform .4s cubic-bezier(.22, 1, .36, 1) .18s; }
