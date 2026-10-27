@@ -94,8 +94,9 @@ export function PlaceGallery(props: { item: Item; className?: string; empty?: "t
 }
 
 function PlaceGalleryInner({ item, className = "", empty = "hide" }: { item: Item; className?: string; empty?: "tile" | "hide" }) {
-  const { mode, token } = useTrip();
-  const privateView = mode === "owner" || !!token;
+  const { token } = useTrip();
+  // Photos for everyone (Kai 2026-10-27); the server caps Google calls per audience.
+  const privateView = true;
   const googleOk = privateView && item.lat != null && !isLogistics(item) && !item.name.startsWith("住宿：") && item.photoSources !== "own";
   const commonsOk = privateView && !item.photoSources;
   const ref = `${item.id}|${item.name}|${item.lat}|${item.lng}`;

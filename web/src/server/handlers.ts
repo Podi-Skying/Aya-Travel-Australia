@@ -15,6 +15,8 @@ import { routeQuota, sha256, createShareLink, deactivateShareLinks, getPublicTri
 import { alertStatus } from "@/domain/rules";
 import { todayStr } from "@/domain/format";
 import type { Op } from "@/domain/ops";
+import type { Item, TripDoc } from "@/domain/schema";
+import { isStayItem } from "@/domain/privacy";
 
 /* Route handler bodies, kept outside app/ so integration tests can call them directly. */
 
@@ -289,10 +291,12 @@ export async function getPhotos(req: Request) {
     const item = q.get("item") ?? "";
     const token = q.get("token");
     if (!/^[A-Za-z0-9_-]{1,40}$/.test(item)) return fail(400, "缺少活動 id");
-    let doc: Parameters<typeof findIn>[0] | null = null;
+    let doc: (Parameters<typeof findIn>[0] & Pick<TripDoc, "stays">) | null = null;
+    let owner = false;
     if (token) doc = (await getPublicTrip(token))?.doc ?? null;
     else {
       const c = missingConfig("owner").length ? null : await checkOwner();
+      owner = !!c?.ok;
       if (c?.ok) doc = (await getCurrentTrip(c.owner))?.doc ?? null;
       // Public visitors (the quiz, Kai 2026-10-27): cached Wikimedia Commons photos of places in the public document.
       else doc = (await getPublicHomeTrip())?.doc ?? null;
@@ -300,6 +304,8 @@ export async function getPhotos(req: Request) {
     if (!doc) return fail(401, "需要分享連結或登入");
     const it = findIn(doc, item);
     if (!it || it.lat == null || it.lng == null) return json({ commons: [] });
+    // Guests get no photo near where they sleep (the hotel stops), not even Commons.
+    if (!owner && isStayItem(it, doc)) return json({ commons: [] });
     const commons = (await commonsPhotos(item, it.name, it.lat, it.lng, { search: false }).catch(() => null)) ?? [];
     return json({ commons }, 200, { "cache-control": "private, max-age=600" });
   } catch (e) {
@@ -320,20 +326,29 @@ export async function getPlacePhotos(req: Request) {
     if (!/^[A-Za-z0-9_-]{1,40}$/.test(item)) return fail(400, "缺少活動 id");
     const hit = await getLookup<PlaceRef>("place-id", item).catch(() => null);
     let ok = false;
-    let scope: "owner" | "share" = "owner";
+    let scope: "owner" | "share" | "public" = "owner";
     if (token) {
       // Share link: the activity must be in this trip at the position the place was matched for
       // (its shown name may be redacted, so the owner-side name is not compared here).
-      const it = findIn((await getPublicTrip(token))?.doc ?? { days: [], attractionPool: [] }, item);
-      ok = !!hit?.value.placeId && !!hit.value.checked && !!it && it.lat != null && it.lng != null && sameRef(hit.value, hit.value.name ?? "", it.lat, it.lng);
+      const sdoc = (await getPublicTrip(token))?.doc;
+      const it = sdoc ? findIn(sdoc, item) : undefined;
+      ok = !!hit?.value.placeId && !!hit.value.checked && !!it && it.lat != null && it.lng != null && !isStayItem(it, sdoc!) && sameRef(hit.value, hit.value.name ?? "", it.lat, it.lng);
       scope = "share";
       if (!it) return fail(401, "需要分享連結或登入");
     } else {
       const c = missingConfig("owner").length ? null : await checkOwner();
-      if (!c?.ok) return fail(401, "需要分享連結或登入");
-      const cur = await getCurrentTrip(c.owner);
-      const it = cur && findIn(cur.doc, item);
-      ok = !!hit?.value.placeId && !!it && sameRef(hit.value, it.name, it.lat, it.lng);
+      if (c?.ok) {
+        const cur = await getCurrentTrip(c.owner);
+        const it = cur && findIn(cur.doc, item);
+        ok = !!hit?.value.placeId && !!it && sameRef(hit.value, it.name, it.lat, it.lng);
+      } else {
+        // Public visitors (Kai 2026-10-27): places shown on the public site, under their own daily sub-cap.
+        const pub = await getPublicHomeTrip();
+        if (!pub) return fail(401, "需要分享連結或登入");
+        const it = findIn(pub.doc, item);
+        ok = !!hit?.value.placeId && !!hit.value.checked && !!it && it.lat != null && it.lng != null && !isStayItem(it, pub.doc) && sameRef(hit.value, hit.value.name ?? "", it.lat, it.lng);
+        scope = "public";
+      }
     }
     if (!ok) return json({ photos: [] });
     // 5 photos: one Place Details + 5 media calls = 6 per gallery.
@@ -354,16 +369,15 @@ export async function getMedia(req: Request, ctx: { params: Promise<{ path: stri
     const rel = parts.join("/");
     if (!/^[a-z0-9/_-]+\.(webp|jpg|png)$/.test(rel) || rel.includes("..")) return fail(404, "找不到");
     const token = new URL(req.url).searchParams.get("token");
+    const want = `/api/media/${rel}`;
+    const shows = (doc: { days: { items: Item[] }[]; attractionPool: { items: Item[] }[] } | null | undefined) =>
+      !!doc && [...doc.days.flatMap((d) => d.items), ...doc.attractionPool.flatMap((p) => p.items)].some((i) => i.photo?.url === want || (i.gallery ?? []).some((g) => g.url === want));
     let ok = false;
-    if (token) {
-      // A share token opens only photos its trip actually shows.
-      const t = await getPublicTrip(token);
-      const want = `/api/media/${rel}`;
-      ok = !!t && [...t.doc.days.flatMap((d) => d.items), ...t.doc.attractionPool.flatMap((p) => p.items)].some((i) => i.photo?.url === want || (i.gallery ?? []).some((g) => g.url === want));
-    }
+    // A share token, or the public site (Kai 2026-10-27: photos for everyone), opens only photos its trip shows.
+    if (token) ok = shows((await getPublicTrip(token))?.doc);
     else {
       const c = missingConfig("owner").length ? null : await checkOwner();
-      ok = !!c?.ok;
+      ok = !!c?.ok || shows((await getPublicHomeTrip())?.doc);
     }
     if (!ok) return fail(401, "需要分享連結或登入");
     const { readFile } = await import("node:fs/promises");

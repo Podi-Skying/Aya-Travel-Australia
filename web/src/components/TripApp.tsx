@@ -71,7 +71,7 @@ const TABS = [
   { key: "map", label: "地圖與景點" },
   { key: "info", label: "資訊與警示" },
   { key: "quiz", label: "旅遊規劃小測驗" }, // open to guests too (Kai 2026-10-27; public start: Hobart city centre)
-  { key: "gallery", label: "畫廊", private: true },
+  { key: "gallery", label: "畫廊" }, // photos are for everyone (Kai 2026-10-27)
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
@@ -118,11 +118,11 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
   const [pickedTab, setPickedTab] = useState<TabKey | null>(null);
   const [pickedDay, setPickedDay] = useState<number | null>(null);
   const url = useUrlState();
-  // Only tabs this mode can show (RV-01); the gallery is private.
+  // Every tab is open to every viewer (2026-10-27: photos and the quiz for everyone).
   // The old 待安排景點 tab now lives on the map (?tab=pool keeps working).
   // Removed tabs (總覽, 預算, 版本與分享 — 2026-10-26) open 每日行程.
   const urlTabKey = url.tab === "pool" ? "map" : ["overview", "budget", "manage", "versions"].includes(url.tab ?? "") ? "days" : url.tab;
-  const urlTab = TABS.some((t) => t.key === urlTabKey && (mode === "owner" || !!token || !("private" in t))) ? (urlTabKey as TabKey) : null;
+  const urlTab = TABS.some((t) => t.key === urlTabKey) ? (urlTabKey as TabKey) : null;
   const urlDayIdx = url.day ? doc.days.findIndex((d) => d.date === url.day) : -1;
   const tab: TabKey = pickedTab ?? urlTab ?? "days";
   const todayIdx = today ? doc.days.findIndex((d) => d.date >= today) : -1;
@@ -378,8 +378,7 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
     offlineCopy: !online || fromCache,
   };
 
-  // The gallery stays private; the quiz is for everyone (the public version never uses the home base).
-  const visibleTabs = TABS.filter((t) => mode === "owner" || !!token || !("private" in t));
+  const visibleTabs = TABS;
   const base = mode === "public" && token ? `/s/${token}` : "";
   const tabsRef = useRef<HTMLDivElement>(null);
   // Keep the selected tab visible in the scrollable tab row (mobile).
@@ -459,11 +458,9 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
         <Panel id="quiz" show={tab === "quiz"}>
           <PlanQuiz active={tab === "quiz"} />
         </Panel>
-        {(mode === "owner" || token) && (
-          <Panel id="gallery" show={tab === "gallery"}>
-            <DriftGallery active={tab === "gallery"} />
-          </Panel>
-        )}
+        <Panel id="gallery" show={tab === "gallery"}>
+          <DriftGallery active={tab === "gallery"} />
+        </Panel>
       </main>
       <footer className="foot">
         <p>

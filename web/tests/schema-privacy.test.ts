@@ -155,10 +155,14 @@ describe("attraction photos", () => {
     expect(parseTripDoc(bad).ok).toBe(false);
   });
 
-  it("strips photos from the anonymous public doc but keeps them for share links", () => {
+  it("shows photos to everyone (Kai 2026-10-27), except photos of where they sleep", () => {
     const d = withPhoto();
-    expect(JSON.stringify(toPublicDoc(d))).not.toContain('"photo"');
+    expect(toPublicDoc(d).days[0].items[0].photo?.site).toBe("Wikimedia Commons");
     expect(toPublicDoc(d, { photos: true }).days[0].items[0].photo?.site).toBe("Wikimedia Commons");
+    const photo = d.days[0].items[0].photo;
+    const home = Object.values(d.stays).find((s) => s.home)!.name;
+    d.days[1].items[0] = { ...d.days[1].items[0], name: `前往 ${home} 入住`, photo };
+    for (const pub of [toPublicDoc(d), toPublicDoc(d, { photos: true })]) expect(pub.days[1].items[0].photo).toBeUndefined();
   });
 
   it("lets the owner set or clear a custom photo URL", () => {

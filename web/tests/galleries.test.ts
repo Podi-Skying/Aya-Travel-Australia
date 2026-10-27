@@ -39,13 +39,13 @@ describe("gallery photo sources", () => {
     expect(g[3].credit.authors).toEqual([{ name: "A" }]);
   });
 
-  it("accepts private /api/media photos in galleries, hides galleries from public documents, and tokenises them on share pages", () => {
+  it("accepts /api/media photos in galleries, shows them on public documents, and tokenises them on share pages", () => {
     const doc = seedDoc() as TripDoc;
     doc.days[0].items[0].gallery = [{ url: "/api/media/balloon-aloft/06-redballoon-sunrise.webp", page: "/api/media/balloon-aloft/06-redballoon-sunrise.webp", site: "Kai 提供", kind: "custom" }];
     const r = parseTripDoc(doc);
     expect(r.ok).toBe(true);
     expect(parseTripDoc({ ...doc, days: doc.days.map((d, i) => (i ? d : { ...d, items: [{ ...d.items[0], gallery: [{ url: "/etc/passwd", page: "/x", site: "x", kind: "custom" }] }] })) }).ok).toBe(false);
-    expect(JSON.stringify(toPublicDoc(r.ok ? r.doc : doc))).not.toContain("balloon-aloft");
+    expect(JSON.stringify(toPublicDoc(r.ok ? r.doc : doc))).toContain("balloon-aloft");
     const t = withMediaToken(doc, "tok");
     expect(t.days[0].items[0].gallery![0].url).toBe("/api/media/balloon-aloft/06-redballoon-sunrise.webp?token=tok");
   });
@@ -105,7 +105,7 @@ describe("Google photos for share links", () => {
     process.env.GOOGLE_MAPS_API_KEY = "test-key-not-real";
   });
 
-  it("a share token gets photos only for activities in its trip, under the share sub-cap; no token gets 401", async () => {
+  it("a share token gets photos only for activities in its trip, under the share sub-cap; the public site under its own sub-cap", async () => {
     const { vi } = await import("vitest");
     const doc = seedDoc();
     const it = doc.days.flatMap((d) => d.items).find((i) => i.lat != null)!;
@@ -115,7 +115,9 @@ describe("Google photos for share links", () => {
     );
     vi.stubGlobal("fetch", spy);
     signedOut();
+    process.env.PUBLIC_HOME = "0";
     expect((await H.getPlacePhotos(req("GET", `/api/place-photos?item=${it.id}`))).status).toBe(401);
+    delete process.env.PUBLIC_HOME;
     expect((await H.getPlacePhotos(req("GET", `/api/place-photos?item=not-in-trip&token=${token}`))).status).toBe(401);
     const r = await H.getPlacePhotos(req("GET", `/api/place-photos?item=${it.id}&token=${token}`));
     const body = (await r.json()) as { photos: { photoUri: string; attributions: { name: string }[] }[] };
@@ -127,6 +129,18 @@ describe("Google photos for share links", () => {
     expect(capped.photos).toEqual([]);
     expect(spy.mock.calls.length).toBe(calls);
     delete process.env.GOOGLE_SHARE_DAILY_CAP;
+    // Public visitors: photo references come from the cache (no Place Details), only the media call is made…
+    const before = spy.mock.calls.length;
+    const pub = (await (await H.getPlacePhotos(req("GET", `/api/place-photos?item=${it.id}`))).json()) as { photos: { attributions: { name: string }[] }[] };
+    expect(pub.photos[0].attributions).toEqual([{ name: "A" }]);
+    expect(spy.mock.calls.slice(before).map((c) => String(c[0])).every((u) => u.includes("/media"))).toBe(true);
+    // …and stop at their own sub-cap, so the page falls back to stored photos.
+    process.env.GOOGLE_PUBLIC_DAILY_CAP = "0";
+    const n = spy.mock.calls.length;
+    const pubCapped = (await (await H.getPlacePhotos(req("GET", `/api/place-photos?item=${it.id}`))).json()) as { photos: unknown[] };
+    expect(pubCapped.photos).toEqual([]);
+    expect(spy.mock.calls.length).toBe(n);
+    delete process.env.GOOGLE_PUBLIC_DAILY_CAP;
     vi.unstubAllGlobals();
     delete process.env.GOOGLE_MAPS_API_KEY;
   });

@@ -33,35 +33,52 @@ function nameRegex(name: string): RegExp {
   return new RegExp(cls, "g");
 }
 
-function scrub(value: unknown, names: string[], photos: boolean): unknown {
+function scrub(value: unknown, names: string[]): unknown {
   if (typeof value === "string") return names.reduce((acc, n) => acc.replace(nameRegex(n), PUBLIC_DRIVER_LABEL), value);
-  if (Array.isArray(value)) return value.map((v) => scrub(v, names, photos));
+  if (Array.isArray(value)) return value.map((v) => scrub(v, names));
   if (value && typeof value === "object") {
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(value)) {
       if (k === "driverConfirmation" || k === "address" || k === "ownerNote") continue;
-      if ((k === "photo" || k === "photoUrl" || k === "gallery") && !photos) continue;
       if (k === "needsDriver") {
         if (typeof v === "string" && v) out[k] = PUBLIC_DRIVER_LABEL;
         continue;
       }
-      out[k] = scrub(v, names, photos);
+      out[k] = scrub(v, names);
     }
     return out;
   }
   return value;
 }
 
+/** An activity about where they sleep (going to the hotel, checking in or out): guests get no photo of it. */
+export function isStayItem(i: { name: string; en?: string }, doc: Pick<TripDoc, "stays">): boolean {
+  const words = (Object.values(doc.stays) as { name: string }[]).map((x) => x.name.replace(/[（(].*$/, "").trim()).filter((w) => w.length >= 4);
+  return /住宿：|入住|退房|飯店|check[- ]?(in|out)/i.test(i.name) || words.some((w) => i.name.includes(w) || (i.en ?? "").includes(w));
+}
+
 /**
- * Photos are hotlinked from other sites for this private trip, so only share-link viewers
- * (and the owner) get them; the anonymous public pages never do.
+ * The redacted document for share links (`photos: true`, which also keeps stay positions rounded to ~300 m)
+ * and the public pages (no stay positions, the home base only as 「住處」). Photos are shown to everyone
+ * (Kai 2026-10-27), except photos of the places where they sleep (the home base, hotels).
  */
 export function toPublicDoc(doc: TripDoc, opts: { photos?: boolean } = {}) {
   // Keep only the confirmation outcome, computed before the confirmation is removed.
   const okByDate = new Map(doc.days.map((d) => [d.date, effectiveDay(d).driverOk]));
   // Free text written by the owner may mention a driver; mask names everywhere.
   const names = [...Object.keys(doc.drivers), ...Object.values(doc.peopleNames ?? {})].filter(Boolean).sort((a, b) => b.length - a.length);
-  const scrubbed = scrub({ ...doc, drivers: {}, peopleNames: {} }, names, !!opts.photos) as TripDoc & { drivers: Record<string, never> };
+  const scrubbed = scrub({ ...doc, drivers: {}, peopleNames: {} }, names) as TripDoc & { drivers: Record<string, never> };
+  // No photo of where they sleep (home base, hotels): it would show the building and so the place.
+  const aboutStay = (i: { name: string; en?: string }) => isStayItem(i, doc);
+  const noStayPhoto = <T extends { name: string; en?: string }>(i: T): T => {
+    if (!aboutStay(i)) return i;
+    const out = { ...i } as T & { photo?: unknown; gallery?: unknown };
+    delete out.photo;
+    delete out.gallery;
+    return out;
+  };
+  scrubbed.days = scrubbed.days.map((d) => ({ ...d, items: d.items.map(noStayPhoto) }));
+  scrubbed.attractionPool = scrubbed.attractionPool.map((p) => ({ ...p, items: p.items.map(noStayPhoto) }));
   scrubbed.days = scrubbed.days.map((d) => (okByDate.get(d.date) ? { ...d, publicDriverOk: true } : d));
   // Where they sleep is effectively Kai's residence: share links get the position rounded to ~300 m;
   // public visitors get no position, and the home base is shown only as 「住處」.

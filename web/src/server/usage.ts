@@ -12,6 +12,7 @@ const { googleUsage } = schema;
 /** Per-day reservation counter rows used for the atomic caps; excluded from reports. */
 const TOTAL = "_total";
 const SHARE_TOTAL = "_share_total";
+const PUBLIC_TOTAL = "_public_total";
 
 export const GOOGLE_APIS = {
   places_search: { sku: "Text Search Pro (id, location, name)", perThousand: 32, freePerMonth: 5_000 },
@@ -27,6 +28,9 @@ export const hobartDay = (d = new Date()) => new Intl.DateTimeFormat("en-CA", { 
 export const dailyCap = () => Math.max(0, Number(process.env.GOOGLE_DAILY_CAP ?? 700) || 0);
 /** Share links (Aya) may use at most this many of the day's calls: 300 ≈ 50 galleries; the owner keeps ≥ 400. */
 export const shareCap = () => Math.max(0, Number(process.env.GOOGLE_SHARE_DAILY_CAP ?? 300) || 0);
+/** Public visitors (no sign-in, Kai 2026-10-27: photos for everyone) share at most this many of the day's calls. */
+export const publicCap = () => Math.max(0, Number(process.env.GOOGLE_PUBLIC_DAILY_CAP ?? 200) || 0);
+export type GoogleScope = "owner" | "share" | "public";
 
 async function bump(api: GoogleApi, field: "calls" | "hits", now: Date) {
   const db = await getDb();
@@ -41,7 +45,7 @@ async function bump(api: GoogleApi, field: "calls" | "hits", now: Date) {
  * Reserves one billable call under today's cap (Hobart day), atomically: the day's `_total` row is
  * incremented only while below the cap, in one statement. False when capped or the DB fails.
  */
-export async function takeGoogleCall(api: GoogleApi, now = new Date(), scope: "owner" | "share" = "owner"): Promise<boolean> {
+export async function takeGoogleCall(api: GoogleApi, now = new Date(), scope: GoogleScope = "owner"): Promise<boolean> {
   const cap = dailyCap();
   if (cap <= 0) return false;
   try {
@@ -57,6 +61,7 @@ export async function takeGoogleCall(api: GoogleApi, now = new Date(), scope: "o
       ).length > 0;
     // Share-link viewers have their own sub-cap, so the owner keeps the rest of the day's calls.
     if (scope === "share" && (shareCap() <= 0 || !(await reserve(SHARE_TOTAL, shareCap())))) return false;
+    if (scope === "public" && (publicCap() <= 0 || !(await reserve(PUBLIC_TOTAL, publicCap())))) return false;
     if (!(await reserve(TOTAL, cap))) return false;
     await bump(api, "calls", now);
     return true;

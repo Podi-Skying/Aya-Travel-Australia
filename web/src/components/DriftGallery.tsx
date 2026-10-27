@@ -78,7 +78,7 @@ export function DriftGallery({ active }: { active: boolean }) {
     [doc],
   );
   useEffect(() => {
-    if (!active || (mode !== "owner" && !token)) return;
+    if (!active) return;
     let live = true;
     void (async () => {
       for (let k = 0; k < places.length && live; k += 6) {

@@ -1,5 +1,5 @@
 import { getLookup, putLookup } from "./cache";
-import { noteGoogleHit, takeGoogleCall, type GoogleApi } from "./usage";
+import { noteGoogleHit, takeGoogleCall, type GoogleApi, type GoogleScope } from "./usage";
 
 /*
  * Google Maps Platform, server side only (docs/PLAN-2026-10-26-google.md). The key comes from
@@ -18,7 +18,7 @@ export function googleKey(): string | null {
 export type GFetch = (url: string, init?: { method?: string; headers?: Record<string, string>; body?: string; signal?: AbortSignal }) => Promise<{ ok: boolean; status: number; json(): Promise<unknown> }>;
 const defaultFetch: GFetch = (url, init) => (fetch as unknown as GFetch)(url, init);
 
-async function call<T>(api: GoogleApi, url: string, init: Parameters<GFetch>[1], f: GFetch, scope: "owner" | "share" = "owner"): Promise<T> {
+async function call<T>(api: GoogleApi, url: string, init: Parameters<GFetch>[1], f: GFetch, scope: GoogleScope = "owner"): Promise<T> {
   if (!(await takeGoogleCall(api, new Date(), scope))) throw new Error("google quota");
   const res = await f(url, { ...init, signal: AbortSignal.timeout(8_000) });
   if (!res.ok) throw new Error(`google http ${res.status}`);
@@ -83,17 +83,20 @@ export async function placePhoto(placeId: string, maxWidthPx = 1200, f: GFetch =
 }
 
 /** Up to `n` live photos for a place: one Place Details call plus one media call per photo. */
-export async function placePhotos(placeId: string, n: number, maxWidthPx = 1200, f: GFetch = defaultFetch, scope: "owner" | "share" = "owner"): Promise<PlacePhoto[]> {
+type PhotoRefs = { photos?: { name: string; googleMapsUri?: string; authorAttributions?: { displayName?: string; uri?: string }[] }[] };
+/** Photo references (names and authors, never image bytes) are kept a few days so a gallery skips Place Details. */
+const REFS_TTL_MS = 3 * 24 * 3600_000;
+
+export async function placePhotos(placeId: string, n: number, maxWidthPx = 1200, f: GFetch = defaultFetch, scope: GoogleScope = "owner"): Promise<PlacePhoto[]> {
   const key = googleKey();
   if (!key || !/^[A-Za-z0-9_-]{10,300}$/.test(placeId)) return [];
   // Field mask `photos` only (Essentials); each photo carries its own Google Maps link.
-  const det = await call<{ photos?: { name: string; googleMapsUri?: string; authorAttributions?: { displayName?: string; uri?: string }[] }[] }>(
-    "place_details",
-    `https://places.googleapis.com/v1/places/${placeId}`,
-    { headers: { "X-Goog-Api-Key": key, "X-Goog-FieldMask": "photos" } },
-    f,
-    scope,
-  );
+  const cached = await getLookup<PhotoRefs>("place-photo-refs", placeId).catch(() => null);
+  const det =
+    cached?.value ??
+    (await call<PhotoRefs>("place_details", `https://places.googleapis.com/v1/places/${placeId}`, { headers: { "X-Goog-Api-Key": key, "X-Goog-FieldMask": "photos" } }, f, scope));
+  if (cached) await noteGoogleHit("place_details");
+  else await putLookup("place-photo-refs", placeId, { photos: (det.photos ?? []).slice(0, 10) }, "Google Place Details (photo names only)", REFS_TTL_MS).catch(() => {});
   const out: PlacePhoto[] = [];
   for (const p of (det.photos ?? []).slice(0, n)) {
     if (!p?.name) continue;

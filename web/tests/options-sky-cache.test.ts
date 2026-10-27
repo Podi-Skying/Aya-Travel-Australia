@@ -105,7 +105,7 @@ describe("trip options", () => {
 });
 
 describe("sky watch", () => {
-  it("adds and removes links and posts, validates URLs, and guests get no photo URL", () => {
+  it("adds and removes links and posts, validates URLs, and shows the post photo to guests too", () => {
     let doc = seedDoc() as TripDoc;
     expect(applyOp(doc, { op: "addSkyLink", kind: "aurora", label: "x", url: "http://a.b", newId: "l1" }).ok).toBe(false);
     const r1 = applyOp(doc, { op: "addSkyLink", kind: "aurora", label: "極光社團", url: "https://www.facebook.com/groups/x", newId: "l1" });
@@ -117,7 +117,7 @@ describe("sky watch", () => {
     const pub = JSON.stringify(toPublicDoc(doc));
     expect(pub).toContain("極光社團");
     expect(pub).not.toContain("Zayden");
-    expect(pub).not.toContain("p.jpg");
+    expect(pub).toContain("p.jpg"); // photos are public (Kai 2026-10-27)
     expect(JSON.stringify(toPublicDoc(doc, { photos: true }))).toContain("p.jpg");
     const r3 = applyOp(doc, { op: "removeSkyPost", id: "p1" });
     expect(r3.ok && r3.doc.skyWatch.posts).toEqual([]);
