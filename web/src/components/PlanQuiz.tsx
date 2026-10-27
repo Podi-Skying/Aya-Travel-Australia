@@ -499,7 +499,7 @@ function Result({
         全程約 <strong>{mins(oneDay.total)}</strong>
       </p>
       {cost}
-      <p className="muted small">{travel === "drive" ? (road && road.every(Boolean) ? "車程與距離依實際道路計算（OpenStreetMap 路網），實際以導航為準。" : "正在依實際道路計算車程；算好之前先用直線距離估算。") : "大眾運輸的時間依直線距離估算，可能更長，出發前請查班次。"}</p>
+      <p className="muted small">{travel === "drive" ? (road && road.every(Boolean) ? "車程與距離依實際道路計算，實際以導航為準。" : "正在依實際道路計算車程；算好之前先用直線距離估算。") : "大眾運輸的時間依直線距離估算，可能更長，出發前請查班次。"}</p>
       {nav(false)}
     </section>
   );

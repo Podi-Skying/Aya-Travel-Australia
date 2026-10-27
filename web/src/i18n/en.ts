@@ -910,7 +910,7 @@ export const EN: Record<string, string> = {
   "{0} 公里": "{0} km",
   "怎麼去？": "How will you get there?",
   "看行程 ↓": "See the plan ↓",
-  "車程與距離依實際道路計算（OpenStreetMap 路網），實際以導航為準。": "Drive times and distances follow the actual roads (OpenStreetMap); go by the navigation on the day.",
+  "車程與距離依實際道路計算，實際以導航為準。": "Drive times and distances follow the actual roads; go by the navigation on the day.",
   "正在依實際道路計算車程；算好之前先用直線距離估算。": "Working out drive times along the roads; straight-line estimates until then.",
   "大眾運輸的時間依直線距離估算，可能更長，出發前請查班次。": "Public transport times are straight-line estimates and may be longer; check the timetable before you go.",
 };
