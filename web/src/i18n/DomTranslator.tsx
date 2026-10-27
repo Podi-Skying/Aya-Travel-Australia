@@ -34,8 +34,10 @@ export function DomTranslator({ content }: { content: Partial<Record<Exclude<Lan
       const lead = v.match(/^\s*/)![0];
       const trail = v.match(/\s*$/)![0];
       const core = v.trim();
-      const t = translate(core);
+      let t = translate(core);
       if (t === core) return;
+      // 「…內容。」 followed by more text in the next node: an English sentence needs its space.
+      if (lang === "en" && /[。！？]$/.test(core) && !/\s$/.test(t)) t += " ";
       orig.set(n, v);
       const nv = lead + t + trail;
       wrote.set(n, nv);
@@ -76,6 +78,7 @@ export function DomTranslator({ content }: { content: Partial<Record<Exclude<Lan
     };
 
     walk(document.body);
+    document.documentElement.classList.remove("i18n-wait"); // translated: show the page (layout.tsx holds it)
     const title = document.title;
     document.title = translate(title);
     const mo = new MutationObserver((list) => {

@@ -11,10 +11,11 @@ export { t, tx, getLang, type Lang } from "./current";
  * Trip content carries its own translations in the data (`tr` fields). The choice is kept per viewer.
  */
 
-export const LANGS: { key: Lang; label: string; html: string }[] = [
-  { key: "zh", label: "繁中", html: "zh-Hant" },
-  { key: "en", label: "EN", html: "en" },
-  { key: "ja", label: "日本語", html: "ja" },
+/** Each language named in itself; `short` is the phone label, `name` the accessible one. */
+export const LANGS: { key: Lang; label: string; short: string; name: string; html: string }[] = [
+  { key: "zh", label: "繁中", short: "中", name: "繁體中文", html: "zh-Hant" },
+  { key: "en", label: "EN", short: "EN", name: "English", html: "en" },
+  { key: "ja", label: "日本語", short: "日", name: "日本語", html: "ja" },
 ];
 
 const KEY = "aya-lang";
@@ -69,10 +70,12 @@ export function useRootLang(): Lang {
 export function LangSwitch() {
   const lang = useLang();
   return (
-    <span className="lang-switch" role="group" aria-label="Language / 語言 / 言語">
+    // Language names stay in their own language whatever the page is shown in (data-no-translate).
+    <span className="lang-switch" role="group" aria-label="Language / 語言 / 言語" data-no-translate="">
       {LANGS.map((l) => (
-        <button key={l.key} type="button" lang={l.html} aria-pressed={lang === l.key} onClick={() => setLang(l.key)}>
-          {l.label}
+        <button key={l.key} type="button" lang={l.html} aria-label={l.name} aria-pressed={lang === l.key} onClick={() => setLang(l.key)}>
+          <span className="l-long" aria-hidden="true">{l.label}</span>
+          <span className="l-short" aria-hidden="true">{l.short}</span>
         </button>
       ))}
     </span>

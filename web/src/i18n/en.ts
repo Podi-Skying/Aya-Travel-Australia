@@ -851,7 +851,7 @@ export const EN: Record<string, string> = {
   "，{0} 取得": ", fetched {0}",
   "，今天": ", today",
   "，保留 {0} 個": ", {0} kept",
-  "，接著": ", then",
+  "，接著": ", then ",
   "，日落 {0}": ", sunset {0}",
   "，更新於 {0}（荷巴特時間）": ", updated {0} (Hobart time)",
   "，最大風速": ", max wind",

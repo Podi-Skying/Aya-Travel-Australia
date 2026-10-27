@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { useTrip } from "./TripApp";
 import { Icon } from "./Icon";
+import { project, rubber, spring } from "./motion";
 import { commonsFor, googleFor } from "@/client/photos";
 import { galleryPhotos, type GalleryPhoto, type GoogleShot } from "@/domain/gallery";
 import { isLogistics } from "@/domain/day-title";
@@ -10,7 +11,8 @@ import type { Item, Photo } from "@/domain/schema";
 
 /*
  * A place's photos, switched in place (Kai 2026-10-26: no pop-up). Tap or click shows the next photo with a
- * short crossfade, a swipe goes forward or back, arrow keys work when focused; 「2 / 9」 counts them. The
+ * short crossfade; a drag moves the photo with the finger and a throw (projected from its speed) changes it,
+ * otherwise it springs back (rubber-banding past a single photo); arrow keys work when focused; 「2 / 9」 counts them. The
  * current photo's credit sits under the card as plain text (Google photos keep their author and Maps links,
  * as Google requires). While photos load, a drawn camera pulses; a place with none shows its category icon.
  */
@@ -108,7 +110,12 @@ function PlaceGalleryInner({ item, className = "", empty = "hide" }: { item: Ite
   const [seen, setSeen] = useState(false);
   const [broken, setBroken] = useState<Set<string>>(() => new Set());
   const [loaded, setLoaded] = useState<Set<string>>(() => new Set());
-  const swipe = useRef<{ x: number; y: number; used: boolean } | null>(null);
+  const swipe = useRef<{ x: number; y: number; used: boolean; axis: "x" | "y" | null; dx: number; v: number; t: number } | null>(null);
+  const imgRef = useRef<HTMLImageElement | null>(null);
+  const settle = useRef<(() => void) | null>(null);
+  const shift = (x: number) => {
+    if (imgRef.current) imgRef.current.style.transform = x ? `translateX(${x}px)` : "";
+  };
 
   const own = galleryPhotos(item, undefined, undefined).length;
   // Curated places skip the Wikimedia list entirely.
@@ -190,19 +197,52 @@ function PlaceGalleryInner({ item, className = "", empty = "hide" }: { item: Ite
     e.preventDefault();
     go(step);
   };
+  const multi = total > 1 || more;
   const onDown = (e: ReactPointerEvent) => {
-    swipe.current = { x: e.clientX, y: e.clientY, used: false };
+    settle.current?.(); // grab a photo that is still springing back
+    swipe.current = { x: e.clientX, y: e.clientY, used: false, axis: null, dx: 0, v: 0, t: e.timeStamp };
+  };
+  const onMove = (e: ReactPointerEvent) => {
+    const s = swipe.current;
+    if (!s) return;
+    if (e.pointerType === "mouse" && e.buttons === 0 && !s.axis) {
+      swipe.current = null; // released outside before any drag began
+      return;
+    }
+    const dx = e.clientX - s.x;
+    if (!s.axis) {
+      // ~10px before choosing: a vertical move stays a page scroll.
+      if (Math.max(Math.abs(dx), Math.abs(e.clientY - s.y)) < 10) return;
+      s.axis = Math.abs(dx) > Math.abs(e.clientY - s.y) ? "x" : "y";
+      if (s.axis === "x") (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
+    }
+    if (s.axis !== "x") return;
+    const dt = Math.max(1, e.timeStamp - s.t);
+    s.v = ((dx - s.dx) / dt) * 1000;
+    s.dx = dx;
+    s.t = e.timeStamp;
+    const w = (e.currentTarget as HTMLElement).clientWidth;
+    shift(multi ? dx : rubber(dx, w)); // one photo: resists instead of moving freely
   };
   const onUp = (e: ReactPointerEvent) => {
     const s = swipe.current;
-    if (!s) return;
-    const dx = e.clientX - s.x;
-    if (Math.abs(dx) > 36 && Math.abs(dx) > Math.abs(e.clientY - s.y)) {
-      s.used = true;
-      go(dx < 0 ? 1 : -1);
+    if (!s || s.axis !== "x") return;
+    s.used = true;
+    const w = (e.currentTarget as HTMLElement).clientWidth;
+    const end = s.dx + project(s.v);
+    if (multi && Math.abs(end) > w * 0.3) {
+      shift(0);
+      go(end < 0 ? 1 : -1);
+      return;
     }
+    const from = multi ? s.dx : rubber(s.dx, w);
+    settle.current = spring(from, s.v, 0, 0.3, shift, () => (settle.current = null));
   };
-  const multi = total > 1 || more;
+  const onCancel = () => {
+    const s = swipe.current;
+    swipe.current = null;
+    if (s?.axis === "x") settle.current = spring(s.dx, 0, 0, 0.3, shift, () => (settle.current = null));
+  };
   return (
     <figure ref={boxRef as never} className={`pg-card ${className}`}>
       <div
@@ -219,7 +259,9 @@ function PlaceGalleryInner({ item, className = "", empty = "hide" }: { item: Ite
         }}
         onKeyDown={onKey}
         onPointerDown={onDown}
+        onPointerMove={onMove}
         onPointerUp={onUp}
+        onPointerCancel={onCancel}
       >
         {/* eslint-disable-next-line @next/next/no-img-element -- photos from several hosts */}
         <img
@@ -234,6 +276,7 @@ function PlaceGalleryInner({ item, className = "", empty = "hide" }: { item: Ite
           style={p.pos ? { objectPosition: p.pos } : undefined}
           onLoad={() => setLoaded((s) => new Set(s).add(p.src))}
           ref={(el) => {
+            imgRef.current = el;
             // A request that never answers counts as failed after 20 s, so no card stays loading.
             if (!el || el.complete) return;
             const src = p.src;

@@ -145,3 +145,5 @@
   .rw .title.hero .lead { font-size: .9375rem; line-height: 1.55; }
   .rw .title.hero .cue { display: none; }
 }
+/* Opening screen: a soft paper glow behind the headline, so the first stop's label sitting behind it never collides with the text. */
+.rw .title.hero::before { content: ""; position: absolute; inset: -32px -40px; z-index: -1; background: radial-gradient(farthest-side, var(--paper) 72%, transparent); pointer-events: none; }

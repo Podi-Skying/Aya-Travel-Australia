@@ -297,7 +297,7 @@ function TourDetail({ item }: { item: Item }) {
           <dt>時間</dt>
           <dd>約 {mins(item.dur ?? 60)}</dd>
         </div>
-        <div>
+        <div className="wide">
           <dt>出發</dt>
           <dd>
             {item.tour?.depart}

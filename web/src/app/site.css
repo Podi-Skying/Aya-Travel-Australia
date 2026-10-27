@@ -14,9 +14,21 @@
 .site-header a:active, .site-account:active { transform: scale(.94); }
 .site-header a, .site-account { transition: transform .1s ease-out; }
 @media (max-width: 380px) { .site-logo span { display: none; } }
+/* Labels never wrap; on phones the header tightens so logo, language switch, links and sign-in fit one row. */
+.site-header nav a, .site-account, .lang-switch button { white-space: nowrap; }
+@media (max-width: 480px) {
+  .site-header { padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(12px, env(safe-area-inset-right)); }
+  .site-header nav { gap: 0; }
+  .site-header nav a { padding: 0 8px; }
+  .site-account { margin-left: 4px; padding: 0 12px; }
+}
 @media (prefers-reduced-transparency: reduce) {
   .site-header.paper { background: #faf7f0; backdrop-filter: none; -webkit-backdrop-filter: none; }
   .site-header.dark { background: #0b1418; backdrop-filter: none; -webkit-backdrop-filter: none; }
   .site-header::after { display: none; }
 }
 @media (prefers-contrast: more) { .site-header.paper { color: #181714; } }
+
+/* English / Japanese first paint: hidden until translated (DomTranslator removes the class); shown after 2.5 s regardless. */
+html.i18n-wait body { visibility: hidden; animation: i18nShow 0s 2.5s forwards; }
+@keyframes i18nShow { to { visibility: visible; } }

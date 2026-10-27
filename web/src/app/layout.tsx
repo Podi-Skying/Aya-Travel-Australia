@@ -11,6 +11,8 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+const LANG_BOOT = `try{var l=localStorage.getItem("aya-lang");if(l==="en"||l==="ja"){var d=document.documentElement;d.lang=l;d.classList.add("i18n-wait")}}catch(e){}`;
+
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
@@ -20,8 +22,11 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="zh-Hant">
+    // The pre-paint script below may set lang and a class before React hydrates.
+    <html lang="zh-Hant" suppressHydrationWarning>
       <head>
+        {/* English or Japanese viewers: hold the page until it is translated, so 繁中 never flashes first (see i18n-wait). */}
+        <script dangerouslySetInnerHTML={{ __html: LANG_BOOT }} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         {/* eslint-disable-next-line @next/next/no-page-custom-font */}

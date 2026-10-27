@@ -713,6 +713,9 @@ details.card.day-summary > summary h3 { margin: 0; }
 .opt-tags { margin: 0; display: flex; flex-wrap: wrap; gap: 4px; }
 .opt-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin: 0; }
 .opt-facts div { display: grid; gap: 2px; }
+/* A long entry (where a tour departs) takes the full row instead of a narrow column. */
+.opt-facts .wide { grid-column: 1 / -1; }
+.opt-facts .wide dd { font-weight: 500; }
 .opt-facts dt { font-size: .75rem; color: var(--ink-muted); }
 .opt-facts dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
 .opt-stays { margin: 0; padding-left: 18px; }
@@ -1010,10 +1013,22 @@ details.card.day-summary > summary h3 { margin: 0; }
 .site-header.dark .lang-switch { border-color: rgba(255,255,255,.4); }
 .site-header.dark .lang-switch button { color: #fff; }
 .site-header.dark .lang-switch button[aria-pressed="true"] { background: #fff; color: var(--ink); }
+.lang-switch .l-short { display: none; }
 @media (max-width: 720px) { .lang-switch button { min-width: 44px; padding: 0 6px; } }
+@media (max-width: 480px) { .lang-switch { margin-right: 4px; } .lang-switch .l-long { display: none; } .lang-switch .l-short { display: inline; } .lang-switch button { padding: 0; } }
 /* Phones: the site name stays on one line next to the language switch (the logo link still carries the full name). */
 @media (max-width: 560px) {
   .site-header .site-logo { min-width: 0; }
   .site-header.with-tabs .site-logo span { display: block; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }
 @media (max-width: 400px) { .site-header.with-tabs .site-logo span { display: none; } }
+
+/* Apple-design audit 2026-10-27 (docs/APPLE-AUDIT-2026-10-27.md): 44px hit areas without changing the look. */
+.todo-list a, .act-more li a, .wx-strip p a, .sky-watch p a { display: inline-block; padding: 12px 0; margin: -12px 0; }
+.todo-list li { margin: 8px 0; }
+.skip { min-height: 44px; box-sizing: border-box; display: inline-flex; align-items: center; }
+.places .map-alt > summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; }
+.leaflet-marker-icon.pool-cluster::before { content: ""; position: absolute; inset: -6px; border-radius: 50%; }
+.grabber { position: relative; }
+.grabber::before { content: ""; position: absolute; left: 0; right: 0; top: -8px; bottom: -8px; }
+.act .note .more, .place-card .note-wrap .more { min-width: 44px; }
