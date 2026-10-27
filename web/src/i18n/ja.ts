@@ -902,4 +902,5 @@ export const JA: Record<string, string> = {
   "高溫 {0}、低溫 {1}": "最高 {0}、最低 {1}",
   "降雨機率 {0}%": "降水確率 {0}%",
   "近 Cataract Gorge": "カタラクト渓谷の近く",
+  "第 {n} 天": "{n} 日目",
 };

@@ -76,7 +76,8 @@ export function DomTranslator({ content }: { content: Partial<Record<Exclude<Lan
     };
 
     walk(document.body);
-    document.title = translate(document.title);
+    const title = document.title;
+    document.title = translate(title);
     const mo = new MutationObserver((list) => {
       for (const m of list) {
         if (m.type === "characterData") doText(m.target as Text);
@@ -87,6 +88,7 @@ export function DomTranslator({ content }: { content: Partial<Record<Exclude<Lan
     mo.observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: [...ATTRS] });
     return () => {
       mo.disconnect();
+      if (document.title === translate(title)) document.title = title;
       // Back to the Chinese originals.
       touched.forEach((n) => {
         if (n.nodeType === Node.TEXT_NODE) {

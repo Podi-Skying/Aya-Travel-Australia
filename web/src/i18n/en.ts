@@ -57,7 +57,7 @@ export const EN: Record<string, string> = {
   "{0}開車的時段（{1}）": "{0} driving hours ({1})",
   "{0}，回到散步首頁": "{0}, back to the walk",
   "{0}，選擇日期": "{0}, choose a date",
-  "{0}：": "{0}:",
+  "{0}：": "{0}: ",
   "{n} 天": "{n} days",
   "← 上一步": "← Back",
   "← 前一天": "← Previous day",
@@ -901,4 +901,5 @@ export const EN: Record<string, string> = {
   "高溫 {0}、低溫 {1}": "high {0}, low {1}",
   "降雨機率 {0}%": "chance of rain {0}%",
   "近 Cataract Gorge": "near Cataract Gorge",
+  "第 {n} 天": "Day {n}",
 };

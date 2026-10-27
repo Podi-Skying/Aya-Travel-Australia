@@ -1,6 +1,7 @@
 "use client";
 
 import { dayTitle, dayTitleZh } from "@/domain/day-title";
+import { t } from "@/i18n/current";
 import { useEffect, useRef, useState } from "react";
 import { useTrip } from "./TripApp";
 import { Icon, MODE_ICON } from "./Icon";
@@ -356,7 +357,7 @@ export function DaysView({ active }: { active: boolean }) {
           <div className="day-head">
             <div>
               <div className="day-date">
-                第 {currentDay + 1} 天・{fmtDay(d.date)}・{seg?.name} {weather && <WxChip wx={wxFor(weather, d.date)?.wx ?? null} place={wxFor(weather, d.date)?.place} unavailable={wxFor(weather, d.date)?.unavailable} />}
+                {t("第 {n} 天", { n: currentDay + 1 })}・{fmtDay(d.date)}・{seg?.name} {weather && <WxChip wx={wxFor(weather, d.date)?.wx ?? null} place={wxFor(weather, d.date)?.place} unavailable={wxFor(weather, d.date)?.unavailable} />}
               </div>
               <h2>{dayTitle(raw)}</h2>
               {night !== "none" && st.name && (

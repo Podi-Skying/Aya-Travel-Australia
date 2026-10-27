@@ -29,6 +29,7 @@ import type { Item } from "@/domain/schema";
 import { dayNightLabel, INK_PALETTE, optionCard, optionPalette, type OptionCard } from "@/domain/options";
 import { OPTION_THEMES } from "@/domain/schema";
 import { fmtDay, fmtMD, mins, money } from "@/domain/format";
+import { t as tt } from "@/i18n/current";
 
 /*
  * 行程方案 (renamed from 推薦行程方案 on 2026-10-26, filters removed; PLAN-2026-10-26 §3; reel in PLAN-2026-10-26-plan-reel): overnight trips as photo slices with
@@ -165,7 +166,7 @@ function OptionDetail({ c, jump }: { c: OptionCard; jump: number }) {
         {o.days.map((d, i) => (
           <li key={i}>
             <h4 ref={i === 0 ? firstDay : undefined} tabIndex={i === 0 ? -1 : undefined} className="opt-day-h">
-              第 {i + 1} 天・{fmtDay(c.dates[i])} {d.title}
+              {tt("第 {n} 天", { n: i + 1 })}・{fmtDay(c.dates[i])} {d.title}
               <span className="small muted">（開車約 {d.driveHrs} 小時）</span>
             </h4>
             {c.items[i].length ? (
