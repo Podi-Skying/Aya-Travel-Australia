@@ -62,3 +62,15 @@ describe("languages", () => {
   });
 });
 
+
+describe("on-screen translation", () => {
+  it("keeps sentences, bracket notes and arrows apart", async () => {
+    const { makeTranslate } = await import("@/i18n/translate");
+    const en = makeTranslate("en");
+    const two = en("此日依賴 朋友 開車，但日期與時段尚未確認：開車行程皆為「暫定」。 預估總開車約 4 小時，超過一般日 2–3 小時的建議（提案中，待確認）。");
+    expect(two).toContain("About 4 h of driving in total");
+    expect(two).not.toMatch(/[㐀-鿿]/);
+    expect(en("11/6 雪梨 → 荷巴特（11:45 → 13:35）")).toBe("11/6 Sydney → Hobart (11:45 → 13:35)");
+    expect(makeTranslate("ja")("11/6 雪梨 → 荷巴特（11:45 → 13:35）")).not.toContain("雪梨");
+  });
+});

@@ -900,4 +900,5 @@ export const EN: Record<string, string> = {
   "{0} 雪梨": "{0} Sydney",
   "高溫 {0}、低溫 {1}": "high {0}, low {1}",
   "降雨機率 {0}%": "chance of rain {0}%",
+  "近 Cataract Gorge": "near Cataract Gorge",
 };
