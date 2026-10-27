@@ -142,7 +142,10 @@ export function PlanQuiz({ active }: { active: boolean }) {
         <section className="card section quiz-step" aria-labelledby="q0">
           <h3 id="q0">起點</h3>
           <p className="quiz-home">
-            <span className="home-pin base" aria-hidden="true" dangerouslySetInnerHTML={{ __html: HOUSE }} /> 從<strong>{homeName}</strong>出發，最後回到這裡。
+            <span className="home-pin base" aria-hidden="true" dangerouslySetInnerHTML={{ __html: HOUSE }} />
+            <span>
+              從<strong>{homeName}</strong>出發，最後回到這裡。
+            </span>
           </p>
           <div className="quiz-nav">
             <button type="button" className="btn" onClick={() => go(1)}>
