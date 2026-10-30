@@ -18,7 +18,7 @@ import { PALETTES, INK_PALETTE } from "@/domain/options";
 import { fmtDay, mins, money } from "@/domain/format";
 import { dayNavUrls, navUrl } from "@/domain/nav";
 import { useRoadLegs, type Leg } from "./useLegs";
-import type { Day, Item } from "@/domain/schema";
+import type { Day, Item, TripDoc } from "@/domain/schema";
 
 /*
  * 旅遊規劃小測驗 (Kai, 2026-10-26): a step-by-step one-day plan from the home base — pick a region,
@@ -261,6 +261,7 @@ export function PlanQuiz({ active }: { active: boolean }) {
           owner={mode === "owner" && online}
           addToDay={async (date, refs, nextRefs) => runOpUndoable({ op: "addQuizPlan", date, refs, nextRefs }, "已加入，可以按「復原」")}
           stays={doc.stays}
+          drivers={doc.drivers}
           ask={ask}
           days={doc.days.filter((d) => d.seg === "tas")}
           party={doc.partySize}
@@ -315,6 +316,7 @@ function Result({
   days,
   party,
   stays,
+  drivers,
 }: {
   active: boolean;
   home: StayPin;
@@ -330,6 +332,7 @@ function Result({
   days: Day[];
   party: number;
   stays: Parameters<typeof overnightNear>[0]["stays"];
+  drivers: TripDoc["drivers"];
 }) {
   const homeAt: [number, number] = [home.lat, home.lng];
   const [h, m] = start.split(":").map(Number);
@@ -400,7 +403,14 @@ function Result({
         className="btn"
         pendingLabel="加入中…"
         onAction={async () => {
-          const choices = overnight ? days.filter((d, k) => days[k + 1] && Date.parse(days[k + 1].date) - Date.parse(d.date) === 86_400_000) : days;
+          // An overnight never starts or ends on a day whose driver does day trips only (noOvernight).
+          const dayTripOnly = (d: Day) => {
+            const k = effectiveDay(d).needsDriver;
+            return !!k && !!drivers[k]?.noOvernight;
+          };
+          const choices = overnight
+            ? days.filter((d, k) => days[k + 1] && Date.parse(days[k + 1].date) - Date.parse(d.date) === 86_400_000 && !dayTripOnly(d) && !dayTripOnly(days[k + 1]))
+            : days;
           const v = await ask(overnight ? "從哪一天開始？" : "加入哪一天？", {
             body: (
               <p className="small muted">
