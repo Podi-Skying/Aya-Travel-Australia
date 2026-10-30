@@ -44,9 +44,11 @@ export const REGIONS: Region[] = [
   {
     key: "east",
     name: "東海岸與瑪麗亞島",
+    // …and the north-east: Bay of Fires, The Gardens, St Helens and Little Blue Lake (Kai 2026-10-30).
     areas: [
       { center: [-42.1, 148.2], km: 55 },
       { center: [-42.6, 148.05], km: 16 },
+      { center: [-41.2, 148.12], km: 30 },
     ],
     car: true,
     far: "單程約 2.5 小時以上，比較適合過夜；瑪麗亞島可以排在去東海岸的路上",
@@ -71,7 +73,8 @@ export function quizPlaces(doc: Pick<TripDoc, "days" | "attractionPool">): QuizP
     const near = REGIONS.flatMap((r) => r.areas.map((a) => ({ r, a, d: km(a.center, [item.lat!, item.lng!]) })))
       .filter((x) => x.d <= x.a.km)
       .sort((a, b) => a.d - b.d)[0];
-    if (!near || out.has(item.id)) return;
+    // A place copied into a day (an applied plan) is the same place as its pool entry: list it once.
+    if (!near || out.has(item.id) || [...out.values()].some((q) => q.item.name === item.name)) return;
     out.set(item.id, { item, region: near.r.key, ...extra });
   };
   for (const p of doc.attractionPool) for (const i of p.items) add(i, { pkg: p.key });
