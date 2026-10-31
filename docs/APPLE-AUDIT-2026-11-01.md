@@ -22,7 +22,7 @@ Kai asked: 「/apple-design 請撤底檢查整個網站並優化」. This replac
 
 First contentful paint went from 3.4–6.4 s to 1.2–1.4 s. Lighthouse's numbers vary between runs, so small differences mean little. The home page's TBT rose from 0 to about 670 ms: with the font no longer blocking the page, the walk's build now falls inside the measured window. Its first paint and LCP are much better.
 
-**axe:** 3–5 rules per tab before (including 1 serious rule with up to 10 nodes). After the first round: 1 moderate rule on every tab, plus 1 serious rule on 資訊 caused by my new scrolling table. Both are fixed in the final commit; see the report for the final recount.
+**axe (live, all 6 tabs):** before, 3–5 rules on every tab, including 1 serious rule on 每日行程 and 資訊 (up to 10 nodes). After, 0 on 5 tabs and 1 moderate rule (heading order, 1 node) on 每日行程, left open as low.
 
 ## Findings
 
