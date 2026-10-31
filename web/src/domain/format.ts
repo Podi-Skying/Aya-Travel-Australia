@@ -38,9 +38,10 @@ export function mins(m: number | undefined): string {
   return (h ? h + H : "") + (h && r && l === "en" ? " " : "") + (r ? r + M : "");
 }
 
+/** Always in Hobart time: the server and the browser must print the same text (a mismatch breaks hydration). */
 export function fmtTs(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-AU", { timeZone: "Australia/Hobart", year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(iso)).map((x) => [x.type, x.value]));
+  return `${p.year}/${Number(p.month)}/${Number(p.day)} ${p.hour}:${p.minute}`;
 }
 
 export function todayStr(now = new Date()): string {

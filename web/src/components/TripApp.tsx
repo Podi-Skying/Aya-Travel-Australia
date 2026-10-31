@@ -19,6 +19,7 @@ import { PlacesMap } from "./Places";
 import { Info } from "./Info";
 import { TripOptions } from "./TripOptions";
 import { PlanQuiz } from "./PlanQuiz";
+import { Icon } from "./Icon";
 import { DriftGallery } from "./DriftGallery";
 
 /*
@@ -66,12 +67,12 @@ export function useTrip(): Ctx {
 }
 
 const TABS = [
-  { key: "days", label: "每日行程" },
-  { key: "options", label: "行程方案" },
-  { key: "map", label: "地圖與景點" },
-  { key: "info", label: "資訊與警示" },
-  { key: "quiz", label: "旅遊規劃小測驗" }, // open to guests too (Kai 2026-10-27; public start: Hobart city centre)
-  { key: "gallery", label: "畫廊" }, // photos are for everyone (Kai 2026-10-27)
+  { key: "days", label: "每日行程", short: "每日", icon: "calendar" },
+  { key: "options", label: "行程方案", short: "方案", icon: "route" },
+  { key: "map", label: "地圖與景點", short: "地圖", icon: "map" },
+  { key: "info", label: "資訊與警示", short: "資訊", icon: "info" },
+  { key: "quiz", label: "旅遊規劃小測驗", short: "測驗", icon: "compass" }, // open to guests too (Kai 2026-10-27; public start: Hobart city centre)
+  { key: "gallery", label: "畫廊", short: "畫廊", icon: "image" }, // photos are for everyone (Kai 2026-10-27)
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
@@ -415,9 +416,15 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
                 aria-selected={tab === t.key}
                 aria-controls={`panel-${t.key}`}
                 tabIndex={tab === t.key ? 0 : -1}
+                aria-label={tt(t.label)}
                 onClick={() => setTab(t.key)}
               >
-                {tt(t.label)}
+                {/* Phones: a bottom tab bar with icon and short label (Kai 2026-10-31); wider screens: the full label. */}
+                <span className="tab-icon" aria-hidden="true">
+                  <Icon name={t.icon} size={22} />
+                </span>
+                <span className="tab-long">{tt(t.label)}</span>
+                <span className="tab-short">{tt(t.short)}</span>
               </button>
             ))}
           </div>
@@ -426,10 +433,10 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
       </SiteHeader>
       <Hero doc={doc} />
       {mode === "public" && (
-        <div className="banner">
+        <aside className="banner" aria-label={tt("檢視模式")}>
           {canVote ? "你正在檢視 Aya 的旅程（唯讀）。可以對活動按「我有興趣」！" : "你正在檢視 Aya 的旅程（唯讀公開版，住址與司機資訊已隱藏）。"}{" "}
 
-        </div>
+        </aside>
       )}
       {(!online || fromCache) && (
         <div className="offline-banner" role="status">
@@ -484,10 +491,13 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
   );
 }
 
+/** A tab's content mounts the first time it is opened and then stays (state and scroll are kept); this keeps the first load light. */
 function Panel({ id, show, children }: { id: string; show: boolean; children: ReactNode }) {
+  const [opened, setOpened] = useState(show);
+  if (show && !opened) setOpened(true);
   return (
     <section className="panel" role="tabpanel" id={`panel-${id}`} aria-labelledby={`tab-${id}`} hidden={!show}>
-      {children}
+      {opened ? children : null}
     </section>
   );
 }
@@ -499,7 +509,7 @@ function Hero({ doc }: { doc: TripDoc }) {
   const e = doc.meta.end;
   const when = !t ? "" : t < s ? tt("距離出發還有 {n} 天", { n: dayDiff(t, s) }) : t <= e ? tt("旅程第 {n} 天", { n: dayDiff(s, t) + 1 }) : tt("旅程已結束");
   return (
-    <header className="hero" id="top">
+    <div className="hero" id="top">
       <div className="hero-inner">
         <h1 className="sr-only">{doc.meta.title}</h1>
         <dl className="hero-facts">
@@ -517,6 +527,6 @@ function Hero({ doc }: { doc: TripDoc }) {
           )}
         </dl>
       </div>
-    </header>
+    </div>
   );
 }

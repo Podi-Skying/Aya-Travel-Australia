@@ -20,7 +20,7 @@ function useNarrow(): boolean {
 }
 import { ShareButton } from "./Share";
 import { PlanReel } from "./PlanReel";
-import { PlaceGallery, cardSrc } from "./PlaceGallery";
+import { PlaceGallery, cardSrc, sizedPhoto } from "./PlaceGallery";
 import { Icon } from "./Icon";
 import { legLabel, routeStops, useLegs, type Leg } from "./useLegs";
 import { stayPin, type StayPin } from "@/domain/home-pins";
@@ -80,7 +80,7 @@ export function TripOptions() {
                 title: c.option.title,
                 caption: `${dayNightLabel(c)}・${c.option.region || "塔斯馬尼亞"}・${fmtMD(c.dates[0])}–${fmtMD(c.dates.at(-1)!)}`,
                 badge: c.option.chosen ? "目前採用" : undefined,
-                image: c.photo?.url,
+                image: c.photo ? sizedPhoto(c.photo.url, 960, c.photo.w) : undefined,
                 imagePos: c.photo?.pos,
                 deep: optionPalette(c.option).deep,
               })).concat(
@@ -89,7 +89,7 @@ export function TripOptions() {
                   title: t.item.name.replace(/（.*?）/g, ""),
                   caption: `跟團・需預訂・${mins(t.item.dur ?? 60)}`,
                   badge: "跟團",
-                  image: t.item.photo?.url,
+                  image: t.item.photo ? sizedPhoto(t.item.photo.url, 960, t.item.photo.w) : undefined,
                   imagePos: t.item.photo?.pos,
                   deep: INK_PALETTE.deep,
                 })),
@@ -131,7 +131,7 @@ function OptionDetail({ c, jump }: { c: OptionCard; jump: number }) {
   const range = `${fmtMD(c.dates[0])}–${fmtMD(c.dates.at(-1)!)}`;
   const firstIdx = doc.days.findIndex((d) => d.date === c.dates[0]);
   return (
-    <article className={`card opt-card plan-detail${o.chosen ? " chosen" : ""}`} id="plan-detail" role="tabpanel" aria-labelledby={`reel-${o.key}`}>
+    <div className={`card opt-card plan-detail${o.chosen ? " chosen" : ""}`} id="plan-detail" role="tabpanel" aria-labelledby={`reel-${o.key}`}>
       <h3>{o.title}</h3>
       <p className="opt-tags">
         <Badge t={dayNightLabel(c)} c="b-line" /> {o.themes.map((t) => <Badge key={t} t={THEME[t]} c="b-info" />)}
@@ -214,7 +214,7 @@ function OptionDetail({ c, jump }: { c: OptionCard; jump: number }) {
           </button>
         )}
       </div>
-    </article>
+    </div>
   );
 }
 
@@ -291,7 +291,7 @@ function TourDetail({ item }: { item: Item }) {
   const pp = item.cost && item.cost.status !== "unknown" && item.cost.unit === "pp" ? item.cost.amount : null;
   const N = 2; // Kai and Aya (friends are not counted for tours)
   return (
-    <article className="card opt-card plan-detail tour-detail" id="plan-detail" role="tabpanel" aria-labelledby={`reel-tour-${item.id}`}>
+    <div className="card opt-card plan-detail tour-detail" id="plan-detail" role="tabpanel" aria-labelledby={`reel-tour-${item.id}`}>
       <h3>{item.name}</h3>
       <p className="opt-tags">
         <Badge t="跟團" c="b-line" /> <Badge t="需預訂" c="b-warn" />
@@ -326,6 +326,6 @@ function TourDetail({ item }: { item: Item }) {
       {/* The tour itself is a boat or a plane; getting to where it leaves is a drive. */}
       <PlanDayTimeline items={[{ ...item, major: true, mode: "drive" }]} start={home} end={home} />
       <p className="small muted">還沒排進任何一天，也沒有預訂；要去的話由 Kai 排進某一天後再預訂。</p>
-    </article>
+    </div>
   );
 }

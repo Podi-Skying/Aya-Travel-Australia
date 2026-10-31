@@ -11,7 +11,9 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-const LANG_BOOT = `try{var l=localStorage.getItem("aya-lang");if(l==="en"||l==="ja"){var d=document.documentElement;d.lang=l;d.classList.add("i18n-wait")}}catch(e){}`;
+/* The serif for headings loads after first paint: a blocking CJK web font cost 6 s on a phone. Body text uses the system font. */
+const FONT = "https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400&display=swap";
+const LANG_BOOT = `(function(){var f=document.createElement("link");f.rel="stylesheet";f.href="${FONT}";f.media="print";f.onload=function(){f.media="all"};document.head.appendChild(f)})();try{var l=localStorage.getItem("aya-lang");if(l==="en"||l==="ja"){var d=document.documentElement;d.lang=l;d.classList.add("i18n-wait")}}catch(e){}`;
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -29,8 +31,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: LANG_BOOT }} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        {/* eslint-disable-next-line @next/next/no-page-custom-font */}
-        <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=Noto+Serif+TC:wght@400;600;700&display=swap" rel="stylesheet" />
       </head>
       <body>
         <Sparks>{children}</Sparks>

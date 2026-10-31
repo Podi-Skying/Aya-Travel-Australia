@@ -70,7 +70,6 @@ export function PlanReel({
             id={`reel-${s.key}`}
             aria-selected={on}
             aria-controls={panelId}
-            aria-label={s.badge ? `${s.title}（${s.badge}）` : s.title}
             tabIndex={on ? 0 : -1}
             className={`reel-slice${on ? " on" : ""}`}
             style={{ ["--deep" as string]: s.deep }}
@@ -79,14 +78,14 @@ export function PlanReel({
           >
             {s.image && !failed.has(s.image) ? (
               // eslint-disable-next-line @next/next/no-img-element -- hotlinked place photo with credit below
-              <img src={s.image} alt="" loading="lazy" referrerPolicy="no-referrer" style={s.imagePos ? { objectPosition: s.imagePos } : undefined} onError={() => setFailed((f) => new Set(f).add(s.image!))} />
+              <img src={s.image} alt="" loading={on ? "eager" : "lazy"} fetchPriority={on ? "high" : "auto"} referrerPolicy="no-referrer" style={s.imagePos ? { objectPosition: s.imagePos } : undefined} onError={() => setFailed((f) => new Set(f).add(s.image!))} />
             ) : (
               <svg viewBox="0 0 320 160" aria-hidden="true" className="reel-art" preserveAspectRatio="xMidYMid slice">
                 <path d="M0 118 C40 96 62 70 96 84 S150 40 188 62 S250 98 320 72" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
                 <path d="M0 136 C30 130 60 140 90 134 S150 128 180 136 S260 142 320 132" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" opacity=".6" />
               </svg>
             )}
-            <span className="reel-caption" aria-hidden={!on}>
+            <span className="reel-caption">
               {s.badge && <span className="reel-badge">{s.badge}</span>}
               <strong>{s.title}</strong>
               <span>{s.caption}</span>

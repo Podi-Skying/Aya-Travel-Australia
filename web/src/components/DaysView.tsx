@@ -25,7 +25,7 @@ import { computeLegs, legLabel, routeStops, softTravel, useLegs, type Leg } from
 import { daySegments, navMode, navUrl, type NavPoint } from "@/domain/nav";
 import { nightStay } from "@/domain/stay";
 import { dayEnds } from "@/domain/home-pins";
-import { PlaceGallery } from "./PlaceGallery";
+import { PlaceGallery, sizedPhoto } from "./PlaceGallery";
 import { isLogistics } from "@/domain/day-title";
 
 /**
@@ -398,7 +398,7 @@ export function DaysView({ active }: { active: boolean }) {
           {dayHero?.photo && (
             <button type="button" className="day-hero" onClick={() => setViewer(dayPhotos.findIndex((p) => p.id === dayHero.id))} aria-label={`放大看照片：${dayHero.name}`}>
               {/* eslint-disable-next-line @next/next/no-img-element -- hotlinked photo, see Photos.tsx */}
-              <img src={dayHero.photo.url} alt="" referrerPolicy="no-referrer" loading="lazy" decoding="async" data-photo-id={dayHero.id} />
+              <img src={sizedPhoto(dayHero.photo.url, 960, dayHero.photo.w)} alt="" referrerPolicy="no-referrer" fetchPriority="high" decoding="async" data-photo-id={dayHero.id} />
               <span className="cap">{dayHero.name}</span>
             </button>
           )}
@@ -706,6 +706,15 @@ export function DaysView({ active }: { active: boolean }) {
               )}
             </div>
           )}
+          {/* Phones: the calendar scrolls away, so the next day is also here at the end of the day. */}
+          <div className="day-nav day-nav-end">
+            <button className="btn ghost small" type="button" disabled={currentDay === 0} onClick={() => { setCurrentDay(currentDay - 1); scrollTo({ top: 0 }); }}>
+              ← 前一天
+            </button>
+            <button className="btn ghost small" type="button" disabled={currentDay === doc.days.length - 1} onClick={() => { setCurrentDay(currentDay + 1); scrollTo({ top: 0 }); }}>
+              後一天 →
+            </button>
+          </div>
           {editable &&
             (addOpen ? (
               <NearbyPicker
@@ -759,7 +768,7 @@ export function DaysView({ active }: { active: boolean }) {
               }))}
             onAdd={editable ? (key, id) => runOp({ op: "scheduleItem", key, itemId: id, date: d.date }) : undefined}
           />
-          <div className="map-tools">
+          <div className="day-map-tools">
             <label className="toggle small">
               <input type="checkbox" checked={showNearby} onChange={(e) => setShowNearby(e.target.checked)} /> 顯示附近的待安排景點
             </label>
@@ -769,6 +778,7 @@ export function DaysView({ active }: { active: boolean }) {
               </PendingButton>
             )}
           </div>
+          <p className="map-note map-hint small muted">用兩根手指移動地圖。</p>
           <p className="map-note">
             實線是開車路線；虛線是步行或大眾運輸（沿實際路線），還沒算好的路段是直線示意。
             {roadLegs && route.slice(1).some((s, k) => (s.drive || (softTravel(s.mode) && !s.gap)) && !roadLegs[k]) ? "有路段還沒算出路線（可能是今天的 Google 用量上限到了）；可以按「重新計算路線」，或明天再打開這天。" : ""}
