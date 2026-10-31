@@ -59,7 +59,10 @@ export function WalkView({
     let stop: (() => void) | undefined;
     let cancelled = false;
     void import("./walk").then((m) => {
-      if (!cancelled && root.current) stop = m.startWalk(root.current, days, { planHref });
+      if (!cancelled && root.current) {
+        stop = m.startWalk(root.current, days, { planHref });
+        root.current.classList.add("rw-ready");
+      }
     });
     return () => {
       cancelled = true;

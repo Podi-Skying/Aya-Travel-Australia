@@ -31,7 +31,11 @@ const CAT_ICON: Record<string, string> = {
 };
 
 /** Commons serves fixed thumbnail widths; 500 px is plenty for a card. */
-export const cardSrc = (src: string) => src.replace(/(upload\.wikimedia\.org\/.+\/thumb\/.+\/)\d+px-([^/]+)$/, "$1500px-$2");
+export const cardSrc = (src: string) =>
+  src
+    .replace(/(upload\.wikimedia\.org\/.+\/thumb\/.+\/)\d+px-([^/]+)$/, "$1500px-$2")
+    // Full files too (some are over 1.5 MB); every full-size Commons photo in the trip is wider than 500 px.
+    .replace(/^(https:\/\/upload\.wikimedia\.org\/wikipedia\/commons)\/(\w\/\w\w)\/([^/]+\.(?:jpe?g|png))$/i, "$1/thumb/$2/$3/500px-$3");
 
 /** A Commons photo at a phone-friendly width instead of the full file (some are over 1.5 MB); only when the original is wider. */
 export function sizedPhoto(src: string, width: number, originalW?: number): string {
