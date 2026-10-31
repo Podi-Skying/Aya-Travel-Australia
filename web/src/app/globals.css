@@ -1293,9 +1293,9 @@ a, button, summary, [role="button"], [role="tab"] { touch-action: manipulation; 
   .hero { padding-top: calc(var(--chrome-h) + 4px); padding-bottom: 0; }
   .days-layout { gap: 6px; }
   .day-cal { margin-bottom: 0; }
-  .day-chip-line .tap-row { flex-wrap: nowrap; overflow-x: auto; margin: 0 -16px; padding: 0 44px 0 16px; scrollbar-width: none; scroll-snap-type: x proximity; scroll-padding-left: 16px; -webkit-mask-image: linear-gradient(to left, transparent, #000 36px); mask-image: linear-gradient(to left, transparent, #000 36px); }
+  .day-chip-line .tap-row { flex-wrap: nowrap; overflow-x: auto; margin: 0 -16px; padding: 0 44px 0 16px; scrollbar-width: none; -webkit-mask-image: linear-gradient(to left, transparent, #000 36px); mask-image: linear-gradient(to left, transparent, #000 36px); }
   .day-chip-line .tap-row::-webkit-scrollbar { display: none; }
-  .day-chip-line .tap-chip { flex: 0 0 auto; scroll-snap-align: start; }
+  .day-chip-line .tap-chip { flex: 0 0 auto; }
   .day-chip-line .owner-menu { order: -1; }
 }
 @media (prefers-reduced-motion: reduce) {
