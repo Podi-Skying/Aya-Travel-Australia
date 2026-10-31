@@ -1059,7 +1059,7 @@ a, button, summary, [role="button"], [role="tab"] { touch-action: manipulation; 
   .lang-root:has(> .site-header.with-tabs) { padding-bottom: var(--tabbar-h); }
 
   /* The header's material moves to a layer: a backdrop filter on the header would trap the fixed tab bar inside it. */
-  .site-header.with-tabs { grid-template-rows: 56px; background: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .site-header.paper.with-tabs, .site-header.dark.with-tabs { grid-template-rows: 56px; background: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
   .site-header.with-tabs::before { content: ""; position: absolute; inset: 0; z-index: -1; background: rgba(250, 247, 240, .88); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
 
   .site-header.with-tabs .tabs { position: fixed; top: auto; left: 0; right: 0; bottom: 0; margin: 0; padding: 0 0 env(safe-area-inset-bottom); z-index: 900; background: rgba(250, 247, 240, .9); -webkit-backdrop-filter: blur(20px) saturate(160%); backdrop-filter: blur(20px) saturate(160%); box-shadow: 0 -1px 0 rgba(41, 40, 35, .08); }
