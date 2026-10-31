@@ -119,7 +119,7 @@ export function StayCards() {
               <span className="stay-pic">
                 {ph ? (
                   // eslint-disable-next-line @next/next/no-img-element -- hotlinked photo, see Photos.tsx
-                  <img src={sizedPhoto(ph.url, 480, ph.w)} alt="" referrerPolicy="no-referrer" loading="lazy" decoding="async" />
+                  <img src={sizedPhoto(ph.url, 500, ph.w)} alt="" referrerPolicy="no-referrer" loading="lazy" decoding="async" />
                 ) : (
                   <Icon name={s.home ? "home" : "bed"} size={32} />
                 )}

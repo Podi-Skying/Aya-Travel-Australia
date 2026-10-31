@@ -93,7 +93,7 @@ function RouteStrip({ items, legBefore }: { items: Item[]; legBefore: (id: strin
               <span className="rs-pic">
                 {pic ? (
                   // eslint-disable-next-line @next/next/no-img-element -- hotlinked photo, see Photos.tsx
-                  <img src={sizedPhoto(pic.url, 160, pic.w)} alt="" referrerPolicy="no-referrer" loading="lazy" decoding="async" />
+                  <img src={sizedPhoto(pic.url, 250, pic.w)} alt="" referrerPolicy="no-referrer" loading="lazy" decoding="async" />
                 ) : (
                   <Icon name={iconOf(i)} size={20} />
                 )}
