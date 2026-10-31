@@ -656,10 +656,10 @@ export function PlacesMap({ active }: { active: boolean }) {
           ) : (
             [...groups, ...(others.length ? [{ c: OTHER as Category | typeof OTHER, xs: others }] : [])].map(({ c, xs }) => (
               <section key={c} className="place-group">
-                <h3>
+                <h2>
                   {c !== OTHER && <Icon name={CATEGORY_META[c as Category].icon} size={16} />} {c === OTHER ? "未分類" : CATEGORY_META[c as Category].t}
                   <span className="muted"> {xs.length}</span>
-                </h3>
+                </h2>
                 <ul>
                   {xs.map((pl) => (
                     <li key={pl.i.id}>

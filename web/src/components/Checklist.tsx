@@ -39,7 +39,7 @@ export function Checklist() {
   return (
     <div className="grid cols-2 section checklist">
       <div className="card">
-        <h3>待確認（{pending.length}）</h3>
+        <h2 className="h3-like">待確認（{pending.length}）</h2>
         {pending.length ? (
           <ul className="todo-list pending-list">
             {pending.map((x) => (
@@ -66,7 +66,7 @@ export function Checklist() {
         )}
       </div>
       <div className="card">
-        <h3>下一步待辦</h3>
+        <h2 className="h3-like">下一步待辦</h2>
         <ol className="todo-list">
           {todo.map((t) => (
             <li key={t}>{t}</li>

@@ -106,7 +106,8 @@ export function DayMap({
       .then((L) => {
         if (cancelled || !box.current) return;
         if (!map.current) {
-          map.current = L.map(box.current, { scrollWheelZoom: false, zoomAnimation: !reduce }).setView(BASE.tas, 9);
+          // On phones one finger scrolls the page past the map; two fingers move it.
+          map.current = L.map(box.current, { scrollWheelZoom: false, zoomAnimation: !reduce, dragging: !L.Browser.mobile }).setView(BASE.tas, 9);
           tiles(L).addTo(map.current);
           map.current.on("popupopen", (e) => {
             (e.popup.getElement() as HTMLElement | undefined)?.querySelector<HTMLButtonElement>("[data-add-id]")?.addEventListener("click", (ev) => {

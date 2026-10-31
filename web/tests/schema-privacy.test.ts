@@ -230,3 +230,21 @@ describe("home base privacy", () => {
     expect(nightStay({ ...doc, tripOptions: [] }, { ...day, items: [{ ...doc.days[0].items[0], name: "住宿：搖籃山附近" }] })).toBe("cradle");
   });
 });
+
+describe("public view after the 2026-11-01 audit", () => {
+  it("still hides addresses, names, flight details and stay positions", () => {
+    const d = seedDoc();
+    d.days[0].items[0].ownerNote = "VA1531 HBA 09:45";
+    d.days[0].items[0].name = "飛往雪梨";
+    const first = Object.values(d.stays)[0];
+    first.address = "1 Private Street, Hobart";
+    first.lat = -42.1;
+    first.lng = 147.1;
+    const home = Object.values(d.stays).find((s) => s.home)!;
+    home.name = "Secret Home Name";
+    const pub = toPublicDoc(d);
+    const text = JSON.stringify(pub);
+    for (const hidden of ["VA1531", "1 Private Street", "Secret Home Name", '"address"', '"ownerNote"', ...Object.keys(d.drivers)]) expect(text).not.toContain(hidden);
+    for (const s of Object.values(pub.stays)) expect((s as { lat?: number }).lat).toBeUndefined();
+  });
+});

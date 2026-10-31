@@ -32,7 +32,7 @@ export function Info() {
       </div>
       <div className="grid cols-2 section">
         <div className="card">
-          <h3>官方警示與交通來源</h3>
+          <h2 className="h3-like">官方警示與交通來源</h2>
           <ul className="src-list">
             {doc.alertsSources.map((s) => (
               <li key={s.url}>

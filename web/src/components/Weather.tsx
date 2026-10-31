@@ -44,7 +44,7 @@ export function WxChip({ wx, place, unavailable }: { wx: DayWx | null; place?: s
   if (!wx) return <span className="wx-chip none">{unavailable ? "暫無預報" : "尚無預報"}</span>;
   const l = wxLabel(wx.code);
   return (
-    <span className={`wx-chip${isWet(wx) ? " wet" : ""}`} aria-label={`${place ? `${place}：` : ""}${l.t}，高溫 ${deg(wx.tMax)}、低溫 ${deg(wx.tMin)}，降雨機率 ${wx.pop ?? "–"}%`}>
+    <span className={`wx-chip${isWet(wx) ? " wet" : ""}`} role="img" aria-label={`${place ? `${place}：` : ""}${l.t}，高溫 ${deg(wx.tMax)}、低溫 ${deg(wx.tMin)}，降雨機率 ${wx.pop ?? "–"}%`}>
       <WxIcon code={wx.code} />
       <span aria-hidden="true">
         {deg(wx.tMax)}/{deg(wx.tMin)}
