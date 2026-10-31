@@ -509,7 +509,7 @@ function Hero({ doc }: { doc: TripDoc }) {
   const e = doc.meta.end;
   const when = !t ? "" : t < s ? tt("距離出發還有 {n} 天", { n: dayDiff(t, s) }) : t <= e ? tt("旅程第 {n} 天", { n: dayDiff(s, t) + 1 }) : tt("旅程已結束");
   return (
-    <div className="hero" id="top">
+    <div className="hero" id="top" role="region" aria-label={tt("旅程概要")}>
       <div className="hero-inner">
         <h1 className="sr-only">{doc.meta.title}</h1>
         <dl className="hero-facts">

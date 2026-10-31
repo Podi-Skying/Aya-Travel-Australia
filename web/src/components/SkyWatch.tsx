@@ -178,7 +178,7 @@ export function SkyWatch() {
       )}
       {nights.length > 0 && (
         <div className="table-wrap">
-          <table className="sky-nights">
+          <table className="sky-nights" tabIndex={0}>
             <caption className="muted small">荷巴特的夜空，塔州每晚（月亮越暗、全暗時數越長越好）</caption>
             <thead>
               <tr>

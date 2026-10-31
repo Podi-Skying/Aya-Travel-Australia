@@ -925,4 +925,5 @@ export const EN: Record<string, string> = {
   "你的行程資料沒有受到影響，可以再試一次。": "Your trip data isn't affected. You can try again.",
   "再試一次": "Try again",
   "載入中…": "Loading…",
+  "旅程概要": "Trip summary",
 };
