@@ -68,3 +68,15 @@ export function dayTitle(d: Pick<Day, "title" | "items"> & { titlePinned?: boole
   if (!d.items.some(isPlan)) return t(UNPLANNED);
   return dayTitleZh(d, (i) => tx(i, "name", undefined) || undefined, l === "en" ? " · " : "・");
 }
+
+const TENTATIVE = /考慮|未預訂|未訂|待確認|建議|暫定|要確認|未予約|検討|提案|considering|not booked|to be confirmed|suggested|tentative/i;
+const STATE_NOTE = /考慮|未預訂|未訂|待確認|已預訂|已訂|建議|暫定|要確認|未予約|予約済|検討|提案|considering|not booked|to be confirmed|suggested|tentative|booked/i;
+
+/** A stop's name in the language shown, without bracketed status notes (the status shows as an icon). */
+export function displayName(i: Pick<Item, "name"> & { tr?: Item["tr"] }): string {
+  const name = getLang() === "zh" ? i.name : tx(i, "name", i.name);
+  return name.replace(/\s*[（(][^（）()]*[）)]/g, (m) => (STATE_NOTE.test(m) ? "" : m)).trim() || name;
+}
+
+/** True when the name itself says the stop is not settled yet. */
+export const nameIsTentative = (i: Pick<Item, "name">): boolean => (/[（(]([^（）()]*)[）)]/.exec(i.name)?.[1] ?? "").match(TENTATIVE) != null;

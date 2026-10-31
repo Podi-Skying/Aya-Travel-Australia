@@ -13,7 +13,7 @@ import { useRootLang } from "@/i18n";
 import { DomTranslator } from "@/i18n/DomTranslator";
 import { contentDict } from "@/i18n/content";
 import { t as tt } from "@/i18n/current";
-import { useAsk, useToast, useHobartToday, useUrlState, withTimeout, writeUrl, type ToastAction } from "./ui";
+import { TapChips, useAsk, useToast, useHobartToday, useUrlState, withTimeout, writeUrl, type ToastAction } from "./ui";
 import { DaysView } from "./DaysView";
 import { PlacesMap } from "./Places";
 import { Info } from "./Info";
@@ -431,16 +431,10 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
           <div className={`save-bar${busy ? " on" : ""}`} aria-hidden="true" />
         </nav>
       </SiteHeader>
-      <Hero doc={doc} />
-      {mode === "public" && (
-        <aside className="banner" aria-label={tt("檢視模式")}>
-          {canVote ? "你正在檢視 Aya 的旅程（唯讀）。可以對活動按「我有興趣」！" : "你正在檢視 Aya 的旅程（唯讀公開版，住址與司機資訊已隱藏）。"}{" "}
-
-        </aside>
-      )}
+      <Hero doc={doc} note={mode === "public" ? (canVote ? "你正在檢視 Aya 的旅程（唯讀）。可以對活動按「我有興趣」！" : "你正在檢視 Aya 的旅程（唯讀公開版，住址與司機資訊已隱藏）。") : null} />
       {(!online || fromCache) && (
         <div className="offline-banner" role="status">
-          離線副本，可能不是最新資料（最後同步：{fmtTs(lastSyncAt)}）
+          <TapChips items={[{ key: "off", icon: <Icon name="wait" size={18} />, text: fmtTs(lastSyncAt), label: "離線副本", tone: "warn", panel: <p className="small">離線副本，可能不是最新資料（最後同步：{fmtTs(lastSyncAt)}）</p> }]} />
           <button className="btn ghost small" type="button" onClick={() => void refresh()}>
             重新連線
           </button>
@@ -470,19 +464,28 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
         </Panel>
       </main>
       <footer className="foot">
-        <p>
-          最後同步：{fmtTs(lastSyncAt)}
-          {!online || fromCache ? "（離線副本，可能不是最新資料）" : ""}。目前沒有即時資料連線，所有價格與時間皆為估計。
-        </p>
-        <p>
-          版本 v{versionNo}・{mode === "owner" ? "擁有者模式" : "唯讀分享"}
-          {mode === "owner" && (
-            <>
-              {" "}・{/* eslint-disable-next-line @next/next/no-html-link-for-pages -- next-auth route, full navigation */}
-              <a href="/api/auth/signout">登出</a>
-            </>
-          )}
-        </p>
+        <TapChips
+          items={[{
+            key: "sync",
+            icon: <Icon name="clock" size={16} />,
+            text: `${fmtTs(lastSyncAt)}・v${versionNo}`,
+            label: `最後同步：${fmtTs(lastSyncAt)}`,
+            panel: (
+              <p>
+                最後同步：{fmtTs(lastSyncAt)}
+                {!online || fromCache ? "（離線副本，可能不是最新資料）" : ""}。目前沒有即時資料連線，所有價格與時間皆為估計。
+                <br />
+                版本 v{versionNo}・{mode === "owner" ? "擁有者模式" : "唯讀分享"}
+              </p>
+            ),
+          }]}
+        />
+        {mode === "owner" && (
+          <p>
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- next-auth route, full navigation */}
+            <a href="/api/auth/signout">登出</a>
+          </p>
+        )}
       </footer>
       {dialog}
       {toastNode}
@@ -503,11 +506,11 @@ function Panel({ id, show, children }: { id: string; show: boolean; children: Re
 }
 
 /** The banner under the top bar (2026-10-26): trip dates and the countdown only. */
-function Hero({ doc }: { doc: TripDoc }) {
+function Hero({ doc, note }: { doc: TripDoc; note: string | null }) {
   const t = useHobartToday();
   const s = doc.meta.start;
   const e = doc.meta.end;
-  const when = !t ? "" : t < s ? tt("距離出發還有 {n} 天", { n: dayDiff(t, s) }) : t <= e ? tt("旅程第 {n} 天", { n: dayDiff(s, t) + 1 }) : tt("旅程已結束");
+  const when = !t ? "" : t < s ? tt("還有 {n} 天", { n: dayDiff(t, s) }) : t <= e ? tt("旅程第 {n} 天", { n: dayDiff(s, t) + 1 }) : tt("旅程已結束");
   return (
     <div className="hero" id="top" role="region" aria-label={tt("旅程概要")}>
       <div className="hero-inner">
@@ -526,6 +529,7 @@ function Hero({ doc }: { doc: TripDoc }) {
             </div>
           )}
         </dl>
+        {note && <TapChips className="view-note" items={[{ key: "view", icon: <Icon name="eye" size={18} />, label: note, panel: <p className="small">{note}</p> }]} />}
       </div>
     </div>
   );

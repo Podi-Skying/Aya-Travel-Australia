@@ -4,7 +4,8 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEve
 import { useTrip } from "./TripApp";
 import { LoadingTile, cardSrc } from "./PlaceGallery";
 import { project, rubber, spring } from "./motion";
-import { useReducedMotion } from "./ui";
+import { useOnceHint, useReducedMotion } from "./ui";
+import { Icon } from "./Icon";
 import { commonsFor } from "@/client/photos";
 import { fmtDay } from "@/domain/format";
 import { isLogistics } from "@/domain/day-title";
@@ -125,16 +126,22 @@ export function DriftGallery({ active }: { active: boolean }) {
     };
   }, [active, places, mode, token]);
 
+  const [hint, doneHint] = useOnceHint("aya-hint-gallery");
   const shots = useMemo(() => tripShots(doc.days, doc.attractionPool, commons), [doc, commons]);
 
   return (
-    <div className="drift">
-      <div className="card">
-        <h2>畫廊</h2>
-        <p className="muted small">
-          {reduce ? "這趟旅程景點的照片。" : "滾動、拖曳或用方向鍵在照片之間漂流；點照片看是哪裡、哪一天。"}共 {shots.length} 張。
+    <div className="drift" onPointerDown={hint ? doneHint : undefined} onWheel={hint ? doneHint : undefined} onKeyDown={hint ? doneHint : undefined}>
+      <h2 className="sr-only">畫廊</h2>
+      {shots.length > 0 && (
+        <span className="drift-count" role="img" aria-label={`共 ${shots.length} 張`}>
+          <Icon name="image" size={14} /> {shots.length}
+        </span>
+      )}
+      {!reduce && hint && shots.length > 0 && (
+        <p className="drift-hint" onClick={doneHint} role="note">
+          滑動漂流・點照片看是哪裡
         </p>
-      </div>
+      )}
       {shots.length === 0 ? (
         <p className="section muted">{loading ? "照片載入中…" : "還沒有照片。景點加上照片之後會出現在這裡。"}</p>
       ) : !reduce && loading && shots.length < MAX_PLANES ? (

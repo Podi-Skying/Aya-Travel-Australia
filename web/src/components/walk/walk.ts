@@ -218,8 +218,8 @@ export function startWalk(root: HTMLElement, days: WalkDay[], opts: { planHref: 
         ? // Built in the page's language (data-no-translate keeps the on-screen translator off it).
           '<div class="title hero" data-no-translate><h1>' + HERO_H1[getLang()] + '</h1><div class="lead">' +
           md(days[0].date) + " – " + md(days[total - 1].date) + t("，") + esc(segs.map((x) => t(x)).join(t("，接著"))) +
-          t("。往下捲動，小人會沿著當天路線走過每個景點，走完就換到下一天。") + "</div>" +
-          '<div class="cue"><svg viewBox="0 0 18 40" aria-hidden="true"><path d="M9 2 V34 M3 28 L9 36 L15 28" fill="none" stroke="#b83a2e" stroke-width="1.4" stroke-linecap="round"/></svg>' + t("往下捲動，開始散步") + "</div></div>"
+          "</div>" +
+          '<div class="cue"><svg viewBox="0 0 18 40" aria-hidden="true"><path d="M9 2 V34 M3 28 L9 36 L15 28" fill="none" stroke="#b83a2e" stroke-width="1.4" stroke-linecap="round"/></svg>' + t("往下滑") + "</div></div>"
         : '<div class="title"><div class="no">' + no + "<small>DAY</small></div><h2>" + esc(d.title) + "</h2><p>" + md(d.date) + "（" + wd(d.date) + "）・" + esc(d.segName) + driver + "</p></div>";
     sec.innerHTML = '<div class="stage"><div class="layer far"></div><div class="track"></div>' + title + "</div>";
     container.appendChild(sec);

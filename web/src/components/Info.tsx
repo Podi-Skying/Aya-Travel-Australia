@@ -8,6 +8,7 @@ import { fmtDay, fmtTs } from "@/domain/format";
 import { SkyWatch } from "./SkyWatch";
 import { Checklist } from "./Checklist";
 import { GoogleUsage } from "./GoogleUsage";
+import { BudgetBars, FlightCards, StayCards } from "./InfoCards";
 
 export function Info() {
   const { doc, mode, alerts, lastSyncAt, offlineCopy, gotoDay } = useTrip();
@@ -20,37 +21,47 @@ export function Info() {
     ));
   return (
     <>
-      <Checklist />
-      <div className="alert warn section">
-        <span className="ic">
-          <Icon name="warn" label="提醒" />
-        </span>
-        <p>
+      <FlightCards />
+      <StayCards />
+      <WeatherStrip onPick={(date) => gotoDay(doc.days.findIndex((d) => d.date === date))} />
+      <BudgetBars />
+      <details className="card section day-summary">
+        <summary>
+          <h3><Icon name="wait" size={18} /> 待確認</h3>
+        </summary>
+        <Checklist />
+      </details>
+      <details className="card section day-summary">
+        <summary>
+          <h3><Icon name="warn" size={18} /> 官方警示</h3>
+        </summary>
+        <p className="small">
           <strong>道路、國家公園與天氣警示沒有即時連線。</strong>
           以下為官方來源連結，出發前與每天出門前請手動查看道路、國家公園與天氣警示。網站不會把舊資料當成最新資訊。
         </p>
-      </div>
-      <div className="grid cols-2 section">
-        <div className="card">
-          <h2 className="h3-like">官方警示與交通來源</h2>
-          <ul className="src-list">
-            {doc.alertsSources.map((s) => (
-              <li key={s.url}>
-                <a href={s.url} target="_blank" rel="noopener noreferrer">
-                  {s.name}
-                </a>
-                <span className="badge b-line">{s.kind}</span>
-              </li>
-            ))}
-          </ul>
-          <p className="muted small">道路與國家公園警示沒有自動查詢，請用上面的官方連結確認。極光指數有即時資料（見下方「極光與藍眼淚」）。</p>
-        </div>
-      </div>
-      <WeatherStrip />
-      <SkyWatch />
+        <ul className="src-list">
+          {doc.alertsSources.map((s) => (
+            <li key={s.url}>
+              <a href={s.url} target="_blank" rel="noopener noreferrer">
+                {s.name}
+              </a>
+              <span className="badge b-line">{s.kind}</span>
+            </li>
+          ))}
+        </ul>
+        <p className="muted small">道路與國家公園警示沒有自動查詢，請用上面的官方連結確認。極光指數有即時資料（見下方「極光與藍眼淚」）。</p>
+      </details>
+      <details className="card section day-summary">
+        <summary>
+          <h3><Icon name="cat-lookout" size={18} /> 極光與藍眼淚</h3>
+        </summary>
+        <SkyWatch />
+      </details>
       {mode === "owner" && <GoogleUsage />}
-      <div className="card section">
-        <h3>最後已知的規劃提醒</h3>
+      <details className="card section day-summary">
+        <summary>
+          <h3><Icon name="info" size={18} /> 最後已知的規劃提醒</h3>
+        </summary>
         <p className="muted small">
           依 {fmtTs(lastSyncAt)} 同步的行程計算{offlineCopy ? "（離線副本，可能不是最新資料）" : ""}。{warnDays.length ? `共 ${warnDays.length} 天有提醒。` : "目前沒有提醒。"}
         </p>
@@ -72,7 +83,7 @@ export function Info() {
             ))}
           </ul>
         )}
-      </div>
+      </details>
       <details className="card section day-summary">
         <summary>
           <h3>標籤說明</h3>

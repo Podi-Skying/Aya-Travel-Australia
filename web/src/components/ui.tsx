@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore, type ButtonHTMLAttributes, type ReactNode } from "react";
 
 /* Shared UI pieces and labels ported from site/js/app.js. */
 
@@ -19,6 +19,72 @@ export const CATS: Record<string, { t: string; color: string }> = {
 
 export function Badge({ t, c }: { t: string; c: string }) {
   return <span className={`badge ${c}`}>{t}</span>;
+}
+
+export type TapChip = { key: string; icon: ReactNode; text?: ReactNode; label: string; tone?: "warn" | "ok" | "wet"; panel?: ReactNode; href?: string };
+
+/** A row of icon chips: picture and number first; a chip with a panel opens the full text on tap. */
+export function TapChips({ items, className = "" }: { items: TapChip[]; className?: string }) {
+  const [open, setOpen] = useState<string | null>(null);
+  const panelId = useId();
+  const cur = items.find((i) => i.key === open);
+  return (
+    <div className={`tap-chips ${className}`}>
+      <div className="tap-row">
+        {items.map((c) => {
+          const cls = `tap-chip${c.tone ? ` ${c.tone}` : ""}`;
+          const body = (
+            <>
+              <span className="tap-ic" aria-hidden="true">{c.icon}</span>
+              {c.text != null && <span className="tap-t" aria-hidden="true">{c.text}</span>}
+            </>
+          );
+          if (c.href)
+            return (
+              <a key={c.key} className={cls} href={c.href} target="_blank" rel="noopener noreferrer" aria-label={c.label}>
+                {body}
+              </a>
+            );
+          if (!c.panel)
+            return (
+              <span key={c.key} className={`${cls} still`} role="img" aria-label={c.label}>
+                {body}
+              </span>
+            );
+          return (
+            <button key={c.key} type="button" className={`${cls}${open === c.key ? " on" : ""}`} aria-label={c.label} aria-expanded={open === c.key} aria-controls={panelId} onClick={() => setOpen(open === c.key ? null : c.key)}>
+              {body}
+            </button>
+          );
+        })}
+      </div>
+      <div id={panelId} className="tap-panel" hidden={!cur?.panel}>
+        {cur?.panel}
+      </div>
+    </div>
+  );
+}
+
+/** A hint shown until its first use, per viewer; if storage is blocked it shows for this page only. */
+export function useOnceHint(key: string): [boolean, () => void] {
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(key)) return;
+    } catch {
+      /* storage blocked */
+    }
+    setShow(true);
+  }, [key]);
+  const done = useCallback(() => {
+    setShow(false);
+    try {
+      localStorage.setItem(key, "1");
+    } catch {
+      /* storage blocked */
+    }
+  }, [key]);
+  return [show, done];
 }
 
 const RM = "(prefers-reduced-motion: reduce)";

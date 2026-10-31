@@ -5,14 +5,14 @@ import { t } from "@/i18n/current";
 import { useEffect, useRef, useState } from "react";
 import { useTrip } from "./TripApp";
 import { Icon, MODE_ICON } from "./Icon";
-import { Badge, LEG, MODE, PendingButton, PRI, STATUS, VERIFY } from "./ui";
+import { Badge, LEG, MODE, PendingButton, PRI, STATUS, TapChips, useReducedMotion, VERIFY, type TapChip } from "./ui";
 import { clearDaySplit } from "@/domain/ops";
 import { AvatarStack, PeopleToggle, peopleOf } from "./People";
 import { PEOPLE, type Person } from "@/domain/schema";
 import { DayCalendar } from "./DayCalendar";
 import { useWeather } from "@/client/weather";
-import { RainPlan, WxChip, WxLine, wxFor } from "./Weather";
-import { weatherNote } from "@/domain/weather";
+import { RainPlan, WxLine, wxChips, wxFor } from "./Weather";
+import { isWet, weatherNote } from "@/domain/weather";
 import { CATEGORY_META, distanceLabel, nearbyPlaces, type NearbyPlace } from "./Places";
 import { PhotoViewer, mapsPhotoLink, type DayPhoto } from "./Photos";
 import { DayMap } from "./MapViews";
@@ -26,7 +26,7 @@ import { daySegments, navMode, navUrl, type NavPoint } from "@/domain/nav";
 import { nightStay } from "@/domain/stay";
 import { dayEnds } from "@/domain/home-pins";
 import { PlaceGallery, sizedPhoto } from "./PlaceGallery";
-import { isLogistics } from "@/domain/day-title";
+import { displayName, isLogistics, nameIsTentative } from "@/domain/day-title";
 
 /**
  * One line per leg (Kai 2026-10-26): the road-computed time and distance when known, else the estimate.
@@ -35,16 +35,16 @@ import { isLogistics } from "@/domain/day-title";
 function Legs({ travel, road, nav }: { travel?: Item["travel"]; road?: Leg | null; nav?: string | null }) {
   const parts = Object.entries(travel ?? {}).filter(([, v]) => (v ?? 0) > 0) as [string, number][];
   const link = nav ? (
-    <a className="leg-nav" href={nav} target="_blank" rel="noopener noreferrer">
-      <Icon name="route" size={14} /> 導航
+    <a className="leg-nav" href={nav} target="_blank" rel="noopener noreferrer" aria-label="導航">
+      <Icon name="route" size={16} />
     </a>
   ) : null;
   if (road && road.durationS > 0) {
     const how = road.source.endsWith("-walking") ? { icon: "walk", t: "步行" } : road.source.endsWith("-transit") ? { icon: "bus", t: "大眾運輸" } : { icon: "car", t: "開車" };
     return (
       <li className="leg">
-        <span className="leg-road">
-          <Icon name={how.icon} size={16} /> {how.t} {legLabel(road)}
+        <span className="leg-road" role="img" aria-label={`${how.t} ${legLabel(road)}`}>
+          <Icon name={how.icon} size={16} /> {legLabel(road)}
         </span>
         {link}
       </li>
@@ -55,11 +55,55 @@ function Legs({ travel, road, nav }: { travel?: Item["travel"]; road?: Leg | nul
   const [k, v] = parts.length === 1 ? parts[0] : [null, total];
   return (
     <li className="leg">
-      <span>
-        <Icon name={k ? (MODE_ICON[k] ?? "route") : "route"} size={16} /> {k ? `${LEG[k] ?? k} ` : ""}約 {mins(v as number)}（估計）
+      <span role="img" aria-label={`${k ? `${LEG[k] ?? k} ` : ""}約 ${mins(v as number)}（估計）`}>
+        <Icon name={k ? (MODE_ICON[k] ?? "route") : "route"} size={16} /> ~{mins(v as number)}
       </span>
       {link}
     </li>
+  );
+}
+
+const iconOf = (i?: Item): string => {
+  if (!i) return "calendar";
+  if (i.name.startsWith("住宿：")) return "bed";
+  if (isLogistics(i)) return MODE_ICON[i.mode] ?? "route";
+  return i.cat ? CATEGORY_META[i.cat].icon : (MODE_ICON[i.mode] ?? "pin");
+};
+
+/** The day as a line of round pictures: photos for main sights, icons for the rest; tap scrolls to the stop. */
+function RouteStrip({ items, legBefore }: { items: Item[]; legBefore: (id: string) => Leg | null }) {
+  const reduce = useReducedMotion();
+  const toStop = (id: string) => document.getElementById(`act-${id}`)?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+  return (
+    <ol className="route-strip" aria-label="當日路線">
+      {items.map((i, k) => {
+        const road = legBefore(i.id);
+        const minutes = road && road.durationS > 0 ? Math.round(road.durationS / 60) : Object.values(i.travel ?? {}).reduce<number>((a, v) => a + (v ?? 0), 0);
+        const how = road ? (road.source.endsWith("-walking") ? "walk" : road.source.endsWith("-transit") ? "bus" : "car") : (MODE_ICON[i.mode] ?? "route");
+        const pic = i.major && !isLogistics(i) ? (i.photo ?? i.gallery?.[0]) : undefined;
+        return (
+          <li key={i.id}>
+            {k > 0 && (
+              <span className="rs-link" role="img" aria-label={`${MODE[i.mode] ?? ""} ${minutes ? mins(minutes) : ""}`}>
+                <Icon name={how} size={14} />
+                {minutes > 0 && <small>{mins(minutes)}</small>}
+              </span>
+            )}
+            <button type="button" className={`rs-stop${pic ? " has-photo" : ""}`} aria-label={`${i.time} ${displayName(i)}`} onClick={() => toStop(i.id)}>
+              <span className="rs-pic">
+                {pic ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- hotlinked photo, see Photos.tsx
+                  <img src={sizedPhoto(pic.url, 160, pic.w)} alt="" referrerPolicy="no-referrer" loading="lazy" decoding="async" />
+                ) : (
+                  <Icon name={iconOf(i)} size={20} />
+                )}
+              </span>
+              {i.major && !isLogistics(i) && <span className="rs-name">{displayName(i)}</span>}
+            </button>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
@@ -348,115 +392,79 @@ export function DaysView({ active }: { active: boolean }) {
     return runOp({ op: "confirmDriver", date: d.date, window: r.win });
   }
 
-  return (
-    <div className="days-layout">
-      <DayCalendar />
-
-      <div className="day-main">
-        <article className="day-detail" key={d.date}>
-          <div className="day-head">
-            <div>
-              <div className="day-date">
-                {t("第 {n} 天", { n: currentDay + 1 })}・{fmtDay(d.date)}・{seg?.name} {weather && <WxChip wx={wxFor(weather, d.date)?.wx ?? null} place={wxFor(weather, d.date)?.place} unavailable={wxFor(weather, d.date)?.unavailable} />}
-              </div>
-              <h2>{dayTitle(raw)}</h2>
-              {night !== "none" && st.name && (
-                <p className="tonight small">
-                  <Icon name="home" size={14} /> 今晚住：{st.home ? (st.name === "住處" ? "住處" : "UTAS 公寓") : st.name}
-                </p>
-              )}
-              {editable && (
-                <p className="title-pin small">
-                  {raw.titlePinned ? "標題已固定" : "標題依當天活動自動產生"}{" "}
-                  <PendingButton
-                    className="btn ghost small"
-                    pendingLabel="儲存中…"
-                    onAction={async () => {
-                      const v = await ask(raw.titlePinned ? "修改或取消固定標題" : "自訂這天的標題", {
-                        body: <p className="small muted">留空會改回依當天活動自動產生的標題。</p>,
-                        fields: [{ name: "title", label: "標題（最多 60 字）", value: raw.titlePinned ? raw.title : dayTitleZh(raw), maxLength: 60 }],
-                      });
-                      if (!v) return null;
-                      return runOp({ op: "setDayTitle", date: raw.date, title: v.title });
-                    }}
-                  >
-                    {raw.titlePinned ? "修改標題" : "自訂標題"}
-                  </PendingButton>
-                </p>
-              )}
-              <AvatarStack people={dayPeople} size={30} />
-            </div>
-            <div className="day-nav">
-              <button className="btn ghost small" type="button" disabled={currentDay === 0} onClick={() => setCurrentDay(currentDay - 1)} aria-label="前一天">
-                ← 前一天
-              </button>
-              <button className="btn ghost small" type="button" disabled={currentDay === doc.days.length - 1} onClick={() => setCurrentDay(currentDay + 1)} aria-label="後一天">
-                後一天 →
-              </button>
-            </div>
-          </div>
-          {dayHero?.photo && (
-            <button type="button" className="day-hero" onClick={() => setViewer(dayPhotos.findIndex((p) => p.id === dayHero.id))} aria-label={`放大看照片：${dayHero.name}`}>
-              {/* eslint-disable-next-line @next/next/no-img-element -- hotlinked photo, see Photos.tsx */}
-              <img src={sizedPhoto(dayHero.photo.url, 960, dayHero.photo.w)} alt="" referrerPolicy="no-referrer" fetchPriority="high" decoding="async" data-photo-id={dayHero.id} />
-              <span className="cap">{dayHero.name}</span>
-            </button>
-          )}
-          {(warnN > 0 || d.needsDriver) && (
-            <div className="day-badges">
-              {warnN > 0 && <Badge t={`${warnN} 項提醒`} c="b-warn" />}
-              {d.needsDriver && <Badge t={d.driverOk ? `司機：${d.needsDriver} 已確認` : `司機：${d.needsDriver}（未確認）`} c={d.driverOk ? "b-ok" : "b-warn"} />}
-            </div>
-          )}
-          {weather && <WxLine day={wxFor(weather, d.date)} />}
-          <RainPlan
-            date={d.date}
-            seg={d.seg}
-            items={raw.items}
-            pool={doc}
-            w={weather}
-            owner={editable}
-            onUse={(itemId, key, backupId) => runOpUndoable({ op: "useBackup", date: d.date, itemId, key, backupId }, "已換成備案，可以按「復原」")}
-            onSwapDay={(toDate) => runOpUndoable({ op: "swapDays", date: d.date, toDate }, "已對調，可以按「復原」")}
-            onIndoor={(itemId, indoor) => runOp({ op: "setIndoor", itemId, indoor })}
-          />
-          <div className="day-facts two">
-            <div className="fact">
-              <div className="k">當日花費（{N} 人）</div>
-              <div className="v">{money(dayTotal(doc, currentDay, N))}</div>
-            </div>
-            <div className="fact">
-              <div className="k">今晚住宿</div>
-              <div className="v">{night === "none" ? "不住宿" : st.area || st.name}</div>
-            </div>
-          </div>
-          {editable && clearDaySplit(raw.items).move.length > 0 && (
-            <div className="day-actions">
-              <PendingButton className="btn ghost small clear-day" pendingLabel="清空中…" onAction={clearDay}>
-                清空這天…
-              </PendingButton>
-            </div>
-          )}
-          <details className="day-summary">
-            <summary>當日摘要</summary>
-            <ul>
-              <li>主要活動 {majors} 個・{d.driveHrs ? `開車約 ${d.driveHrs} 小時` : "不開車"}</li>
-              <li>
-                可行性：{fe.t}
-                {d.transfer ? "・移動日" : ""}
-                {d.ferry ? "・有渡輪" : ""}
-                {d.hike ? "・有步道" : ""}
-              </li>
-              {st.name && night !== "none" && (
-                <li>
-                  <Icon name="home" size={16} /> {st.name}
-                  {owner && st.address ? `・地址：${st.address}` : "・確切地址已隱藏"}
-                  {st.note ? `・${st.note}` : ""}
-                </li>
-              )}
-            </ul>
-          </details>
-          {cs.map((c, k) => (
+  // Status chips above the stops: pictures and numbers first, the sentence opens on tap.
+  const dayWx = wxFor(weather, d.date);
+  const facts: TapChip[] = [
+    ...(weather ? wxChips(dayWx, <WxLine day={dayWx} />) : []),
+    ...(weather && dayWx?.wx && isWet(dayWx.wx)
+      ? [{
+          key: "rain",
+          icon: <Icon name="umbrella" size={18} />,
+          text: t("備案"),
+          label: "雨天備案",
+          tone: "wet" as const,
+          panel: (
+            <RainPlan
+              date={d.date}
+              seg={d.seg}
+              items={raw.items}
+              pool={doc}
+              w={weather}
+              owner={editable}
+              onUse={(itemId, key, backupId) => runOpUndoable({ op: "useBackup", date: d.date, itemId, key, backupId }, "已換成備案，可以按「復原」")}
+              onSwapDay={(toDate) => runOpUndoable({ op: "swapDays", date: d.date, toDate }, "已對調，可以按「復原」")}
+              onIndoor={(itemId, indoor) => runOp({ op: "setIndoor", itemId, indoor })}
+            />
+          ),
+        }]
+      : []),
+    { key: "cost", icon: <Icon name="wallet" size={18} />, text: money(dayTotal(doc, currentDay, N)), label: `當日花費（${N} 人）：${money(dayTotal(doc, currentDay, N))}` },
+    ...(night !== "none" && st.name
+      ? [{
+          key: "stay",
+          icon: <Icon name="bed" size={18} />,
+          text: st.area || st.name,
+          label: `今晚住宿：${st.area || st.name}`,
+          panel: (
+            <p className="small">
+              {st.name}
+              {owner && st.address ? `・地址：${st.address}` : "・確切地址已隱藏"}
+              {st.note ? `・${st.note}` : ""}
+            </p>
+          ),
+        }]
+      : []),
+    {
+      key: "drive",
+      icon: <Icon name="car" size={18} />,
+      text: d.driveHrs ? `${d.driveHrs} h` : "0",
+      label: d.driveHrs ? `開車約 ${d.driveHrs} 小時` : "不開車",
+      panel: (
+        <p className="small">
+          主要活動 {majors} 個・{d.driveHrs ? `開車約 ${d.driveHrs} 小時` : "不開車"}・可行性：{fe.t}
+          {d.transfer ? "・移動日" : ""}
+          {d.ferry ? "・有渡輪" : ""}
+          {d.hike ? "・有步道" : ""}
+        </p>
+      ),
+    },
+    ...(d.needsDriver
+      ? [{
+          key: "driver",
+          icon: <Icon name={d.driverOk ? "ok" : "wait"} size={18} />,
+          label: d.driverOk ? `司機：${d.needsDriver} 已確認` : `司機：${d.needsDriver}（未確認）`,
+          tone: d.driverOk ? ("ok" as const) : ("warn" as const),
+          panel: <p className="small">{d.driverOk ? `司機：${d.needsDriver} 已確認` : `司機：${d.needsDriver}（未確認）`}</p>,
+        }]
+      : []),
+    ...(cs.length
+      ? [{
+          key: "checks",
+          icon: <Icon name={warnN ? "warn" : "info"} size={18} />,
+          text: String(cs.length),
+          label: `${cs.length} 項提醒`,
+          tone: warnN ? ("warn" as const) : undefined,
+          panel: cs.map((c, k) => (
             <div key={k} className={`alert ${c.lv}`}>
               <span className="ic">
                 <Icon name={c.lv === "warn" ? "warn" : c.lv === "ok" ? "ok" : c.lv === "danger" ? "stop" : "info"} label={c.lv === "warn" ? "提醒" : c.lv === "ok" ? "確認" : c.lv === "danger" ? "危險" : "資訊"} />
@@ -471,22 +479,91 @@ export function DaysView({ active }: { active: boolean }) {
                 )}
               </div>
             </div>
-          ))}
-          {editable && d.needsDriver && (
-            <p>
-              {d.driverOk || raw.driverConfirmation ? (
-                <PendingButton className="btn ghost small" pendingLabel="儲存中…" onAction={() => runOp({ op: "clearDriver", date: d.date })}>
-                  改回未確認
-                </PendingButton>
-              ) : null}{" "}
-              {!d.driverOk && (
-                <PendingButton className="btn small" pendingLabel="確認中…" onAction={confirmDriver}>
-                  ✓ 確認司機與時段
-                </PendingButton>
-              )}
-            </p>
-          )}
+          )),
+        }]
+      : []),
+    ...dayNav.map(({ u, t: navT }) => ({ key: u, icon: <Icon name="route" size={18} />, label: navT, href: u })),
+  ];
+
+  return (
+    <div className="days-layout">
+      <DayCalendar />
+
+      <div className="day-main">
+        <article className="day-detail" key={d.date}>
+          <div className={`day-cover${dayHero?.photo ? "" : " no-photo"}`}>
+            {dayHero?.photo ? (
+              <button type="button" className="day-cover-photo" onClick={() => setViewer(dayPhotos.findIndex((p) => p.id === dayHero.id))} aria-label={`放大看照片：${dayHero.name}`}>
+                {/* eslint-disable-next-line @next/next/no-img-element -- hotlinked photo, see Photos.tsx */}
+                <img src={sizedPhoto(dayHero.photo.url, 960, dayHero.photo.w)} alt="" referrerPolicy="no-referrer" fetchPriority="high" decoding="async" data-photo-id={dayHero.id} />
+              </button>
+            ) : (
+              <span className="day-cover-tile" aria-hidden="true">
+                <Icon name={iconOf(d.items.find((i) => i.major) ?? d.items[0])} size={72} />
+              </span>
+            )}
+            <div className="day-cover-text">
+              <div className="day-date">
+                {t("第 {n} 天", { n: currentDay + 1 })}・{fmtDay(d.date)}・{seg?.name}
+              </div>
+              <h2>{dayTitle(raw)}</h2>
+            </div>
+            <span className="day-cover-people">
+              <AvatarStack people={dayPeople} size={30} />
+            </span>
+            <button className="day-arrow prev" type="button" disabled={currentDay === 0} onClick={() => setCurrentDay(currentDay - 1)} aria-label="前一天">
+              <Icon name="chevron-left" size={22} />
+            </button>
+            <button className="day-arrow next" type="button" disabled={currentDay === doc.days.length - 1} onClick={() => setCurrentDay(currentDay + 1)} aria-label="後一天">
+              <Icon name="chevron-right" size={22} />
+            </button>
+          </div>
+          <div className="day-chip-line">
+            <TapChips items={facts} />
+            {editable && (
+              <details className="owner-menu">
+                <summary aria-label="更多動作">
+                  <Icon name="more" size={20} />
+                </summary>
+                <div className="owner-menu-body">
+                  <p className="title-pin small">
+                    {raw.titlePinned ? "標題已固定" : "標題依當天活動自動產生"}{" "}
+                    <PendingButton
+                      className="btn ghost small"
+                      pendingLabel="儲存中…"
+                      onAction={async () => {
+                        const v = await ask(raw.titlePinned ? "修改或取消固定標題" : "自訂這天的標題", {
+                          body: <p className="small muted">留空會改回依當天活動自動產生的標題。</p>,
+                          fields: [{ name: "title", label: "標題（最多 60 字）", value: raw.titlePinned ? raw.title : dayTitleZh(raw), maxLength: 60 }],
+                        });
+                        if (!v) return null;
+                        return runOp({ op: "setDayTitle", date: raw.date, title: v.title });
+                      }}
+                    >
+                      {raw.titlePinned ? "修改標題" : "自訂標題"}
+                    </PendingButton>
+                  </p>
+                  {clearDaySplit(raw.items).move.length > 0 && (
+                    <PendingButton className="btn ghost small clear-day" pendingLabel="清空中…" onAction={clearDay}>
+                      清空這天…
+                    </PendingButton>
+                  )}
+                  {d.needsDriver && (d.driverOk || raw.driverConfirmation) && (
+                    <PendingButton className="btn ghost small" pendingLabel="儲存中…" onAction={() => runOp({ op: "clearDriver", date: d.date })}>
+                      改回未確認
+                    </PendingButton>
+                  )}
+                  {d.needsDriver && !d.driverOk && (
+                    <PendingButton className="btn small" pendingLabel="確認中…" onAction={confirmDriver}>
+                      ✓ 確認司機與時段
+                    </PendingButton>
+                  )}
+                </div>
+              </details>
+            )}
+          </div>
           {owner && !online && <p className="small muted">離線中：可以查看，但修改需要網路連線。</p>}
+          {d.items.length > 0 && <RouteStrip items={d.items} legBefore={roadBefore} />}
           {d.items.length ? (
             <ol className="acts">
               {route[0]?.kind === "start" && (
@@ -495,16 +572,7 @@ export function DaysView({ active }: { active: boolean }) {
                     <Icon name="home" size={14} />
                   </div>
                   <div className="body">
-                    <strong>出發</strong> <span className="muted">從{ends.start?.home ? "住處" : ends.start?.name}出發</span>
-                    {dayNav.length > 0 && (
-                      <span className="day-nav-links">
-                        {dayNav.map(({ u, t }) => (
-                          <a key={u} className="btn ghost small" href={u} target="_blank" rel="noopener noreferrer">
-                            <Icon name="route" size={14} /> {t}
-                          </a>
-                        ))}
-                      </span>
-                    )}
+                    <Icon name="home" size={16} /> <span className="muted">{ends.start?.home ? "住處" : ends.start?.name}</span>
                   </div>
                 </li>
               )}
@@ -512,105 +580,84 @@ export function DaysView({ active }: { active: boolean }) {
                 const tent = isTentative(d, i);
                 const voted = myVotes.find((v) => v.itemId === i.id && v.dayDate === d.date);
                 const cnt = countOf(i.id);
-                return (
-                  <FragmentItem key={i.id}>
-                    {posOf(i.id) !== 0 && <Legs travel={i.travel} road={roadBefore(i.id)} nav={posOf(i.id) > 0 ? navBefore(posOf(i.id)) : null} />}
-                    <li className={`act ${focusId === i.id ? "active" : ""}`}>
-                      <div className={`pin ${d.seg}`} aria-hidden="true">
-                        {k + 1}
+                const big = i.major && !isLogistics(i);
+                const name = displayName(i);
+                const waiting = i.status === "pending" || tent || nameIsTentative(i);
+                const stateIcon =
+                  i.status === "confirmed" ? (
+                    <span className="stop-state ok">
+                      <Icon name="ok" size={16} label="已確認" />
+                    </span>
+                  ) : waiting ? (
+                    <span className="stop-state wait">
+                      <Icon name="wait" size={16} label={tent ? "暫定（司機未確認）" : "待確認"} />
+                    </span>
+                  ) : null;
+                const chips = (
+                  <div className="stop-chips">
+                    <span aria-label={`停留 ${mins(i.dur)}`} role="img">
+                      <Icon name="clock" size={14} /> {mins(i.dur)}
+                    </span>
+                    <span role="img" aria-label={MODE[i.mode]}>
+                      <Icon name={MODE_ICON[i.mode] ?? "route"} size={14} />
+                    </span>
+                    {i.cost && i.cost.status !== "unknown" && (
+                      <span role="img" aria-label={`費用 ${money(lineAmount(i.cost, N))}`}>
+                        <Icon name="wallet" size={14} /> {money(lineAmount(i.cost, N))}
+                      </span>
+                    )}
+                    {i.pri === "must" && <Badge {...PRI.must} />}
+                    {!samePeople(peopleOf(i, raw), dayPeople) && <AvatarStack people={peopleOf(i, raw)} size={22} />}
+                  </div>
+                );
+                const more = (
+                  <>
+                    {name !== i.name && <p className="small muted">{i.name}</p>}
+                    {weatherNote(i) && <p className="small wx-note">{weatherNote(i)}</p>}
+                    {i.note && <ActNote text={i.note} />}
+                    {i.ownerNote && (
+                      <div className="note owner-note">
+                        <Icon name="info" size={16} /> 只有你看得到：{i.ownerNote}
                       </div>
-                      <div className="body">
-                        <div className="act-main">
-                          <div className="act-text">
-                            <div className="top">
-                              <span className="time">
-                                {i.time}・{mins(i.dur)}
-                              </span>
-                              {i.status === "pending" ? (
-                                <Badge t="待確認" c="b-warn" />
-                              ) : i.status === "confirmed" ? (
-                                <Badge t="已確認" c="b-ok" />
-                              ) : tent ? (
-                                <Badge t="暫定（司機未確認）" c="b-warn" />
-                              ) : i.pri === "must" ? (
-                                <Badge {...PRI[i.pri]} />
-                              ) : null}
-                              {/* Only when this activity's people differ from the day's group. */}
-                              {!samePeople(peopleOf(i, raw), dayPeople) && <AvatarStack people={peopleOf(i, raw)} size={22} />}
-                            </div>
-                            <h4>{i.name}</h4>
-                            {weatherNote(i) && <p className="small wx-note">{weatherNote(i)}</p>}
-                            <div className="meta">
-                              <span>
-                                <Icon name={MODE_ICON[i.mode] ?? "route"} size={16} /> {MODE[i.mode]}
-                              </span>
-                              {i.cost && i.cost.status !== "unknown" && <span>{money(lineAmount(i.cost, N))}</span>}
-                            </div>
-                          </div>
-                          {i.id !== dayHero?.id && i.major && !isLogistics(i) && !i.name.startsWith("住宿：") && (i.photo || i.gallery?.length || ((owner || token) && i.lat != null)) && (
-                            <PlaceGallery item={i} className="act-thumb" empty="hide" />
-                          )}
-                        </div>
-                        {i.note && <ActNote text={i.note} />}
-                        {i.ownerNote && (
-                          <div className="note owner-note">
-                            <Icon name="info" size={16} /> 只有你看得到：{i.ownerNote}
-                          </div>
-                        )}
-                        <details className="act-more">
-                          <summary>更多資訊</summary>
-                          <ul>
-                            {i.en && <li className="en">{i.en}</li>}
-                            <li>
-                              <Badge {...VERIFY[i.verify]} /> <Badge {...PRI[i.pri]} /> {i.originPackage && <Badge t="來自待安排景點" c="b-line" />}
-                            </li>
-                            {i.src && (
-                              <li>
-                                來源：
-                                <a href={i.src.url} target="_blank" rel="noopener noreferrer">
-                                  {i.src.label}
-                                </a>
-                                {i.checked ? `（${i.checked} 查核）` : "（未查核）"}
-                              </li>
-                            )}
-                            {i.cost && (
-                              <li>
-                                {i.cost.status === "unknown" ? "費用未知" : `${basis(i.cost, N)} = ${money(lineAmount(i.cost, N))}`} <Badge {...STATUS[i.cost.status]} />
-                                {i.cost.note ? `・${i.cost.note}` : ""}
-                              </li>
-                            )}
-                            {!i.photo && (i.src || i.originPackage) && i.mode !== "flight" && (
-                              <li>
-                                <a href={mapsPhotoLink(i.en || i.name)} target="_blank" rel="noopener noreferrer">
-                                  在 Google 地圖看照片
-                                </a>
-                              </li>
-                            )}
-                            {i.packageContext && (
-                              <li>
-                                來自「{i.packageContext.title ?? i.packageContext.key}」：{i.packageContext.driveHrs ? `整趟約開車 ${i.packageContext.driveHrs} 小時；` : ""}共乘費用未套用。
-                              </li>
-                            )}
-                          </ul>
-                        </details>
-                        <div className="tools">
-                          <button className="btn ghost small" type="button" onClick={() => setFocusId(i.id)}>
-                            <Icon name="map" size={16} /> 地圖
-                          </button>
-                          {mode === "public" ? (
-                            canVote && (
-                            <span className="interest">
-                              <button className={`btn small ${voted ? "ghost" : ""}`} type="button" onClick={() => void vote(i.id, d.date)}>
-                                {voted ? `✓ 已表達興趣${voted.nickname ? "（" + voted.nickname + "）" : ""}` : "我有興趣"}
-                              </button>
-                              {voted && (
-                                <button className="btn ghost small" type="button" onClick={() => void unvote(i.id, d.date)}>
-                                  收回
-                                </button>
-                              )}
-                            </span>
-                            )
-                          ) : (
+                    )}
+                    <ul className="stop-more-list">
+                      {i.en && <li className="en">{i.en}</li>}
+                      <li>
+                        <Badge {...VERIFY[i.verify]} /> <Badge {...PRI[i.pri]} /> {i.originPackage && <Badge t="來自待安排景點" c="b-line" />}
+                      </li>
+                      {i.src && (
+                        <li>
+                          來源：
+                          <a href={i.src.url} target="_blank" rel="noopener noreferrer">
+                            {i.src.label}
+                          </a>
+                          {i.checked ? `（${i.checked} 查核）` : "（未查核）"}
+                        </li>
+                      )}
+                      {i.cost && (
+                        <li>
+                          {i.cost.status === "unknown" ? "費用未知" : `${basis(i.cost, N)} = ${money(lineAmount(i.cost, N))}`} <Badge {...STATUS[i.cost.status]} />
+                          {i.cost.note ? `・${i.cost.note}` : ""}
+                        </li>
+                      )}
+                      {!i.photo && (i.src || i.originPackage) && i.mode !== "flight" && (
+                        <li>
+                          <a href={mapsPhotoLink(i.en || i.name)} target="_blank" rel="noopener noreferrer">
+                            在 Google 地圖看照片
+                          </a>
+                        </li>
+                      )}
+                      {i.packageContext && (
+                        <li>
+                          來自「{i.packageContext.title ?? i.packageContext.key}」：{i.packageContext.driveHrs ? `整趟約開車 ${i.packageContext.driveHrs} 小時；` : ""}共乘費用未套用。
+                        </li>
+                      )}
+                    </ul>
+                    <div className="tools">
+                      <button className="btn ghost small" type="button" onClick={() => setFocusId(i.id)} aria-label="地圖">
+                        <Icon name="map" size={16} />
+                      </button>
+                      {mode !== "public" && (
                             <details className="act-manage">
                               <summary>管理</summary>
                               <div className="manage">
@@ -675,8 +722,61 @@ export function DaysView({ active }: { active: boolean }) {
                               </div>
                             </details>
                           )}
-                        </div>
+                    </div>
+                  </>
+                );
+                const interest = mode === "public" && canVote && (
+                  <span className="interest">
+                    <button className={`btn small ${voted ? "ghost" : ""}`} type="button" onClick={() => void vote(i.id, d.date)}>
+                      {voted ? `✓ 已表達興趣${voted.nickname ? "（" + voted.nickname + "）" : ""}` : "我有興趣"}
+                    </button>
+                    {voted && (
+                      <button className="btn ghost small" type="button" onClick={() => void unvote(i.id, d.date)}>
+                        收回
+                      </button>
+                    )}
+                  </span>
+                );
+                return (
+                  <FragmentItem key={i.id}>
+                    {posOf(i.id) !== 0 && <Legs travel={i.travel} road={roadBefore(i.id)} nav={posOf(i.id) > 0 ? navBefore(posOf(i.id)) : null} />}
+                    <li id={`act-${i.id}`} className={`act ${big ? "act-big" : "act-row"} ${focusId === i.id ? "active" : ""}`}>
+                      <div className={`pin ${d.seg}`} aria-hidden="true">
+                        {k + 1}
                       </div>
+                      {big ? (
+                        <div className="body">
+                          <div className="stop-media">
+                            {i.id !== dayHero?.id && !i.name.startsWith("住宿：") && (i.photo || i.gallery?.length || ((owner || token) && i.lat != null)) && <PlaceGallery item={i} className="stop-photo" empty="hide" />}
+                            <span className="stop-time">{i.time}</span>
+                            {stateIcon}
+                          </div>
+                          <h4>{name}</h4>
+                          {chips}
+                          {interest}
+                          <details className="act-more">
+                            <summary>更多</summary>
+                            {more}
+                          </details>
+                        </div>
+                      ) : (
+                        <div className="body">
+                          <details className="stop-line">
+                            <summary>
+                              <span className="stop-line-time">{i.time}</span>
+                              <Icon name={iconOf(i)} size={18} />
+                              <span className="stop-line-name">{name}</span>
+                              {stateIcon}
+                              <span className="stop-line-more" aria-hidden="true">
+                                <Icon name="chevron-right" size={16} />
+                              </span>
+                            </summary>
+                            {chips}
+                            {more}
+                          </details>
+                          {interest}
+                        </div>
+                      )}
                     </li>
                   </FragmentItem>
                 );
@@ -689,7 +789,7 @@ export function DaysView({ active }: { active: boolean }) {
                       <Icon name="home" size={14} />
                     </div>
                     <div className="body">
-                      <strong>{ends.end?.home ? "回到住處" : `入住 ${ends.end?.name}`}</strong>
+                      <Icon name={ends.end?.home ? "home" : "bed"} size={16} /> <strong>{ends.end?.home ? "回到住處" : `入住 ${ends.end?.name}`}</strong>
                     </div>
                   </li>
                 </>
@@ -697,22 +797,18 @@ export function DaysView({ active }: { active: boolean }) {
             </ol>
           ) : (
             <div className="empty-day">
-              這天還沒有安排活動。
-              {owner && (
-                <>
-                  <br />
-                  可以保留休息、新增活動，或從「待安排景點」排入。
-                </>
-              )}
+              <Icon name="calendar" size={28} />
+              <span>{t("可安排")}</span>
+              {owner && <span className="small muted">可以保留休息、新增活動，或從「待安排景點」排入。</span>}
             </div>
           )}
           {/* Phones: the calendar scrolls away, so the next day is also here at the end of the day. */}
           <div className="day-nav day-nav-end">
-            <button className="btn ghost small" type="button" disabled={currentDay === 0} onClick={() => { setCurrentDay(currentDay - 1); scrollTo({ top: 0 }); }}>
-              ← 前一天
+            <button className="btn ghost small" type="button" disabled={currentDay === 0} aria-label="前一天" onClick={() => { setCurrentDay(currentDay - 1); scrollTo({ top: 0 }); }}>
+              <Icon name="chevron-left" size={18} />
             </button>
-            <button className="btn ghost small" type="button" disabled={currentDay === doc.days.length - 1} onClick={() => { setCurrentDay(currentDay + 1); scrollTo({ top: 0 }); }}>
-              後一天 →
+            <button className="btn ghost small" type="button" disabled={currentDay === doc.days.length - 1} aria-label="後一天" onClick={() => { setCurrentDay(currentDay + 1); scrollTo({ top: 0 }); }}>
+              <Icon name="chevron-right" size={18} />
             </button>
           </div>
           {editable &&
@@ -770,7 +866,7 @@ export function DaysView({ active }: { active: boolean }) {
           />
           <div className="day-map-tools">
             <label className="toggle small">
-              <input type="checkbox" checked={showNearby} onChange={(e) => setShowNearby(e.target.checked)} /> 顯示附近的待安排景點
+              <input type="checkbox" checked={showNearby} onChange={(e) => setShowNearby(e.target.checked)} /> 附近景點
             </label>
             {editable && roadLegs && route.slice(1).some((s, k) => (s.drive || (softTravel(s.mode) && !s.gap)) && !roadLegs[k]) && (
               <PendingButton className="btn ghost small" pendingLabel="計算中…" onAction={() => computeLegs(route)}>
@@ -778,9 +874,10 @@ export function DaysView({ active }: { active: boolean }) {
               </PendingButton>
             )}
           </div>
-          <p className="map-note map-hint small muted">用兩根手指移動地圖。</p>
-          <p className="map-note">
-            實線是開車路線；虛線是步行或大眾運輸（沿實際路線），還沒算好的路段是直線示意。
+
+          <p className="map-note map-legend small muted">
+            <span role="img" aria-label="實線是開車路線"><Icon name="car" size={14} /> ━</span>{" "}
+            <span role="img" aria-label="虛線是步行或大眾運輸（沿實際路線）"><Icon name="walk" size={14} /> ┅</span>{" "}
             {roadLegs && route.slice(1).some((s, k) => (s.drive || (softTravel(s.mode) && !s.gap)) && !roadLegs[k]) ? "有路段還沒算出路線（可能是今天的 Google 用量上限到了）；可以按「重新計算路線」，或明天再打開這天。" : ""}
           </p>
         </aside>

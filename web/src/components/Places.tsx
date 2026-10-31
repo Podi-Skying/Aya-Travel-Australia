@@ -262,7 +262,7 @@ export function PlacesMap({ active }: { active: boolean }) {
         const ink = cssVar("--ink", "#292823");
         const red = cssVar("--vermilion", "#b83a2e");
         const popup = (d: ReturnType<typeof effectiveDay>, i: Item, idx: number) =>
-          `<div class="stop-pop">${i.photo ? `<img src="${esc(i.photo.url)}" alt="" referrerpolicy="no-referrer" loading="lazy">` : ""}<div><div class="d">${fmtDay(d.date)}・${esc(dayTitle(d))}</div><strong>${esc(i.name)}</strong><a href="#" data-goto="${idx}">查看當天行程 →</a>${i.photo ? `<span class="src small muted">${esc(creditText(i.photo))}</span>` : ""}</div></div>`;
+          `<div class="stop-pop">${i.photo ? `<img src="${esc(i.photo.url)}" alt="" referrerpolicy="no-referrer" loading="lazy">` : ""}<div><strong>${esc(i.name)}</strong><a href="#" data-goto="${idx}" aria-label="查看當天行程">${iconSvg("calendar", 16)} ${fmtDay(d.date)}</a>${i.photo ? `<span class="src small muted">${esc(creditText(i.photo))}</span>` : ""}</div></div>`;
         if (f.days)
           doc.days.forEach((raw, idx) => {
             if (f.seg !== "all" && raw.seg !== f.seg) return;
@@ -559,18 +559,19 @@ export function PlacesMap({ active }: { active: boolean }) {
             <p className="day-strip-sum small">
               <strong>{fmtDay(selDay.date)}</strong> {dayTitle(selDay)}
               {roadTotal && roadTotal.s > 0 && (
-                <span className="muted">
-                  ・開車路段約 {Math.round(roadTotal.m / 1000)} 公里、{Math.round((roadTotal.s / 3600) * 10) / 10} 小時（道路計算）
+                <span className="muted" role="img" aria-label={`開車路段約 ${Math.round(roadTotal.m / 1000)} 公里、${Math.round((roadTotal.s / 3600) * 10) / 10} 小時（道路計算）`}>
+                  {" "}<Icon name="car" size={14} /> {Math.round(roadTotal.m / 1000)} km・{Math.round((roadTotal.s / 3600) * 10) / 10} h
                 </span>
               )}{" "}
               <a
                 href="#"
+                aria-label="查看當天行程"
                 onClick={(e) => {
                   e.preventDefault();
                   gotoDay(selIdx);
                 }}
               >
-                查看當天行程 →
+                <Icon name="calendar" size={16} /> →
               </a>
               {editable && selStops && legs && drivePairs.some((dr, k) => dr && !legs[k]) && (
                 <PendingButton className="btn ghost small" pendingLabel="計算中…" onAction={() => computeLegs(selStops)}>
@@ -677,7 +678,12 @@ export function PlacesMap({ active }: { active: boolean }) {
             ))
           )}
           {noCoords.length > 0 && <p className="muted small">沒有座標、地圖上沒畫出來：{noCoords.map((pl) => pl.i.name).join("、")}</p>}
-          <p className="muted small">實心點是已排行程（點一下可跳到當天），空心紅圈是待安排景點；數字圓圈是聚在一起的景點，點一下會放大；朱紅房子是住處（每晚住的地方）。</p>
+          <ul className="map-legend-row small">
+            <li role="img" aria-label="實心點是已排行程（點一下可跳到當天）"><i className="lg-dot" /> 已排</li>
+            <li role="img" aria-label="空心紅圈是待安排景點"><i className="lg-ring" /> 待安排</li>
+            <li role="img" aria-label="數字圓圈是聚在一起的景點，點一下會放大"><i className="lg-num">3</i> 群聚</li>
+            <li role="img" aria-label="朱紅房子是住處（每晚住的地方）"><Icon name="home" size={16} /> 住處</li>
+          </ul>
           <details className="map-alt">
             <summary>依分組檢視（可整組排入）</summary>
             <Pool />

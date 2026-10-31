@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useTrip } from "./TripApp";
 import { Icon } from "./Icon";
-import { PendingButton, useReducedMotion } from "./ui";
+import { PendingButton, TapChips, useReducedMotion } from "./ui";
 import { commonsFor } from "@/client/photos";
 import { cardSrc } from "./PlaceGallery";
 import { DayMap } from "./MapViews";
@@ -130,7 +130,6 @@ export function PlanQuiz({ active }: { active: boolean }) {
     <div className="quiz">
       <div className="card">
         <h2>旅遊規劃小測驗</h2>
-        <p className="muted small">{who === "public" ? "回答幾個問題，排出從荷巴特市中心出發、回到市中心的一日行程。" : "回答幾個問題，排出從住處出發、回到住處的一日行程。"}</p>
         <ol className="quiz-steps" aria-label="步驟">
           {STEPS.map((s, k) => (
             <li key={s} className={k === step ? "on" : k < step ? "done" : ""} aria-current={k === step ? "step" : undefined}>
@@ -146,9 +145,7 @@ export function PlanQuiz({ active }: { active: boolean }) {
           <h3 id="q0">起點</h3>
           <p className="quiz-home">
             <span className="home-pin base" aria-hidden="true" dangerouslySetInnerHTML={{ __html: HOUSE }} />
-            <span>
-              從<strong>{homeName}</strong>出發，最後回到這裡。
-            </span>
+            <strong>{homeName}</strong>
           </p>
           <div className="quiz-nav">
             <button type="button" className="btn" onClick={() => go(1)}>
@@ -179,7 +176,7 @@ export function PlanQuiz({ active }: { active: boolean }) {
               return {
                 image: photoOf(list.find((p) => p.item.photo)?.item ?? list[0].item),
                 title: r.name,
-                subtitle: [`${list.length} 個景點`, r.car ? "需要開車" : "公車可到", r.note, long ? "建議過夜" : "", r.far].filter(Boolean).join("・"),
+                subtitle: [`${list.length} 個景點`, r.car ? "需要開車" : "公車可到", long ? "建議過夜" : ""].filter(Boolean).join("・"),
                 accent: accentFor(r.key),
                 inset: <MiniMap places={list.map((p) => at(p.item))} home={homeAt} zoom={zoomOf(r.key)} />,
                 insetLabel: `位置：${r.name}`,
@@ -193,7 +190,7 @@ export function PlanQuiz({ active }: { active: boolean }) {
       {step === 2 && reg && (
         <section className="card section quiz-step" aria-labelledby="q2">
           <h3 id="q2">{`在${reg.name}想去哪些景點？（可多選）`}</h3>
-          {reg.far && <p className="small quiz-warn">{reg.far}</p>}
+          {(reg.far || reg.note) && <TapChips items={[{ key: "reg", icon: <Icon name={reg.far ? "warn" : "info"} size={18} />, label: reg.far ?? reg.note ?? "", tone: reg.far ? "warn" : undefined, panel: <p className="small">{[reg.note, reg.far].filter(Boolean).join("・")}</p> }]} />}
           <ChromaGrid
             theme="light"
             grayscale={0}
@@ -234,7 +231,8 @@ export function PlanQuiz({ active }: { active: boolean }) {
                 ["transit", "大眾運輸"],
               ] as const
             ).map(([k, t]) => (
-              <button key={k} type="button" role="radio" aria-checked={travel === k} className={`chip${travel === k ? " on" : ""}`} onClick={() => setTravel(k)}>
+              <button key={k} type="button" role="radio" aria-checked={travel === k} className={`quiz-pick${travel === k ? " on" : ""}`} onClick={() => setTravel(k)}>
+                <Icon name={k === "drive" ? "car" : "bus"} size={40} />
                 {t}
               </button>
             ))}

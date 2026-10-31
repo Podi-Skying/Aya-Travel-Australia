@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect } from "react";
 import { t, useRootLang } from "@/i18n";
+import { Icon } from "./Icon";
 
 /* Not found and error pages: what happened, and a way back to the trip. */
 export function EmptyPage({ title, body, onRetry }: { title: string; body: string; onRetry?: () => void }) {
@@ -11,6 +12,7 @@ export function EmptyPage({ title, body, onRetry }: { title: string; body: strin
   useEffect(() => document.documentElement.classList.remove("i18n-wait"), []);
   return (
     <main className="empty-page">
+      <Icon name="compass" size={48} />
       <h1>{t(title)}</h1>
       <p>{t(body)}</p>
       <nav aria-label={t("回到行程")}>

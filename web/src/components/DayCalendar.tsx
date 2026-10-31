@@ -8,6 +8,7 @@ import { WxIcon, wxFor } from "./Weather";
 import { isWet } from "@/domain/weather";
 import { useHobartToday, useReducedMotion } from "./ui";
 import { Icon } from "./Icon";
+import { TapChips } from "./ui";
 import { dayStatus, monthGrid, moveInGrid, weekIndexOf, type DayStatus } from "@/domain/calendar";
 import { effectiveDay } from "@/domain/effective-day";
 import { checks } from "@/domain/rules";
@@ -214,7 +215,14 @@ export function DayCalendar() {
     <div className={`day-cal${expanded ? " is-open" : ""}`}>
       <div className="cal-head">
         <span className="cal-month">{monthLabel}</span>
-        <span className="cal-legend" aria-hidden="true">
+        <TapChips
+          className="cal-legend-chip"
+          items={[{
+            key: "legend",
+            icon: <Icon name="info" size={18} />,
+            label: "圖例",
+            panel: (
+              <span className="cal-legend">
           <span className="lg st-available">
             <i />
             可安排
@@ -236,6 +244,9 @@ export function DayCalendar() {
             提醒
           </span>
         </span>
+            ),
+          }]}
+        />
       </div>
       <div className="cal-week-head" aria-hidden="true">
         {WEEK_HEAD.map((w) => (
@@ -312,7 +323,7 @@ export function DayCalendar() {
       {narrow && (
         <button type="button" className="cal-toggle" aria-expanded={expanded} onClick={() => animateP(expanded ? 0 : 1)}>
           <span className="grip" aria-hidden="true" />
-          {expanded ? "收合成一週" : "展開整個月"}
+          <span className="sr-only">{expanded ? "收合成一週" : "展開整個月"}</span>
         </button>
       )}
       <p className="cal-caption" aria-live="polite">

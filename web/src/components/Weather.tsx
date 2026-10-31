@@ -2,10 +2,12 @@
 
 import { useWeather, type TripWeather } from "@/client/weather";
 import { backupsFor, isWet, isWindy, outdoorPlans, weatherNote, wxLabel, type DayWx } from "@/domain/weather";
-import { PendingButton } from "./ui";
+import { PendingButton, type TapChip } from "./ui";
+import { Icon } from "./Icon";
+import type { ReactNode } from "react";
 import { isLogistics } from "@/domain/day-title";
 import type { Item, TripDoc } from "@/domain/schema";
-import { fmtDay } from "@/domain/format";
+import { fmtDay, fmtMD } from "@/domain/format";
 import { getLang } from "@/i18n/current";
 
 /*
@@ -54,6 +56,20 @@ export function WxChip({ wx, place, unavailable }: { wx: DayWx | null; place?: s
   );
 }
 
+/** The day's forecast as chips; `full` (the sentence) opens from the first one. */
+export function wxChips(day: { place: string; wx: DayWx | null; unavailable?: boolean } | null, full: ReactNode): TapChip[] {
+  const wx = day?.wx;
+  if (!wx) return [{ key: "wx", icon: <Icon name="info" size={18} />, text: "–", label: day?.unavailable ? "暫無預報" : "尚無預報", panel: full }];
+  const l = wxLabel(wx.code);
+  return [
+    { key: "wx", icon: <WxIcon code={wx.code} size={20} />, text: `${deg(wx.tMin)}–${deg(wx.tMax)}`, label: `${day!.place}：${l.t}，${deg(wx.tMin)}–${deg(wx.tMax)}`, tone: isWet(wx) ? "wet" : undefined, panel: full },
+    ...(wx.pop != null ? [{ key: "pop", icon: <Icon name="droplet" size={18} />, text: `${wx.pop}%`, label: `降雨機率 ${wx.pop}%`, tone: isWet(wx) ? ("wet" as const) : undefined }] : []),
+    ...(isWindy(wx) ? [{ key: "wind", icon: <Icon name="wind" size={18} />, text: `${wx.wind ?? "–"}`, label: `最大風速 ${wx.wind ?? "–"} km/h`, tone: "warn" as const }] : []),
+    ...(wx.uv != null && wx.uv >= 6 ? [{ key: "uv", icon: <Icon name="uv" size={18} />, text: `${Math.round(wx.uv)}`, label: `紫外線 ${Math.round(wx.uv)}` }] : []),
+    ...(wx.sunset ? [{ key: "sunset", icon: <Icon name="sunset" size={18} />, text: wx.sunset, label: `日落 ${wx.sunset}` }] : []),
+  ];
+}
+
 /** Day detail: a short forecast line plus rain or wind warnings. */
 export function WxLine({ day }: { day: { date: string; place: string; wx: DayWx | null; unavailable?: boolean } | null }) {
   if (!day) return null;
@@ -74,33 +90,42 @@ export function WxLine({ day }: { day: { date: string; place: string; wx: DayWx 
   );
 }
 
-/** 資訊與警示: the next days at a glance. */
-export function WeatherStrip() {
+/** 資訊與警示: the whole trip as a strip of weather tiles; a tile opens that day. */
+export function WeatherStrip({ onPick }: { onPick?: (date: string) => void }) {
   const w = useWeather();
-  if (!w) return null;
-  const today = new Date().toISOString().slice(0, 10);
-  const days = w.days.filter((d) => d.date >= today).slice(0, 10);
-  if (!days.length) return null;
+  if (!w?.days.length) return null;
   return (
     <section className="card section wx-strip" aria-labelledby="wx-h">
-      <h3 id="wx-h">天氣預報</h3>
+      <h3 id="wx-h">
+        <Icon name="uv" size={18} /> 天氣預報
+      </h3>
       <ol>
-        {days.map((d) => (
-          <li key={d.date} className={isWet(d.wx ?? undefined) ? "wet" : ""}>
-            <span className="d">{fmtDay(d.date)}</span>
-            <span className="p small muted">{d.place}</span>
-            <WxChip wx={d.wx} place={d.place} unavailable={d.unavailable} />
+        {w.days.map((d) => (
+          <li key={d.date}>
+            <button
+              type="button"
+              className={`wx-tile${isWet(d.wx ?? undefined) ? " wet" : ""}`}
+              onClick={() => onPick?.(d.date)}
+              aria-label={`${fmtDay(d.date)} ${d.place}：${d.wx ? `${wxLabel(d.wx.code).t}，高溫 ${deg(d.wx.tMax)}、低溫 ${deg(d.wx.tMin)}，降雨機率 ${d.wx.pop ?? "–"}%` : d.unavailable ? "暫無預報" : "尚無預報"}`}
+            >
+              <span className="d">{fmtMD(d.date)}</span>
+              {d.wx ? <WxIcon code={d.wx.code} size={24} /> : <span className="none">–</span>}
+              <span className="t">{d.wx ? deg(d.wx.tMax) : ""}</span>
+              <span className="t lo">{d.wx ? deg(d.wx.tMin) : ""}</span>
+            </button>
           </li>
         ))}
       </ol>
-      <p className="muted small">
-        來源：
-        <a href={w.url} target="_blank" rel="noopener noreferrer">
-          {w.source}
-        </a>
-        {w.fetchedAt ? `，更新於 ${new Date(w.fetchedAt).toLocaleString(({ zh: "zh-TW", en: "en-AU", ja: "ja-JP" } as const)[getLang()], { timeZone: "Australia/Hobart", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}（荷巴特時間）` : ""}
-        {w.stale ? "；暫時連不上，顯示上次的資料" : ""}。預報只到出發前 16 天內的日子。
-      </p>
+      <details className="day-summary">
+        <summary>來源</summary>
+        <p className="muted small">
+          <a href={w.url} target="_blank" rel="noopener noreferrer">
+            {w.source}
+          </a>
+          {w.fetchedAt ? `，更新於 ${new Date(w.fetchedAt).toLocaleString(({ zh: "zh-TW", en: "en-AU", ja: "ja-JP" } as const)[getLang()], { timeZone: "Australia/Hobart", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}（荷巴特時間）` : ""}
+          {w.stale ? "；暫時連不上，顯示上次的資料" : ""}。預報只到出發前 16 天內的日子。
+        </p>
+      </details>
     </section>
   );
 }

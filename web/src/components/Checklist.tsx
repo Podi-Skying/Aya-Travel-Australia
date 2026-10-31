@@ -37,7 +37,7 @@ export function Checklist() {
   if (poolCount) todo.push(`待安排景點還有 ${poolCount} 個活動`);
 
   return (
-    <div className="grid cols-2 section checklist">
+    <div className="grid cols-2 checklist">
       <div className="card">
         <h2 className="h3-like">待確認（{pending.length}）</h2>
         {pending.length ? (
