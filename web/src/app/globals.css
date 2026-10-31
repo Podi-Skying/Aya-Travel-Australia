@@ -1106,3 +1106,16 @@ a, button, summary, [role="button"], [role="tab"] { touch-action: manipulation; 
 .empty-page nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 8px; }
 .page-loading { min-height: 70dvh; display: grid; place-items: center; color: var(--ink-muted); }
 .place-group h2 { display: flex; align-items: center; gap: 6px; font-size: .8rem; font-weight: 600; color: var(--ink-2); margin: 14px 0 4px; letter-spacing: .02em; }
+
+/* 畫廊 on phones (Kai 2026-10-31): new photos fade in; a picked photo opens in a sheet above the tab bar. */
+.drift-plane img { transition: opacity .25s ease-out; }
+.drift-wait { height: min(72vh, 680px); margin: 0 16px; position: relative; display: grid; place-items: center; }
+.drift-wait .ph-tile { width: 100%; height: 100%; border-radius: 16px; }
+.drift-info-img { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; border-radius: 10px; margin-bottom: 6px; background: var(--paper-raised); }
+.drift-info { animation: driftInfoIn .24s cubic-bezier(.22, 1, .36, 1); }
+@keyframes driftInfoIn { from { opacity: 0; transform: translateY(12px); } }
+@media (max-width: 720px) {
+  .drift-wait { margin: 0 8px; height: 68vh; }
+  .drift-info { position: fixed; left: 12px; right: 12px; bottom: calc(var(--tabbar-h, 0px) + 12px); margin: 0; z-index: 800; max-height: 70dvh; overflow-y: auto; box-shadow: 0 10px 32px -8px rgba(41, 40, 35, .35); }
+}
+@media (prefers-reduced-motion: reduce) { .drift-info { animation: viewerFade 150ms linear; } .drift-plane img { transition: none; } }

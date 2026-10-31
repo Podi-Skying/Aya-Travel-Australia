@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sameImage, tripShots } from "@/components/DriftGallery";
+import { releaseVelocity, sameImage, tripShots } from "@/components/DriftGallery";
 import type { Item, Photo } from "@/domain/schema";
 
 /* 畫廊 photo list (2026-10-26) */
@@ -11,9 +11,9 @@ describe("drift gallery", () => {
   it("lists each photo once, skips logistics and stay notes, and keeps the day for scheduled places", () => {
     const days = [{ date: "2026-11-09", items: [mk("a", "Wineglass Bay", ph("/x.webp"), [ph("/y.webp")]), mk("b", "搭 T8 到飯店", ph("/t.webp")), mk("c", "住宿：Bicheno", ph("/s.webp"))] }];
     const pool = [{ items: [mk("d", "Bruny", ph("/x.webp"))] }];
-    const commons = { a: [ph("https://upload.wikimedia.org/a/b/1920px-F.jpg", "commons")] };
+    const commons = { a: [ph("https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/F.jpg/1920px-F.jpg", "commons")] };
     const shots = tripShots(days, pool, commons);
-    expect(shots.map((s) => s.src)).toEqual(["/x.webp", "/y.webp", "https://upload.wikimedia.org/a/b/500px-F.jpg"]);
+    expect(shots.map((s) => s.src)).toEqual(["/x.webp", "/y.webp", "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/F.jpg/500px-F.jpg"]);
     expect(shots[0]).toMatchObject({ name: "Wineglass Bay", date: "2026-11-09", dayIndex: 0 });
   });
 
@@ -28,3 +28,12 @@ describe("drift gallery", () => {
   });
 });
 
+describe("gallery release speed", () => {
+  it("uses the last 100 ms, stops when the finger had paused, and caps a flick", () => {
+    const samples = [{ t: 0, pos: 0 }, { t: 50, pos: 25 }, { t: 100, pos: 50 }];
+    expect(releaseVelocity(samples, 110)).toBe(500);
+    expect(releaseVelocity(samples, 300)).toBe(0);
+    expect(releaseVelocity([{ t: 0, pos: 0 }, { t: 8, pos: 400 }], 10)).toBe(3000);
+    expect(releaseVelocity([], 0)).toBe(0);
+  });
+});
