@@ -1161,7 +1161,7 @@ a, button, summary, [role="button"], [role="tab"] { touch-action: manipulation; 
 .day-cover-tile { position: absolute; inset: 0; display: grid; place-items: center; padding-bottom: 40px; color: var(--ink-muted); }
 .day-cover-text { position: absolute; left: 16px; right: 16px; bottom: 12px; color: #faf7f0; text-shadow: 0 1px 6px rgba(24, 23, 20, .55); pointer-events: none; }
 .day-cover-text .day-date { color: inherit; font-size: .78rem; font-variant-numeric: tabular-nums; opacity: .92; }
-.day-cover-text h2 { margin: 2px 0 0; color: inherit; font-size: 1.28rem; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.day-cover-text h2 { margin: 2px 0 0; color: inherit; font-size: 1.2rem; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .day-cover.no-photo .day-cover-text { color: var(--ink); text-shadow: none; }
 .day-cover-people { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); pointer-events: none; }
 .day-arrow { position: absolute; top: 10px; width: 44px; height: 44px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 50%; background: rgba(250, 247, 240, .82); color: var(--ink); cursor: pointer; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); transition: transform 100ms var(--ease); }
@@ -1293,9 +1293,9 @@ a, button, summary, [role="button"], [role="tab"] { touch-action: manipulation; 
   .hero { padding-top: calc(var(--chrome-h) + 4px); padding-bottom: 0; }
   .days-layout { gap: 6px; }
   .day-cal { margin-bottom: 0; }
-  .day-chip-line .tap-row { flex-wrap: nowrap; overflow-x: auto; margin: 0 -16px; padding: 0 16px; scrollbar-width: none; }
+  .day-chip-line .tap-row { flex-wrap: nowrap; overflow-x: auto; margin: 0 -16px; padding: 0 44px 0 16px; scrollbar-width: none; scroll-snap-type: x proximity; scroll-padding-left: 16px; -webkit-mask-image: linear-gradient(to left, transparent, #000 36px); mask-image: linear-gradient(to left, transparent, #000 36px); }
   .day-chip-line .tap-row::-webkit-scrollbar { display: none; }
-  .day-chip-line .tap-chip { flex: 0 0 auto; }
+  .day-chip-line .tap-chip { flex: 0 0 auto; scroll-snap-align: start; }
   .day-chip-line .owner-menu { order: -1; }
 }
 @media (prefers-reduced-motion: reduce) {

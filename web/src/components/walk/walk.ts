@@ -159,6 +159,9 @@ function clouds(w: number, h: number, seed: number) {
   return out;
 }
 
+/** A note with no time of its own (「Aya 已在雪梨」): it shows no clock. */
+const isMarker = (it: { time: string; dur: number }) => !it.dur && it.time === "00:00";
+
 type Spot = { el: HTMLElement; meta: HTMLElement; wash: HTMLElement; strokes: (SVGGeometryElement & { _l: number })[] };
 type DayState = {
   d: WalkDay;
@@ -323,7 +326,7 @@ export function startWalk(root: HTMLElement, days: WalkDay[], opts: { planHref: 
         el.setAttribute("aria-label", "走到 " + it.time + " " + it.name);
         el.innerHTML =
           '<svg class="art sketch" viewBox="0 0 150 110" aria-hidden="true">' + ART[kind] + "</svg>" +
-          '<div class="meta"><div class="time">' + esc(it.time) + "　·　" + mins(it.dur) + "</div><h3>" + esc(it.name) + '</h3><div class="en">' + esc(it.en || "") + "</div>" +
+          '<div class="meta"><div class="time">' + (isMarker(it) ? "" : esc(it.time) + (it.dur ? "　·　" + mins(it.dur) : "")) + "</div><h3>" + esc(it.name) + '</h3><div class="en">' + esc(it.en || "") + "</div>" +
           (it.pri === "must" ? '<span class="must">必去</span>' : "") + "</div>";
         el.style.left = x + "px";
         if (up) {
@@ -476,9 +479,14 @@ export function startWalk(root: HTMLElement, days: WalkDay[], opts: { planHref: 
           s.wash.style.transform = "translate(-50%, -50%) scale(" + (0.6 + 0.4 * wash).toFixed(3) + ")";
         }
         const seen = reduce ? 1 : Math.round(Math.min(1, Math.max(0, (dist + o.vw * 0.35) / (o.vw * 0.1))) * 100) / 100;
-        if (seen !== o.last.seen[k]) {
-          o.last.seen[k] = seen;
-          s.meta.style.opacity = String(0.25 + 0.75 * seen);
+        // Phones: a caption shows only once all of it fits on screen, so none is cut at the edge.
+        const half = s.meta.offsetWidth / 2;
+        const sx = s.el.offsetLeft - cam;
+        const fit = o.vw >= 680 ? 1 : Math.round(Math.min(1, Math.max(0, Math.min(o.vw - sx - half, sx - half) / 24)) * 100) / 100;
+        const show = seen * 1000 + fit;
+        if (show !== o.last.seen[k]) {
+          o.last.seen[k] = show;
+          s.meta.style.opacity = String((0.25 + 0.75 * seen) * fit);
         }
         const dot = dist > -6;
         if (dot !== o.last.dot[k]) o.dots[k].setAttribute("fill", (o.last.dot[k] = dot) ? "#d2483a" : "#faf7f0");

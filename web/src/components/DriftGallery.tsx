@@ -132,7 +132,7 @@ export function DriftGallery({ active }: { active: boolean }) {
   return (
     <div className="drift" onPointerDown={hint ? doneHint : undefined} onWheel={hint ? doneHint : undefined} onKeyDown={hint ? doneHint : undefined}>
       <h2 className="sr-only">畫廊</h2>
-      {shots.length > 0 && (
+      {!loading && shots.length > 0 && (
         <span className="drift-count" role="img" aria-label={`共 ${shots.length} 張`}>
           <Icon name="image" size={14} /> {shots.length}
         </span>

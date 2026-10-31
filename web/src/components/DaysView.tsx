@@ -1,6 +1,6 @@
 "use client";
 
-import { dayTitle, dayTitleZh } from "@/domain/day-title";
+import { dayCoverTitle, dayTitle, dayTitleZh } from "@/domain/day-title";
 import { t } from "@/i18n/current";
 import { useEffect, useRef, useState } from "react";
 import { useTrip } from "./TripApp";
@@ -89,7 +89,7 @@ function RouteStrip({ items, legBefore }: { items: Item[]; legBefore: (id: strin
                 {minutes > 0 && <small>{mins(minutes)}</small>}
               </span>
             )}
-            <button type="button" className={`rs-stop${pic ? " has-photo" : ""}`} aria-label={`${i.time} ${displayName(i)}`} onClick={() => toStop(i.id)}>
+            <button type="button" className={`rs-stop${pic ? " has-photo" : ""}`} aria-label={i.dur === 0 && i.time === "00:00" ? displayName(i) : `${i.time} ${displayName(i)}`} onClick={() => toStop(i.id)}>
               <span className="rs-pic">
                 {pic ? (
                   // eslint-disable-next-line @next/next/no-img-element -- hotlinked photo, see Photos.tsx
@@ -506,7 +506,7 @@ export function DaysView({ active }: { active: boolean }) {
               <div className="day-date">
                 {t("第 {n} 天", { n: currentDay + 1 })}・{fmtDay(d.date)}・{seg?.name}
               </div>
-              <h2>{dayTitle(raw)}</h2>
+              <h2>{dayCoverTitle(raw)}</h2>
             </div>
             <span className="day-cover-people">
               <AvatarStack people={dayPeople} size={30} />
@@ -763,7 +763,7 @@ export function DaysView({ active }: { active: boolean }) {
                         <div className="body">
                           <details className="stop-line">
                             <summary>
-                              <span className="stop-line-time">{i.time}</span>
+                              {!(i.dur === 0 && i.time === "00:00") && <span className="stop-line-time">{i.time}</span>}
                               <Icon name={iconOf(i)} size={18} />
                               <span className="stop-line-name">{name}</span>
                               {stateIcon}

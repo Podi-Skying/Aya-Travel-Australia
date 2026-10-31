@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { displayName, nameIsTentative } from "@/domain/day-title";
+import { dayCoverTitle, displayName, nameIsTentative } from "@/domain/day-title";
 
 describe("displayName", () => {
   it("drops bracketed status notes", () => {
@@ -13,5 +13,12 @@ describe("displayName", () => {
   it("says when the name itself is unsettled", () => {
     expect(nameIsTentative({ name: "熱氣球（考慮中・未預訂）" })).toBe(true);
     expect(nameIsTentative({ name: "The Gardens（火焰灣北端）" })).toBe(false);
+  });
+});
+
+describe("dayCoverTitle", () => {
+  it("keeps full stop names", () => {
+    const stop = (name: string) => ({ name, major: true, mode: "drive", pri: "pref" }) as never;
+    expect(dayCoverTitle({ title: "x", items: [stop("Bay of Fires 火焰灣（Binalong Bay）"), stop("Little Blue Lake 藍湖")] })).toBe("Bay of Fires 火焰灣 → Little Blue Lake 藍湖");
   });
 });

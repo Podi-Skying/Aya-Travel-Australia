@@ -39,7 +39,7 @@ export const shortTr = (s: string) => s.replace(/\s*[（(][^）)]*[）)]/g, "").
  * The day's title. `nameOf` gives a translated name per item (the English and Japanese pages build the same
  * title from translated names, so it reads in full instead of a cut Chinese one).
  */
-export function dayTitleZh(d: Pick<Day, "title" | "items"> & { titlePinned?: boolean }, nameOf?: (i: Item) => string | undefined, joiner = "・"): string {
+export function dayTitleZh(d: Pick<Day, "title" | "items"> & { titlePinned?: boolean }, nameOf?: (i: Item) => string | undefined, joiner = "・", limit?: number): string {
   if (d.titlePinned && d.title.trim()) return d.title.trim(); // shown as the owner wrote it (≤ 60)
   const plans = d.items.filter(isPlan);
   if (!plans.length) return UNPLANNED;
@@ -52,7 +52,7 @@ export function dayTitleZh(d: Pick<Day, "title" | "items"> & { titlePinned?: boo
     const t = nameOf?.(i);
     return t ? shortTr(t) : shortName(i.name);
   };
-  const max = nameOf ? 48 : MAX;
+  const max = limit ?? (nameOf ? 48 : MAX);
   const pick = (major.length ? major : must.length ? must : pool).map(name);
   const uniq = pick.filter((n, k) => pick.indexOf(n) === k);
   const driving = plans.some((i) => i.mode === "drive");
@@ -80,3 +80,11 @@ export function displayName(i: Pick<Item, "name"> & { tr?: Item["tr"] }): string
 
 /** True when the name itself says the stop is not settled yet. */
 export const nameIsTentative = (i: Pick<Item, "name">): boolean => (/[（(]([^（）()]*)[）)]/.exec(i.name)?.[1] ?? "").match(TENTATIVE) != null;
+
+/** The title on a day's cover: full stop names, never cut; the cover has room for several lines. */
+export function dayCoverTitle(d: Pick<Day, "title" | "items"> & { titlePinned?: boolean; tr?: Day["tr"] }): string {
+  const l = getLang();
+  if (d.titlePinned && d.title.trim()) return l === "zh" ? d.title.trim() : tx(d, "title", d.title.trim());
+  if (!d.items.some(isPlan)) return t(UNPLANNED);
+  return dayTitleZh(d, (i) => (l === "zh" ? i.name : tx(i, "name", undefined) || undefined), l === "en" ? " · " : "・", 200);
+}
