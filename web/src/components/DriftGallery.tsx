@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { useTrip } from "./TripApp";
 import { LoadingTile, cardSrc } from "./PlaceGallery";
+import { project, rubber, spring } from "./motion";
 import { useReducedMotion } from "./ui";
 import { commonsFor } from "@/client/photos";
 import { fmtDay } from "@/domain/format";
@@ -26,6 +27,21 @@ const FRICTION = 2.2; // velocity decay per second (exponential)
 const MAX_SPEED = 3000; // px of depth per second: a flick travels at most about 5 planes
 const DRAG_DEPTH = 1.6; // px of depth per px of finger
 const DRAG_START = 10; // px before a press counts as a drag (a tap stays a tap)
+
+const IDLE_SPEED = 40;
+const IDLE_AFTER_MS = 1500; // the drift comes back this long after the last touch, in the same direction
+
+/** The axis of a drag, chosen once after DRAG_START px; null until then. It stays locked, so a diagonal swipe never jitters. */
+export function lockAxis(dx: number, dy: number): "x" | "y" | null {
+  if (Math.max(Math.abs(dx), Math.abs(dy)) < DRAG_START) return null;
+  return Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+}
+
+/** What a plane shows: its photo stays while it stays in the same lap, whatever happens to the list. */
+export function planeShot<T>(prev: { n: number; shot: T } | undefined, n: number, list: T[]): { n: number; shot: T } {
+  if (prev && prev.n === n) return prev;
+  return { n, shot: list[((n % list.length) + list.length) % list.length] };
+}
 
 type Sample = { t: number; pos: number };
 /** Release speed from the last ~100 ms of the drag, not one noisy sample; 0 if the finger had stopped before letting go. */
@@ -86,7 +102,7 @@ export function DriftGallery({ active }: { active: boolean }) {
   const reduce = useReducedMotion();
   const [commons, setCommons] = useState<Record<string, Photo[]>>({});
   const [loading, setLoading] = useState(true);
-  const [picked, setPicked] = useState<Shot | null>(null);
+  const [picked, setPicked] = useState<{ shot: Shot; from: DOMRect | null } | null>(null);
 
   // Cached Commons photos for places, a few requests at a time once the page is open (never Google: billed).
   const places = useMemo(
@@ -130,7 +146,7 @@ export function DriftGallery({ active }: { active: boolean }) {
         <ul className="drift-grid">
           {shots.map((s) => (
             <li key={s.key}>
-              <button type="button" onClick={() => setPicked(s)} aria-label={`${s.name}${s.date ? `，${fmtDay(s.date)}` : ""}`}>
+              <button type="button" onClick={() => setPicked({ shot: s, from: null })} aria-label={`${s.name}${s.date ? `，${fmtDay(s.date)}` : ""}`}>
                 {/* eslint-disable-next-line @next/next/no-img-element -- photos from several hosts */}
                 <img src={s.src} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" />
               </button>
@@ -138,32 +154,163 @@ export function DriftGallery({ active }: { active: boolean }) {
           ))}
         </ul>
       ) : (
-        <Field shots={shots} active={active} paused={!!picked} onPick={setPicked} />
+        <Field shots={shots} active={active} paused={!!picked} onPick={(shot, from) => setPicked({ shot, from })} />
       )}
       {picked && (
-        <div className="drift-info card" role="status" key={picked.key}>
-          {/* eslint-disable-next-line @next/next/no-img-element -- photos from several hosts */}
-          <img className="drift-info-img" src={picked.src} alt="" referrerPolicy="no-referrer" />
-          <strong>{picked.name}</strong>
-          <span className="small muted">{picked.date ? fmtDay(picked.date) : "還沒排進行程"}</span>
-          <span className="small muted">{picked.credit}</span>
-          <span className="drift-info-actions">
-            {picked.dayIndex != null && (
-              <button type="button" className="btn small" onClick={() => gotoDay(picked.dayIndex!)}>
-                看那天的行程
-              </button>
-            )}
-            <button type="button" className="btn ghost small" onClick={() => setPicked(null)}>
-              關閉
-            </button>
-          </span>
-        </div>
+        <DetailSheet
+          key={picked.shot.key}
+          shot={picked.shot}
+          from={picked.from}
+          reduce={reduce}
+          onClose={() => setPicked(null)}
+          onGoto={picked.shot.dayIndex != null ? () => gotoDay(picked.shot.dayIndex!) : undefined}
+        />
       )}
     </div>
   );
 }
 
-function Field({ shots, active, paused, onPick }: { shots: Shot[]; active: boolean; paused: boolean; onPick: (s: Shot) => void }) {
+/**
+ * A picked photo: it grows from where it was in the field into a sheet (and returns the same way). The sheet
+ * follows a finger down and closes on a throw, carrying the finger's speed. Reduced motion cross-fades instead.
+ */
+function DetailSheet({ shot, from, reduce, onClose, onGoto }: { shot: Shot; from: DOMRect | null; reduce: boolean; onClose: () => void; onGoto?: () => void }) {
+  const sheet = useRef<HTMLDivElement>(null);
+  const bg = useRef<HTMLDivElement>(null);
+  const body = useRef<HTMLDivElement>(null);
+  const scrim = useRef<HTMLDivElement>(null);
+  const photo = useRef<HTMLImageElement>(null);
+  const closeBtn = useRef<HTMLButtonElement>(null);
+  // p: 0 at the photo in the field, 1 open. y: the finger's offset.
+  const state = useRef({ p: 0, y: 0, fromX: 0, fromY: 0, scale: 1, grow: false });
+  const stop = useRef<(() => void)[]>([]);
+  const closing = useRef(false);
+  const drag = useRef<{ id: number; y0: number; moved: boolean; samples: Sample[] } | null>(null);
+
+  const paint = () => {
+    const st = state.current;
+    const k = 1 - st.p;
+    if (sheet.current) {
+      sheet.current.style.transform = st.grow ? `translate3d(${st.fromX * k}px, ${st.fromY * k + st.y}px, 0) scale(${st.scale + (1 - st.scale) * st.p})` : `translate3d(0, ${st.y}px, 0)`;
+      sheet.current.style.opacity = st.grow ? "1" : String(st.p);
+    }
+    if (bg.current) bg.current.style.opacity = String(st.p);
+    if (body.current) body.current.style.opacity = String(st.p);
+    if (scrim.current) scrim.current.style.opacity = String(st.p);
+  };
+  const run = (to: number, v0: number, done?: () => void) => {
+    stop.current.forEach((f) => f());
+    const st = state.current;
+    if (reduce) {
+      st.p = to;
+      st.y = 0;
+      paint();
+      done?.();
+      return;
+    }
+    stop.current = [
+      spring(st.p, 0, to, 0.3, (x) => {
+        st.p = x;
+        paint();
+      }, done),
+      spring(st.y, v0, 0, 0.3, (x) => {
+        st.y = x;
+        paint();
+      }),
+    ];
+  };
+  const close = (v0 = 0) => {
+    if (closing.current) return;
+    closing.current = true;
+    run(0, v0, onClose);
+  };
+
+  useLayoutEffect(() => {
+    const st = state.current;
+    const r = photo.current?.getBoundingClientRect();
+    const box = sheet.current?.getBoundingClientRect();
+    if (!reduce && from && r && box && r.width) {
+      st.grow = true;
+      st.scale = from.width / r.width;
+      // The sheet scales from the photo's top left corner, so that corner is what travels.
+      if (sheet.current) sheet.current.style.transformOrigin = `${r.left - box.left}px ${r.top - box.top}px`;
+      st.fromX = from.left - r.left;
+      st.fromY = from.top - r.top;
+    }
+    paint();
+    run(1, 0);
+    closeBtn.current?.focus({ preventScroll: true });
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === "Escape") close();
+    };
+    window.addEventListener("keydown", onKey);
+    const stops = stop;
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      stops.current.forEach((f) => f());
+      // Back to the field the sheet came from.
+      document.querySelector<HTMLElement>(".drift-field")?.focus({ preventScroll: true });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const onDown = (e: ReactPointerEvent) => {
+    if (drag.current || closing.current || (e.target as Element).closest("button")) return;
+    stop.current.forEach((f) => f());
+    // A grab mid-opening finishes opening under the finger.
+    state.current.p = 1;
+    drag.current = { id: e.pointerId, y0: e.clientY - state.current.y, moved: false, samples: [{ t: e.timeStamp, pos: state.current.y }] };
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    paint();
+  };
+  const onMove = (e: ReactPointerEvent) => {
+    const d = drag.current;
+    if (!d || e.pointerId !== d.id) return;
+    const raw = e.clientY - d.y0;
+    if (!d.moved && Math.abs(raw) < DRAG_START) return;
+    d.moved = true;
+    state.current.y = raw >= 0 ? raw : rubber(raw, 300);
+    d.samples.push({ t: e.timeStamp, pos: state.current.y });
+    if (d.samples.length > 12) d.samples.shift();
+    paint();
+  };
+  const onUp = (e: ReactPointerEvent) => {
+    const d = drag.current;
+    if (!d || e.pointerId !== d.id) return;
+    drag.current = null;
+    const v = releaseVelocity(d.samples, e.timeStamp);
+    if (e.type !== "pointercancel" && state.current.y + project(v) > 140) close(v);
+    else run(1, v);
+  };
+
+  return (
+    <>
+      <div ref={scrim} className="drift-scrim" onClick={() => close()} aria-hidden="true" />
+      <div ref={sheet} className="drift-sheet" role="dialog" aria-modal="true" aria-label={shot.name} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}>
+        <div ref={bg} className="drift-sheet-bg" />
+        {/* eslint-disable-next-line @next/next/no-img-element -- photos from several hosts */}
+        <img ref={photo} className="drift-info-img" src={shot.src} alt="" referrerPolicy="no-referrer" draggable={false} />
+        <div ref={body} className="drift-sheet-body">
+          <strong>{shot.name}</strong>
+          <span className="small muted">{shot.date ? fmtDay(shot.date) : "還沒排進行程"}</span>
+          <span className="small muted">{shot.credit}</span>
+          <span className="drift-info-actions">
+            {onGoto && (
+              <button type="button" className="btn small" onClick={onGoto}>
+                看那天的行程
+              </button>
+            )}
+            <button ref={closeBtn} type="button" className="btn ghost small" onClick={() => close()}>
+              關閉
+            </button>
+          </span>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function Field({ shots, active, paused, onPick }: { shots: Shot[]; active: boolean; paused: boolean; onPick: (s: Shot, from: DOMRect) => void }) {
   const boxRef = useRef<HTMLDivElement>(null);
   const planes = useRef<(HTMLButtonElement | null)[]>([]);
   const cam = useRef(0);
@@ -187,6 +334,18 @@ function Field({ shots, active, paused, onPick }: { shots: Shot[]; active: boole
     if (!box || !active) return;
     let raf = 0;
     let last = performance.now();
+    let lastTouch = -Infinity;
+    let dir = 1;
+    let press: { id: number; x0: number; y0: number; axis: "x" | "y" | null; x: number; y: number; samples: Sample[] } | null = null;
+    const wanted = new Set<string>();
+    /** Fetch and decode ahead, so a photo is ready when its plane comes into view. */
+    const preload = (src: string) => {
+      if (wanted.has(src)) return;
+      wanted.add(src);
+      const im = new Image();
+      im.referrerPolicy = "no-referrer";
+      im.src = src;
+    };
     let w = box.clientWidth;
     let h = box.clientHeight;
     const sizes = new ResizeObserver(() => {
@@ -198,12 +357,15 @@ function Field({ shots, active, paused, onPick }: { shots: Shot[]; active: boole
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
       // While a finger holds the field it alone moves the camera.
-      if (!dragging) {
+      if (!press?.axis) {
         cam.current += vel.current * dt;
-        vel.current *= Math.exp(-FRICTION * dt);
-        // A slow idle drift keeps the field alive; it rests while a photo's details are open.
-        const idle = pausedRef.current ? 0 : 40;
-        if (Math.abs(vel.current) < 40) vel.current += (idle - vel.current) * Math.min(1, dt * 0.8);
+        if (Math.abs(vel.current) > IDLE_SPEED) vel.current *= Math.exp(-FRICTION * dt);
+        else {
+          // Below drift speed: settle, then the drift eases back in the direction of the last motion, never reversing.
+          const idle = !press && !pausedRef.current && now - lastTouch > IDLE_AFTER_MS ? IDLE_SPEED * dir : 0;
+          vel.current += (idle - vel.current) * Math.min(1, dt);
+        }
+        if (Math.abs(vel.current) > 1) dir = Math.sign(vel.current);
       }
       const list = shotsRef.current;
       const PLANES = planesRef.current;
@@ -216,19 +378,28 @@ function Field({ shots, active, paused, onPick }: { shots: Shot[]; active: boole
         const lap = Math.floor(raw / DEPTH);
         const d = raw - lap * DEPTH; // 0 … DEPTH
         const n = i - lap * PLANES; // stable id for this plane in this lap
-        const idx = ((n % list.length) + list.length) % list.length;
+        const idx = ((n % list.length) + list.length) % list.length; // for reading ahead
         if (shown.current[i]?.n !== n) {
-          const shot = list[idx];
-          shown.current[i] = { n, shot };
+          const next = planeShot(shown.current[i], n, list);
+          shown.current[i] = next;
           const img = el.firstElementChild as HTMLImageElement;
-          // The new photo fades in once it has loaded; until then the plane is empty, never the old photo.
+          // The plane is out of sight here. It stays empty until the new photo is decoded, then eases in; never the old photo.
           img.style.opacity = "0";
-          img.onload = () => {
-            img.style.opacity = "1";
-          };
-          img.src = shot.src;
-          if (img.complete && img.naturalWidth) img.style.opacity = "1";
-          el.setAttribute("aria-label", shot.name);
+          img.dataset.pending = "1";
+          const im = new Image();
+          im.referrerPolicy = "no-referrer";
+          im.src = next.shot.src;
+          void im.decode().then(
+            () => {
+              if (shown.current[i] !== next) return;
+              img.src = next.shot.src;
+              delete img.dataset.pending;
+              img.style.opacity = "1";
+            },
+            () => undefined, // a broken photo leaves its plane empty
+          );
+          el.setAttribute("aria-label", next.shot.name);
+          for (let k = 1; k <= 12; k++) preload(list[(((idx + k * dir) % list.length) + list.length) % list.length].src);
         }
         const x = (rand(n) - 0.5) * w * 1.1;
         const y = (rand(n + 0.5) - 0.5) * h * 0.9;
@@ -251,42 +422,39 @@ function Field({ shots, active, paused, onPick }: { shots: Shot[]; active: boole
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       vel.current = Math.max(-MAX_SPEED, Math.min(MAX_SPEED, vel.current + (e.deltaY + e.deltaX) * 6));
+      lastTouch = performance.now();
     };
-    // Drag moves the camera along the dominant axis, so diagonals never cancel out. One finger only.
-    let press: { id: number; x: number; y: number; samples: Sample[] } | null = null;
-    let dragging = false;
+    // One finger, one axis (locked after DRAG_START), 1:1 from there: swipe up or left goes forward.
     const onDown = (e: PointerEvent) => {
       if (press) return;
       // Pressing stops the drift at once (interruptible).
       vel.current = 0;
+      lastTouch = performance.now();
       delete box.dataset.dragged;
-      dragging = true;
-      press = { id: e.pointerId, x: e.clientX, y: e.clientY, samples: [{ t: e.timeStamp, pos: cam.current }] };
+      press = { id: e.pointerId, x0: e.clientX, y0: e.clientY, axis: null, x: e.clientX, y: e.clientY, samples: [] };
     };
     const onMove = (e: PointerEvent) => {
       if (!press || e.pointerId !== press.id) return;
-      const dx = press.x - e.clientX;
-      const dy = press.y - e.clientY;
-      const delta = Math.abs(dx) > Math.abs(dy) ? dx : dy;
-      if (!box.dataset.dragged) {
-        if (Math.abs(delta) < DRAG_START) return;
+      if (!press.axis) {
+        press.axis = lockAxis(e.clientX - press.x0, e.clientY - press.y0);
+        if (!press.axis) return;
         box.dataset.dragged = "1";
-        press.x = e.clientX;
-        press.y = e.clientY;
-        return;
+        box.setPointerCapture?.(e.pointerId);
+        press.samples.push({ t: e.timeStamp, pos: cam.current });
+      } else {
+        cam.current += (press.axis === "x" ? press.x - e.clientX : press.y - e.clientY) * DRAG_DEPTH;
+        press.samples.push({ t: e.timeStamp, pos: cam.current });
+        if (press.samples.length > 12) press.samples.shift();
       }
-      cam.current += delta * DRAG_DEPTH;
       press.x = e.clientX;
       press.y = e.clientY;
-      press.samples.push({ t: e.timeStamp, pos: cam.current });
-      if (press.samples.length > 12) press.samples.shift();
     };
     const onUp = (e: PointerEvent) => {
       if (!press || e.pointerId !== press.id) return;
-      // The camera carries on at the finger's speed: no seam between dragging and gliding.
-      vel.current = releaseVelocity(press.samples, e.timeStamp);
+      // The camera carries on at the finger's speed: no seam between dragging and gliding. A cancelled touch just stops.
+      vel.current = e.type === "pointercancel" ? 0 : releaseVelocity(press.samples, e.timeStamp);
+      lastTouch = performance.now();
       press = null;
-      dragging = false;
     };
     box.addEventListener("wheel", onWheel, { passive: false });
     box.addEventListener("pointerdown", onDown);
@@ -311,7 +479,7 @@ function Field({ shots, active, paused, onPick }: { shots: Shot[]; active: boole
     const dir = { ArrowUp: 1, ArrowRight: 1, ArrowDown: -1, ArrowLeft: -1 }[e.key];
     if (!dir) return;
     e.preventDefault();
-    vel.current += dir * 900;
+    vel.current = Math.max(-MAX_SPEED, Math.min(MAX_SPEED, vel.current + dir * 900));
   };
 
   return (
@@ -341,9 +509,9 @@ function Field({ shots, active, paused, onPick }: { shots: Shot[]; active: boole
             ref={(el) => {
               planes.current[i] = el;
             }}
-            onClick={() => {
+            onClick={(e) => {
               const shot = shown.current[i]?.shot;
-              if (shot) onPick(shot);
+              if (shot) onPick(shot, e.currentTarget.getBoundingClientRect());
             }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element -- photos from several hosts; src set by the drift loop */}

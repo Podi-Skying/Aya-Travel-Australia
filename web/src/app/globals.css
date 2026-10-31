@@ -898,7 +898,6 @@ details.card.day-summary > summary h3 { margin: 0; }
 .drift-plane img { display: block; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
 .drift-plane img:not([src]) { visibility: hidden; }
 @media (max-width: 720px) { .drift-field { margin: 0 8px; height: 68vh; } .drift-plane { left: -80px; top: -58px; width: 160px; height: 116px; } }
-.drift-info { position: sticky; bottom: 16px; margin: 12px 16px 0; display: grid; gap: 4px; z-index: 5; }
 .drift-info-actions { display: flex; gap: 8px; margin-top: 4px; }
 .drift-info-actions .btn { min-height: 44px; }
 .drift-grid { list-style: none; margin: 0 16px; padding: 0; columns: 3 200px; column-gap: 10px; }
@@ -1108,14 +1107,22 @@ a, button, summary, [role="button"], [role="tab"] { touch-action: manipulation; 
 .place-group h2 { display: flex; align-items: center; gap: 6px; font-size: .8rem; font-weight: 600; color: var(--ink-2); margin: 14px 0 4px; letter-spacing: .02em; }
 
 /* 畫廊 on phones (Kai 2026-10-31): new photos fade in; a picked photo opens in a sheet above the tab bar. */
-.drift-plane img { transition: opacity .25s ease-out; }
+.drift-plane img { opacity: 0; transition: opacity .2s ease-out; }
 .drift-wait { height: min(72vh, 680px); margin: 0 16px; position: relative; display: grid; place-items: center; }
 .drift-wait .ph-tile { width: 100%; height: 100%; border-radius: 16px; }
-.drift-info-img { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; border-radius: 10px; margin-bottom: 6px; background: var(--paper-raised); }
-.drift-info { animation: driftInfoIn .24s cubic-bezier(.22, 1, .36, 1); }
-@keyframes driftInfoIn { from { opacity: 0; transform: translateY(12px); } }
+.drift-scrim { position: fixed; inset: 0; z-index: 800; background: rgba(41, 40, 35, .4); opacity: 0; }
+.drift-sheet { position: fixed; z-index: 810; left: 50%; bottom: calc(var(--tabbar-h, 0px) + 12px); width: min(460px, calc(100vw - 24px)); margin-left: calc(min(460px, calc(100vw - 24px)) / -2); padding: 12px; display: grid; gap: 8px; touch-action: none; will-change: transform; user-select: none; -webkit-user-select: none; cursor: grab; }
+.drift-sheet-bg { position: absolute; inset: 0; z-index: -1; border-radius: 18px; background: var(--paper-raised); box-shadow: 0 16px 40px -10px rgba(41, 40, 35, .4); opacity: 0; }
+.drift-info-img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 10px; background: var(--paper-raised); }
+.drift-sheet-body { display: grid; gap: 4px; opacity: 0; }
 @media (max-width: 720px) {
-  .drift-wait { margin: 0 8px; height: 68vh; }
-  .drift-info { position: fixed; left: 12px; right: 12px; bottom: calc(var(--tabbar-h, 0px) + 12px); margin: 0; z-index: 800; max-height: 70dvh; overflow-y: auto; box-shadow: 0 10px 32px -8px rgba(41, 40, 35, .35); }
+  /* The field fills the screen under the top lines, like the map; the title floats on it. */
+  .drift { position: relative; }
+  .drift > .card { position: absolute; z-index: 2; top: 8px; left: 8px; right: 8px; margin: 0; padding: 8px 12px; pointer-events: none; background: rgba(250, 247, 240, .8); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); border-radius: 12px; }
+  .drift > .card h2 { font-size: .9375rem; margin: 0; }
+  .drift > .card p { margin: 0; font-size: .75rem; }
+  .drift-field, .drift-wait { height: calc(100dvh - var(--chrome-h) - var(--tabbar-h, 0px) - 84px); margin: 0 -16px; border-radius: 0; }
+  .drift-wait .ph-tile { border-radius: 0; }
 }
-@media (prefers-reduced-motion: reduce) { .drift-info { animation: viewerFade 150ms linear; } .drift-plane img { transition: none; } }
+@media (prefers-reduced-transparency: reduce) { .drift > .card { background: var(--bg); -webkit-backdrop-filter: none; backdrop-filter: none; } }
+@media (prefers-reduced-motion: reduce) { .drift-plane img { transition: none; } .drift-sheet { will-change: auto; } }

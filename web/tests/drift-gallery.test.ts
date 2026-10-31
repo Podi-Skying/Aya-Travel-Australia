@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { releaseVelocity, sameImage, tripShots } from "@/components/DriftGallery";
+import { lockAxis, planeShot, releaseVelocity, sameImage, tripShots } from "@/components/DriftGallery";
 import type { Item, Photo } from "@/domain/schema";
 
 /* 畫廊 photo list (2026-10-26) */
@@ -35,5 +35,21 @@ describe("gallery release speed", () => {
     expect(releaseVelocity(samples, 300)).toBe(0);
     expect(releaseVelocity([{ t: 0, pos: 0 }, { t: 8, pos: 400 }], 10)).toBe(3000);
     expect(releaseVelocity([], 0)).toBe(0);
+  });
+});
+
+describe("gallery gestures and photos", () => {
+  it("locks one axis only after 10 px", () => {
+    expect(lockAxis(5, -6)).toBeNull();
+    expect(lockAxis(14, 3)).toBe("x");
+    expect(lockAxis(-9, 12)).toBe("y");
+  });
+
+  it("keeps a plane's photo when the list changes, and picks a new one only when it recycles", () => {
+    const first = planeShot(undefined, 3, ["a", "b", "c", "d"]);
+    expect(first.shot).toBe("d");
+    expect(planeShot(first, 3, ["new", "a", "b", "c", "d"]).shot).toBe("d");
+    expect(planeShot(first, 4, ["a", "b", "c", "d"]).shot).toBe("a");
+    expect(planeShot(undefined, -1, ["a", "b", "c", "d"]).shot).toBe("d");
   });
 });
