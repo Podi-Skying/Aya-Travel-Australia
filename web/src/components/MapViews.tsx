@@ -8,7 +8,6 @@ import type { EffectiveDay } from "@/domain/effective-day";
 import { iconSvg } from "./Icon";
 import { routeCredit, routeStops, useLegs } from "./useLegs";
 import { HOUSE_SVG, type StayPin } from "@/domain/home-pins";
-import { isLogistics } from "@/domain/day-title";
 import { iconOf } from "./stopIcon";
 import { sizedPhoto } from "./PlaceGallery";
 
@@ -149,7 +148,7 @@ export function DayMap({
             for (const x of all) markers.current.delete(x.id);
             return; // the hotel or home pin already marks this spot
           }
-          const pic = i.major && !isLogistics(i) ? (i.photo ?? i.gallery?.[0]) : undefined;
+          const pic = i.photo ?? i.gallery?.[0];
           const body = pic ? `<img src="${esc(sizedPhoto(pic.url, 250, pic.w))}" alt="" referrerpolicy="no-referrer"${pic.pos ? ` style="object-position:${esc(pic.pos)}"` : ""}>` : iconSvg(iconOf(i), 18);
           const m = L.marker([i.lat!, i.lng!], {
             // 44px hit area around the picture.

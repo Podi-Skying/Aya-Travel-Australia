@@ -27,7 +27,7 @@ import { nightStay } from "@/domain/stay";
 import { dayEnds } from "@/domain/home-pins";
 import { PlaceGallery, sizedPhoto } from "./PlaceGallery";
 import { displayName, isLogistics, nameIsTentative } from "@/domain/day-title";
-import { iconOf } from "./stopIcon";
+import { iconOf, isLegOnly } from "./stopIcon";
 
 /**
  * One line per leg (Kai 2026-10-26): the road-computed time and distance when known, else the estimate.
@@ -68,22 +68,37 @@ function Legs({ travel, road, nav }: { travel?: Item["travel"]; road?: Leg | nul
 function RouteStrip({ items, legBefore }: { items: Item[]; legBefore: (id: string) => Leg | null }) {
   const reduce = useReducedMotion();
   const toStop = (id: string) => document.getElementById(`act-${id}`)?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+  let carried = 0;
+  let carriedHow: string | null = null;
+  let shown = false;
   return (
     <ol className="route-strip" aria-label="當日路線">
       {items.map((i, k) => {
         const road = legBefore(i.id);
-        const minutes = road && road.durationS > 0 ? Math.round(road.durationS / 60) : Object.values(i.travel ?? {}).reduce<number>((a, v) => a + (v ?? 0), 0);
+        const minutes = (road && road.durationS > 0 ? Math.round(road.durationS / 60) : Object.values(i.travel ?? {}).reduce<number>((n, v) => n + (v ?? 0), 0)) + carried;
         const how = road ? (road.source.endsWith("-walking") ? "walk" : road.source.endsWith("-transit") ? "bus" : "car") : (MODE_ICON[i.mode] ?? "route");
-        const pic = i.major && !isLogistics(i) ? (i.photo ?? i.gallery?.[0]) : undefined;
+        // A leg with no place of its own adds its time to the next connecting line.
+        if (isLegOnly(i)) {
+          carried = minutes;
+          carriedHow = how;
+          return null;
+        }
+        carried = 0;
+        const icon = carriedHow ?? how;
+        carriedHow = null;
+        const pic = i.photo ?? i.gallery?.[0];
+        const main = i.major && !isLogistics(i);
+        const first = !shown;
+        shown = true;
         return (
           <li key={i.id}>
-            {k > 0 && (
+            {!first && (
               <span className="rs-link" role="img" aria-label={`${MODE[i.mode] ?? ""} ${minutes ? mins(minutes) : ""}`}>
-                <Icon name={how} size={14} />
+                <Icon name={icon} size={14} />
                 {minutes > 0 && <small>{mins(minutes)}</small>}
               </span>
             )}
-            <button type="button" className={`rs-stop${pic ? " has-photo" : ""}`} aria-label={i.dur === 0 && i.time === "00:00" ? displayName(i) : `${i.time} ${displayName(i)}`} onClick={() => toStop(i.id)}>
+            <button type="button" className={`rs-stop${pic ? " has-photo" : ""}`} aria-label={`${i.time} ${displayName(i)}`} onClick={() => toStop(i.id)}>
               <span className="rs-pic">
                 {pic ? (
                   // eslint-disable-next-line @next/next/no-img-element -- hotlinked photo, see Photos.tsx
@@ -92,7 +107,7 @@ function RouteStrip({ items, legBefore }: { items: Item[]; legBefore: (id: strin
                   <Icon name={iconOf(i)} size={20} />
                 )}
               </span>
-              {i.major && !isLogistics(i) && <span className="rs-name">{displayName(i)}</span>}
+              {main && <span className="rs-name">{displayName(i)}</span>}
             </button>
           </li>
         );
@@ -791,7 +806,12 @@ export function DaysView({ active }: { active: boolean }) {
                           <details className="stop-line">
                             <summary>
                               {!(i.dur === 0 && i.time === "00:00") && <span className="stop-line-time">{i.time}</span>}
-                              <Icon name={iconOf(i)} size={18} />
+                              {i.photo ? (
+                                // eslint-disable-next-line @next/next/no-img-element -- hotlinked photo, see Photos.tsx
+                                <img className="stop-line-pic" src={sizedPhoto(i.photo.url, 250, i.photo.w)} style={i.photo.pos ? { objectPosition: i.photo.pos } : undefined} alt="" referrerPolicy="no-referrer" loading="lazy" decoding="async" />
+                              ) : (
+                                <Icon name={iconOf(i)} size={18} />
+                              )}
                               <span className="stop-line-name">{name}</span>
                               {stateIcon}
                               <span className="stop-line-more" aria-hidden="true">

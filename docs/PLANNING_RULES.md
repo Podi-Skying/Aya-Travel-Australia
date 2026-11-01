@@ -59,4 +59,5 @@ Apply these to every plan, including unapplied plan cards when they are applied.
 - **Sunrise and sunset:** use that day's times for that day's place (Open-Meteo, free). Plan dawn and dusk stops on them; long November days can be used.
 - **Dinner:** check kitchen closing or last-seating times, plan dinner before them, and show them under 更多. Items with `closes` are flagged when planned later.
 - **Check-in:** record each stay's window in `checkin` and arrive before the last check-in. Late arrivals are flagged.
+- **Photos (replaces "main sights only"):** every stop at a real, named place gets a matching photo, or an icon if none is found. Pure transport steps and generic or private stops keep icons, and a drive step puts its time on the route strip's connecting line.
 - **Cradle Mountain:** walks are on foot. Park at the visitor centre and take the shuttle; private cars are barred during shuttle hours (see parks.tas.gov.au).

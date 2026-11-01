@@ -3,6 +3,11 @@ import type { Item } from "@/domain/schema";
 import { MODE_ICON } from "./Icon";
 import { CATEGORY_META } from "./Places";
 
+/** A drive, bus or train step with no photo of a place: its time goes on the connecting line, not in its own circle. */
+export function isLegOnly(i: Item): boolean {
+  return !i.photo && !i.gallery?.length && ["drive", "bus", "train", "transit"].includes(i.mode) && (isLogistics(i) || /^開往/.test(i.name));
+}
+
 /** The picture for a stop with no photo: what it is, else how you get there. */
 export function iconOf(i?: Item): string {
   if (!i) return "calendar";

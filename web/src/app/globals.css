@@ -1319,3 +1319,4 @@ a, button, summary, [role="button"], [role="tab"] { touch-action: manipulation; 
 .day-nav-go { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0; }
 .day-nav-go .btn { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; }
 @media (prefers-reduced-motion: reduce) { .stop-marker, .leaflet-marker-icon.num-hit { transition: none; } }
+.stop-line-pic { width: 34px; height: 34px; flex: 0 0 auto; border-radius: 50%; object-fit: cover; }

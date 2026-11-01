@@ -262,3 +262,18 @@ describe("stay photos", () => {
     }
   });
 });
+
+describe("hotel photos on stops", () => {
+  it("keep a shared hotel photo on its stops, but no other stay photo", () => {
+    const d = seedDoc();
+    const url = "/api/media/x/1.webp";
+    const photo = { url, page: url, kind: "custom", site: "Kai" } as never;
+    d.stays.syd = { ...(d.stays.syd ?? { name: "Some Hotel", area: "A", address: "", nightly: 0, status: "unknown", note: "" }), photo };
+    const other = { url: "https://example.com/a.jpg", page: "https://example.com/a", kind: "custom", site: "x" } as never;
+    d.days[0].items[0] = { ...d.days[0].items[0], name: "回飯店休息", photo };
+    d.days[0].items[1] = { ...d.days[0].items[1], name: "回飯店休息", photo: other };
+    const pub = toPublicDoc(d);
+    expect(pub.days[0].items[0].photo?.url).toBe(url);
+    expect(pub.days[0].items[1].photo).toBeUndefined();
+  });
+});

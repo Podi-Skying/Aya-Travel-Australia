@@ -72,6 +72,9 @@ export function toPublicDoc(doc: TripDoc, opts: { photos?: boolean } = {}) {
   const aboutStay = (i: { name: string; en?: string }) => isStayItem(i, doc);
   const noStayPhoto = <T extends { name: string; en?: string }>(i: T): T => {
     if (!aboutStay(i)) return i;
+    // A hotel photo Kai chose to show (2026-11-01) stays; the home base never has one in public.
+    const shared = (Object.values(doc.stays) as { home?: boolean; photo?: { url: string } }[]).some((st) => !st.home && st.photo?.url && st.photo.url === (i as T & { photo?: { url: string } }).photo?.url);
+    if (shared) return i;
     const out = { ...i } as T & { photo?: unknown; gallery?: unknown };
     delete out.photo;
     delete out.gallery;
