@@ -48,8 +48,9 @@ const nearestTown = (lat: number, lng: number) => [...TOWNS].sort((a, b) => km([
  * from home, else the farthest stop's town when the day goes more than 50 km out, else Hobart.
  */
 export function dayPlace(doc: Pick<TripDoc, "stays" | "days" | "tripOptions">, d: Day): WxPlace {
-  if (d.seg !== "tas") return SYDNEY;
   const stay = doc.stays[nightStay(doc, d)] as { home?: boolean; lat?: number; lng?: number } | undefined;
+  // A day that ends at the home base is a Hobart day, even if it starts in Sydney (11/6).
+  if (d.seg !== "tas" && !stay?.home) return SYDNEY;
   if (stay && !stay.home && stay.lat != null && stay.lng != null) return nearestTown(stay.lat, stay.lng);
   const far = d.items
     .filter((i) => i.lat != null && i.lng != null && i.lat < -40 && !isLogistics(i))

@@ -215,6 +215,8 @@ export const tripOptionSchema = z.object({
   summary: shortText(300),
   region: shortText(20),
   themes: z.array(z.enum(OPTION_THEMES)).max(OPTION_THEMES.length),
+  /** The stop whose photo is this plan's cover. */
+  coverId: z.string().max(60).optional(),
   photoUrl: httpsUrl.optional(),
   chosen: z.boolean(),
   start: dateStr,

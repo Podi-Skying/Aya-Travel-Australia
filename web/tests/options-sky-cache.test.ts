@@ -317,3 +317,13 @@ describe("plan reel palettes", () => {
     }
   });
 });
+
+describe("plan rainbow", () => {
+  it("cycles seven colours and keeps white text legible", async () => {
+    const { RAINBOW, planColor, contrast } = await import("@/domain/options");
+    expect(RAINBOW).toHaveLength(7);
+    expect(planColor(0).name).toBe("red");
+    expect(planColor(7).name).toBe("red");
+    for (const p of RAINBOW) expect(contrast(p.deep, "#ffffff"), p.name).toBeGreaterThanOrEqual(4.5);
+  });
+});

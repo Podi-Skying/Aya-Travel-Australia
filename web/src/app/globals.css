@@ -1320,3 +1320,8 @@ a, button, summary, [role="button"], [role="tab"] { touch-action: manipulation; 
 .day-nav-go .btn { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; }
 @media (prefers-reduced-motion: reduce) { .stop-marker, .leaflet-marker-icon.num-hit { transition: none; } }
 .stop-line-pic { width: 34px; height: 34px; flex: 0 0 auto; border-radius: 50%; object-fit: cover; }
+
+/* Plan colours (Kai 2026-11-01): each card's border and badge use its own rainbow colour. */
+.reel-slice { box-shadow: 0 0 0 2px var(--deep); }
+.reel-slice.on { box-shadow: 0 0 0 3px var(--deep); }
+.reel-badge { background: var(--deep); }

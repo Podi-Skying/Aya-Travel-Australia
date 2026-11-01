@@ -26,7 +26,7 @@ import { legLabel, routeStops, useLegs, type Leg } from "./useLegs";
 import { stayPin, type StayPin } from "@/domain/home-pins";
 import { homeStayKey } from "@/domain/stay";
 import type { Item } from "@/domain/schema";
-import { dayNightLabel, INK_PALETTE, optionCard, optionPalette, type OptionCard } from "@/domain/options";
+import { dayNightLabel, optionCard, planColor, type OptionCard } from "@/domain/options";
 import { OPTION_THEMES } from "@/domain/schema";
 import { fmtDay, fmtMD, mins, money } from "@/domain/format";
 import { t as tt } from "@/i18n/current";
@@ -51,10 +51,11 @@ export function TripOptions() {
   const tours = useMemo(() => doc.attractionPool.filter((p) => p.seg === "tas").flatMap((p) => p.items.filter((i) => i.tour).map((i) => ({ key: `tour-${i.id}`, item: i, pkg: p.key }))), [doc]);
   const tour = tours.find((t) => t.key === picked) ?? null;
   const current = tour ? null : (shown.find((c) => c.option.key === picked) ?? shown.find((c) => c.option.chosen) ?? shown[0]);
-  const pal = current ? optionPalette(current.option) : null;
+  // Every plan has its colour from the rainbow, in reel order; tours continue after the plans.
+  const pal = planColor(tour ? shown.length + tours.indexOf(tour) : Math.max(0, shown.findIndex((c) => c === current)));
 
   return (
-    <div className="plan-stage" style={pal ? { ["--plan-tint" as string]: pal.tint, ["--plan-deep" as string]: pal.deep } : undefined}>
+    <div className="plan-stage" style={{ ["--plan-tint" as string]: pal.tint, ["--plan-deep" as string]: pal.deep }}>
       <h2 className="sr-only">行程方案</h2>
       {!cards.length && <p className="section muted">還沒有方案。</p>}
       {(current || tour) && (
@@ -65,39 +66,38 @@ export function TripOptions() {
               label="行程方案"
               panelId="plan-detail"
               active={tour ? tour.key : current!.option.key}
-              onSelect={(k) => {
+              onSelect={(k, via) => {
                 // A tap opens the photo in place (Kai 2026-10-27); the page stays where it is.
+                // Tapping the open card goes to its itinerary.
+                if (k === (tour ? tour.key : current?.option.key) && via === "click") {
+                  if (!tour) setJump({ key: k, n: (jump?.n ?? 0) + 1 });
+                  else document.getElementById("plan-detail")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  return;
+                }
                 setPicked(k);
                 setJump(null);
               }}
-              slices={shown.map((c) => ({
+              slices={shown.map((c, n) => ({
                 key: c.option.key,
                 title: c.option.title,
                 caption: `${dayNightLabel(c)}・${fmtMD(c.dates[0])}–${fmtMD(c.dates.at(-1)!)}`,
                 badge: c.option.chosen ? "目前採用" : undefined,
                 image: c.photo ? sizedPhoto(c.photo.url, 960, c.photo.w) : undefined,
                 imagePos: c.photo?.pos,
-                deep: optionPalette(c.option).deep,
+                deep: planColor(n).deep,
               })).concat(
-                tours.map((t) => ({
+                tours.map((t, n) => ({
                   key: t.key,
                   title: t.item.name.replace(/（.*?）/g, ""),
                   caption: mins(t.item.dur ?? 60),
                   badge: "跟團",
                   image: t.item.photo ? sizedPhoto(t.item.photo.url, 960, t.item.photo.w) : undefined,
                   imagePos: t.item.photo?.pos,
-                  deep: INK_PALETTE.deep,
+                  deep: planColor(shown.length + n).deep,
                 })),
               )}
             />
           </div>
-          {!tour && (
-            <p className="reel-more">
-              <button type="button" className="btn ghost" onClick={() => setJump({ key: current!.option.key, n: (jump?.n ?? 0) + 1 })}>
-                <Icon name="chevron-down" size={18} /> 看行程
-              </button>
-            </p>
-          )}
           {tour ? <TourDetail key={tour.key} item={tour.item} /> : <OptionDetail key={current!.option.key} c={current!} jump={jump?.key === current!.option.key ? jump.n : 0} />}
         </>
       )}

@@ -63,7 +63,7 @@ export function optionCard(doc: TripDoc, o: TripOption, N: number): OptionCard {
     cost,
     items,
     people: PEOPLE.filter((p) => ppl.has(p)),
-    photo: o.photoUrl ? { url: o.photoUrl, page: o.photoUrl, site: new URL(o.photoUrl).hostname.replace(/^www\./, ""), kind: "custom" } : items.flat().find((i) => i.photo)?.photo,
+    photo: items.flat().find((i) => i.id === o.coverId)?.photo ?? (o.photoUrl ? { url: o.photoUrl, page: o.photoUrl, site: new URL(o.photoUrl).hostname.replace(/^www\./, ""), kind: "custom" } : items.flat().find((i) => i.photo)?.photo),
   };
 }
 
@@ -82,6 +82,18 @@ export const PALETTES: (Palette & { words: string[] })[] = [
   { name: "forest", deep: "#2f4a3a", tint: "#dfe8e1", words: ["布魯尼", "Bruny", "Huon"] },
   { name: "ochre", deep: "#7f5222", tint: "#f2e4d3", words: ["瑪麗亞", "Maria"] },
 ];
+/** Each plan's colour in 行程方案 (Kai 2026-11-01): a repeating rainbow, in plan order. White text stays AA on `deep`. */
+export const RAINBOW: Palette[] = [
+  { name: "red", deep: "#b3261e", tint: "#f8e3e1" },
+  { name: "orange", deep: "#b3520a", tint: "#f9e7d8" },
+  { name: "yellow", deep: "#856400", tint: "#f8f0cf" },
+  { name: "green", deep: "#2e7d32", tint: "#e2f0e3" },
+  { name: "blue", deep: "#1565c0", tint: "#dfeaf7" },
+  { name: "indigo", deep: "#3949ab", tint: "#e4e6f6" },
+  { name: "violet", deep: "#7b1fa2", tint: "#f0e2f5" },
+];
+export const planColor = (i: number): Palette => RAINBOW[((i % RAINBOW.length) + RAINBOW.length) % RAINBOW.length];
+
 export const INK_PALETTE: Palette = { name: "ink", deep: "#3d3a33", tint: "#ece8df" };
 
 export function optionPalette(o: Pick<TripOption, "title" | "region">): Palette {
