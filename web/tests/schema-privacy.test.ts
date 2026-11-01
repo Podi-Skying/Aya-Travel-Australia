@@ -314,4 +314,14 @@ describe("other private names", () => {
     expect(pub.privateNames ?? []).toEqual([]);
     expect(() => assertPublicSafe({ a: "Zorro" }, d)).toThrow(PrivacyGuardError);
   });
+
+  it("keep a dinner guest's name out while the +N count stays", () => {
+    const d = seedDoc();
+    (d as { privateNames?: string[] }).privateNames = ["Zelda"];
+    d.days[0].items[0].note = "Zelda 只來晚餐";
+    (d.days[0].items[0] as { extraPeople?: number }).extraPeople = 3;
+    const pub = toPublicDoc(d);
+    expect(JSON.stringify(pub)).not.toMatch(/zelda/i);
+    expect(pub.days[0].items[0].extraPeople).toBe(3);
+  });
 });

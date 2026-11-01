@@ -817,6 +817,7 @@ export function DaysView({ active }: { active: boolean }) {
                             {stateIcon}
                           </div>
                           <h4>{name}</h4>
+                          {i.extraPeople ? <span className="stop-plus" role="img" aria-label={`另外還有 ${i.extraPeople} 人`}>+{i.extraPeople}</span> : null}
                           {flag && <BookWarn flag={flag} size={16} text />}
                           {chips}
                           {interest}
@@ -837,6 +838,7 @@ export function DaysView({ active }: { active: boolean }) {
                                 <Icon name={iconOf(i)} size={18} />
                               )}
                               <span className="stop-line-name">{name}</span>
+                              {i.extraPeople ? <span className="stop-plus" role="img" aria-label={`另外還有 ${i.extraPeople} 人`}>+{i.extraPeople}</span> : null}
                               {flag ? <BookWarn flag={flag} size={20} text /> : stateIcon}
                               <span className="stop-line-more" aria-hidden="true">
                                 <Icon name="chevron-right" size={16} />

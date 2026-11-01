@@ -126,6 +126,8 @@ export const itemSchema = z.object({
   /** Owner-only detail (flight numbers, workplace); removed from every public document. */
   ownerNote: shortText(500).optional(),
   people: peopleSchema.optional(),
+  /** People at this stop only without an avatar, shown as +N (a friend who joins for dinner). */
+  extraPeople: z.number().int().min(1).max(20).optional(),
 });
 
 /* "08:30–18:00" (en dash) or "08:30-18:00"; start must be before end. */

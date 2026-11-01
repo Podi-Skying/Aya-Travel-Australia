@@ -1368,3 +1368,4 @@ a, button, summary, [role="button"], [role="tab"] { touch-action: manipulation; 
 .nb-name { flex: 1 1 8em; min-width: 0; }
 .day-cover-people { display: inline-flex; align-items: center; gap: 4px; }
 .people-plus { display: grid; place-items: center; min-width: 30px; height: 30px; padding: 0 6px; border-radius: 15px; background: rgba(250, 247, 240, .9); color: var(--ink); font-size: .78rem; font-weight: 600; }
+.stop-plus { flex: none; padding: 1px 7px; border-radius: 11px; background: var(--paper-raised); color: var(--ink); font-size: .75rem; font-weight: 600; }
