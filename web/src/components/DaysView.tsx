@@ -406,7 +406,8 @@ export function DaysView({ active }: { active: boolean }) {
     return { driveMin: s.drive && roadLegs?.[k] ? Math.round(roadLegs[k]!.durationS / 60) : 0, stopMin: item?.dur ?? 0 };
   });
   const longest = longestDrive(drives);
-  const cs = longest > MAX_DRIVE_MIN ? [...cs0, { lv: "warn" as const, t: `連續開車約 ${mins(longest)}，要加一個至少 30 分鐘的休息站。` }] : cs0;
+  // Only days they drive themselves: a coach or tour handles its own breaks.
+  const cs = d.needsDriver && longest > MAX_DRIVE_MIN ? [...cs0, { lv: "warn" as const, t: `連續開車約 ${mins(longest)}，要加一個至少 30 分鐘的休息站。` }] : cs0;
   // Status chips above the stops: pictures and numbers first, the sentence opens on tap.
   const dayWx = wxFor(weather, d.date);
   const warnN = cs.filter((c) => c.lv === "warn").length;
