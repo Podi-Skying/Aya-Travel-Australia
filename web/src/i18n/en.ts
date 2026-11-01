@@ -969,4 +969,13 @@ export const EN: Record<string, string> = {
   "司機改回未確認": "Mark driver unconfirmed",
   "{0} 個活動・{1}": "{0} events · {1}",
   "同步失敗": "Sync failed",
+  "未訂票": "Not booked",
+  "未訂位": "No reservation",
+  "未訂房": "Room not booked",
+  "需要預訂": "To book",
+  "預訂": "Book",
+  "有未預訂項目": "Something to book",
+  "{n} 項要預訂": "{n} to book",
+  "{n} 項要預訂但還沒訂。": "{n} still to book.",
+  "{0}：一定要訂": "{0}: must book",
 };

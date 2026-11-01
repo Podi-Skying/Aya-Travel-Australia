@@ -2,6 +2,7 @@ import { nightStay } from "./stay";
 import type { TripDoc } from "./schema";
 import { effectiveDay, type EffectiveDay } from "./effective-day";
 import { stayOf } from "./budget";
+import { bookingFlag } from "./booking";
 
 /* Ports of checks / feasibility from site/js/app.js (PLANNING_RULES.md, FR-10, FR-12). */
 
@@ -46,6 +47,8 @@ export function checks(doc: Pick<TripDoc, "stays" | "tripOptions">, d: Effective
   const endOf = (i: { time: string; dur: number }) => toMin(i.time) + i.dur;
   for (const i of d.items)
     if (i.closes && endOf(i) > toMin(i.closes)) out.push({ lv: "warn", t: `「${i.name}」排到 ${fromMin(endOf(i))}，但 ${i.closes} 就打烊或最後入座。` });
+  const toBook = d.items.filter((i) => bookingFlag(i)).length;
+  if (toBook) out.push({ lv: "warn", t: `${toBook} 項要預訂但還沒訂。` });
   const lateTo = st.checkin?.to;
   if (lateTo && !d.items.some((i) => /入住/.test(i.name) && toMin(i.time) <= toMin(lateTo))) {
     const last = d.items.filter((i) => !i.name.startsWith("住宿：")).at(-1);

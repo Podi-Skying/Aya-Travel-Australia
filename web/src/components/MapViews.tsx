@@ -9,6 +9,8 @@ import { iconSvg } from "./Icon";
 import { routeCredit, routeStops, splitLines, useLegs } from "./useLegs";
 import { HOUSE_SVG, type StayPin } from "@/domain/home-pins";
 import { iconOf } from "./stopIcon";
+import { bookingFlag } from "@/domain/booking";
+import { bookWarnSvg } from "./BookWarn";
 import { sizedPhoto } from "./PlaceGallery";
 
 /*
@@ -177,7 +179,7 @@ export function DayMap({
           const body = pic ? `<img src="${esc(sizedPhoto(pic.url, 250, pic.w))}" alt="" referrerpolicy="no-referrer"${pic.pos ? ` style="object-position:${esc(pic.pos)}"` : ""}>` : iconSvg(iconOf(i), 18);
           const m = L.marker([i.lat!, i.lng!], {
             // 44px hit area around the picture.
-            icon: L.divIcon({ className: "num-hit", html: `<span class="stop-marker${pic ? " has-photo" : ""}">${body}<b>${k + 1}</b></span>`, iconSize: [44, 44] }),
+            icon: L.divIcon({ className: "num-hit", html: `<span class="stop-marker${pic ? " has-photo" : ""}">${body}<b>${k + 1}</b>${all.some((x) => bookingFlag(x)) ? `<i class="marker-warn">${bookWarnSvg(16)}</i>` : ""}</span>`, iconSize: [44, 44] }),
             keyboard: true,
             title: i.name,
             zIndexOffset: i.major ? 500 : 0,

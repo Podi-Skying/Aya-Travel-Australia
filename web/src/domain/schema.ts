@@ -112,6 +112,10 @@ export const itemSchema = z.object({
   photoSources: z.enum(["own", "own+google"]).optional(),
   /** Reached by a park shuttle or similar: no routed leg, `travel` gives the estimate (Kai 2026-11-01). */
   noRoute: z.boolean().optional(),
+  /** Does it need booking ahead? Absent means no. A warning shows until its status is confirmed. */
+  book: z.enum(["required", "recommended", "none"]).optional(),
+  /** The latest sensible day to book. */
+  bookBy: dateStr.optional(),
   /** Dinner: when the kitchen closes or last seating, HH:MM; a later plan is flagged. */
   closes: z.string().regex(/^\d{2}:\d{2}$/).optional(),
   tr: trSchema,

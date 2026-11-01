@@ -8,10 +8,11 @@ import { fmtDay, fmtTs } from "@/domain/format";
 import { SkyWatch } from "./SkyWatch";
 import { Checklist } from "./Checklist";
 import { GoogleUsage } from "./GoogleUsage";
+import { NeedBooking } from "./NeedBooking";
 import { BudgetBars, FlightCards, StayCards } from "./InfoCards";
 
 export function Info() {
-  const { doc, mode, alerts, lastSyncAt, offlineCopy, gotoDay } = useTrip();
+  const { doc, mode, token, alerts, lastSyncAt, offlineCopy, gotoDay } = useTrip();
   const warnDays = alerts.map((a, i) => ({ ...a, i, warns: a.checks.filter((c) => c.lv === "warn" || c.lv === "danger") })).filter((a) => a.warns.length);
   const legend = (o: Record<string, { t: string; c: string }>) =>
     Object.values(o).map((v) => (
@@ -21,6 +22,7 @@ export function Info() {
     ));
   return (
     <>
+      {(mode === "owner" || token) && <NeedBooking />}
       <FlightCards />
       <StayCards />
       <WeatherStrip onPick={(date) => gotoDay(doc.days.findIndex((d) => d.date === date))} />

@@ -166,3 +166,25 @@ describe("syncCalendar", () => {
     expect(seen).not.toContain(SECRET);
   });
 });
+
+describe("booking warning", () => {
+  it("flags what needs booking until it is booked", async () => {
+    const { bookingFlag } = await import("@/domain/booking");
+    expect(bookingFlag({ name: "塔", book: "recommended" })?.label).toBe("未訂票");
+    expect(bookingFlag({ name: "晚餐", book: "required", cat: "food" })?.label).toBe("未訂位");
+    expect(bookingFlag({ name: "住宿：X", book: "required" })?.label).toBe("未訂房");
+    expect(bookingFlag({ name: "塔", book: "required", status: "confirmed" })).toBeNull();
+    expect(bookingFlag({ name: "海灘", book: "none" })).toBeNull();
+    expect(bookingFlag({ name: "海灘" })).toBeNull();
+  });
+  it("marks unbooked required events in the calendar title only", () => {
+    const d = doc();
+    d.days[0].items[0] = { ...d.days[0].items[0], book: "required", tr: { en: { name: "Tour" } } } as never;
+    d.days[0].items[1] = { ...d.days[0].items[1], book: "recommended", tr: { en: { name: "Tower" } } } as never;
+    const ev = calendarEvents(d);
+    expect(ev.find((e) => e.key === "one")!.body.summary).toBe("⚠ Not booked: Tour");
+    expect(ev.find((e) => e.key === "two")!.body.summary).toBe("Tower");
+    d.days[0].items[0].status = "confirmed";
+    expect(calendarEvents(d).find((e) => e.key === "one")!.body.summary).toBe("Tour");
+  });
+});

@@ -9,6 +9,8 @@ import { isWet } from "@/domain/weather";
 import { useHobartToday, useReducedMotion } from "./ui";
 import { Icon } from "./Icon";
 import { TapChips } from "./ui";
+import { bookingFlag } from "@/domain/booking";
+import { BookWarn } from "./BookWarn";
 import { dayStatus, monthGrid, moveInGrid, weekIndexOf, type DayStatus } from "@/domain/calendar";
 import { effectiveDay } from "@/domain/effective-day";
 import { checks } from "@/domain/rules";
@@ -291,7 +293,7 @@ export function DayCalendar() {
                     tabIndex={c.dayIdx === focusIdx ? 0 : -1}
                     aria-selected={sel}
                     aria-current={isToday ? "date" : undefined}
-                    aria-label={`${fmtDay(c.date)} ${dayTitle(x2)}${isToday ? "，今天" : ""}，${STATUS_T[status[c.dayIdx]]}${x2.needsDriver ? "，朋友開車" : ""}${warn[c.dayIdx] ? "，有提醒" : ""}`}
+                    aria-label={`${fmtDay(c.date)} ${dayTitle(x2)}${x2.items.some((i) => bookingFlag(i)) ? "，有未預訂項目" : ""}${isToday ? "，今天" : ""}，${STATUS_T[status[c.dayIdx]]}${x2.needsDriver ? "，朋友開車" : ""}${warn[c.dayIdx] ? "，有提醒" : ""}`}
                     onClick={() => setCurrentDay(c.dayIdx)}
                     onPointerEnter={(e) => e.pointerType === "mouse" && setHoverIdx(c.dayIdx)}
                     onPointerLeave={() => setHoverIdx(null)}
@@ -307,6 +309,11 @@ export function DayCalendar() {
                       ) : null;
                     })()}
                     {warn[c.dayIdx] && <span className="dot" />}
+                    {x2.items.some((i) => bookingFlag(i)) && (
+                      <span className="cal-book">
+                        <BookWarn flag="有未預訂項目" size={13} />
+                      </span>
+                    )}
                     {status[c.dayIdx] === "pending" && <span className="q" aria-hidden="true">?</span>}
                     {x2.needsDriver && (
                       <span className="car" aria-hidden="true">

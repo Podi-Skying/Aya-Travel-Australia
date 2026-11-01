@@ -29,6 +29,8 @@ import { PlaceGallery, sizedPhoto } from "./PlaceGallery";
 import { displayName, isLogistics, nameIsTentative } from "@/domain/day-title";
 import { iconOf, isLegOnly } from "./stopIcon";
 import { OwnerMenu } from "./OwnerMenu";
+import { bookingFlag } from "@/domain/booking";
+import { BookWarn } from "./BookWarn";
 import { useCalendarSync } from "./useCalendarSync";
 
 /**
@@ -109,6 +111,11 @@ function RouteStrip({ items, legBefore }: { items: Item[]; legBefore: (id: strin
                   <Icon name={iconOf(i)} size={20} />
                 )}
               </span>
+              {bookingFlag(i) && (
+                <span className="rs-warn">
+                  <BookWarn flag={bookingFlag(i)!} size={18} />
+                </span>
+              )}
               {main && <span className="rs-name">{displayName(i)}</span>}
             </button>
           </li>
@@ -414,7 +421,17 @@ export function DaysView({ active }: { active: boolean }) {
   // Status chips above the stops: pictures and numbers first, the sentence opens on tap.
   const dayWx = wxFor(weather, d.date);
   const warnN = cs.filter((c) => c.lv === "warn").length;
+  const toBook = d.items.flatMap((i) => (bookingFlag(i) ? [i] : []));
   const facts0: TapChip[] = [
+    ...(toBook.length
+      ? [{
+          key: "book",
+          icon: <BookWarn flag={`${toBook.length} 項要預訂`} size={20} />,
+          text: String(toBook.length),
+          label: `${toBook.length} 項要預訂`,
+          panel: <ul className="small">{toBook.map((i) => <li key={i.id}>{displayName(i)}</li>)}</ul>,
+        }]
+      : []),
     ...(weather ? wxChips(dayWx, <WxLine day={dayWx} />) : []),
     ...(weather && dayWx?.wx && isWet(dayWx.wx)
       ? [{
@@ -515,7 +532,7 @@ export function DaysView({ active }: { active: boolean }) {
   ];
 
   // A stay with a photo leads the row, so its picture is in view without scrolling.
-  const facts = st.photo ? [...facts0.filter((f) => f.key === "stay"), ...facts0.filter((f) => f.key !== "stay")] : facts0;
+  const facts = [...facts0.filter((f) => f.key === "book"), ...(st.photo ? facts0.filter((f) => f.key === "stay") : []), ...facts0.filter((f) => f.key !== "book" && !(st.photo && f.key === "stay"))];
 
   return (
     <div className="days-layout">
@@ -622,8 +639,10 @@ export function DaysView({ active }: { active: boolean }) {
                 const big = i.major && !isLogistics(i);
                 const name = displayName(i);
                 const waiting = i.status === "pending" || tent || nameIsTentative(i);
-                const stateIcon =
-                  i.status === "confirmed" ? (
+                const flag = bookingFlag(i);
+                const stateIcon = flag ? (
+                  <BookWarn flag={flag} size={22} />
+                ) : i.status === "confirmed" ? (
                     <span className="stop-state ok">
                       <Icon name="ok" size={16} label="已確認" />
                     </span>
@@ -796,6 +815,7 @@ export function DaysView({ active }: { active: boolean }) {
                             {stateIcon}
                           </div>
                           <h4>{name}</h4>
+                          {flag && <BookWarn flag={flag} size={16} text />}
                           {chips}
                           {interest}
                           <details className="act-more">
@@ -815,7 +835,7 @@ export function DaysView({ active }: { active: boolean }) {
                                 <Icon name={iconOf(i)} size={18} />
                               )}
                               <span className="stop-line-name">{name}</span>
-                              {stateIcon}
+                              {flag ? <BookWarn flag={flag} size={20} text /> : stateIcon}
                               <span className="stop-line-more" aria-hidden="true">
                                 <Icon name="chevron-right" size={16} />
                               </span>

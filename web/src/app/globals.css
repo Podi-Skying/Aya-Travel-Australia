@@ -1352,3 +1352,17 @@ a, button, summary, [role="button"], [role="tab"] { touch-action: manipulation; 
 .menu-badge { flex: 0 0 auto; padding: 1px 8px; border-radius: 999px; background: rgba(41, 40, 35, .08); color: var(--ink-2); font-size: .72rem; }
 @media (prefers-reduced-motion: reduce) { .menu-surface { transform: none !important; will-change: opacity; opacity: 0; } .menu-row, .owner-menu-btn { transition: none; } .owner-menu-btn:active { transform: none; } }
 @media (prefers-reduced-transparency: reduce) { .menu-popover { background: var(--paper-raised); -webkit-backdrop-filter: none; backdrop-filter: none; } }
+
+/* Not booked yet (Kai 2026-11-02): one amber triangle everywhere. */
+.book-warn { display: inline-flex; align-items: center; gap: 4px; flex: 0 0 auto; vertical-align: middle; }
+.book-warn svg { display: block; }
+.book-warn-t { font-size: .76rem; font-weight: 600; color: #7a5a00; white-space: nowrap; }
+.rs-stop { position: relative; }
+.rs-warn { position: absolute; top: -2px; left: 50%; margin-left: 10px; line-height: 0; }
+.stop-media:has(.pg-frame) .book-warn { position: absolute; right: 8px; top: 8px; padding: 3px; border-radius: 50%; background: rgba(250, 247, 240, .92); pointer-events: none; }
+.marker-warn { position: absolute; left: -6px; top: -6px; line-height: 0; }
+.cal-book { position: absolute; left: 3px; bottom: 3px; line-height: 0; }
+.need-book h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; }
+.need-book ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.need-book li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-height: 36px; font-size: .88rem; }
+.nb-name { flex: 1 1 8em; min-width: 0; }
