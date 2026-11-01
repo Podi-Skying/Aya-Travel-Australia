@@ -26,9 +26,12 @@ export function calendarEvents(doc: TripDoc, siteUrl = ""): CalendarEvent[] {
   const out: CalendarEvent[] = [];
   const N = doc.partySize;
   for (const d of doc.days) {
-    const timeZone = d.seg === "syd" ? "Australia/Sydney" : "Australia/Hobart";
+    const endsAtHome = !!stayOf(doc, nightStay(doc, d)).home;
     const timed = d.items.filter((i) => !i.name.startsWith("住宿：") && !(i.dur === 0 && i.time === "00:00"));
     timed.forEach((i, k) => {
+      // Where the stop is decides the zone; a stop with no position follows where the day ends.
+      const inTas = i.lat != null ? i.lat < -40 : d.seg !== "syd" || endsAtHome;
+      const timeZone = inTas ? "Australia/Hobart" : "Australia/Sydney";
       const start = toMin(i.time);
       const next = timed[k + 1] ? toMin(timed[k + 1].time) : null;
       const end = i.dur > 0 ? start + i.dur : next !== null && next > start ? next : start + 60;
