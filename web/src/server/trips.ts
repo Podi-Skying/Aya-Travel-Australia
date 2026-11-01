@@ -1,3 +1,4 @@
+import { scheduleCalendarSync } from "./gcal";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { getDb, schema, type AppDb } from "./db/client";
 import { HttpError } from "./http";
@@ -108,7 +109,7 @@ export async function writeVersion(
   if (!Number.isInteger(baseVersionNo)) throw new HttpError(400, "缺少 baseVersionNo");
   const db = await getDb();
   try {
-    return await db.transaction(async (tx) => {
+    const written = await db.transaction(async (tx) => {
       const tripRows = await tx
         .select({ id: trips.id, currentVersionId: trips.currentVersionId })
         .from(trips)
@@ -131,6 +132,8 @@ export async function writeVersion(
       await tx.update(trips).set({ currentVersionId: inserted[0].id, updatedAt: sql`now()` }).where(eq(trips.id, trip.id));
       return { versionNo, summary: next.summary, doc };
     });
+    await scheduleCalendarSync(written.doc);
+    return written;
   } catch (e) {
     if (isUniqueViolation(e)) throw new HttpError(409, "行程已在其他地方更新，請重新整理後再試");
     throw e;

@@ -28,6 +28,7 @@ import { dayEnds } from "@/domain/home-pins";
 import { PlaceGallery, sizedPhoto } from "./PlaceGallery";
 import { displayName, isLogistics, nameIsTentative } from "@/domain/day-title";
 import { iconOf, isLegOnly } from "./stopIcon";
+import { CalendarSync } from "./CalendarSync";
 
 /**
  * One line per leg (Kai 2026-10-26): the road-computed time and distance when known, else the estimate.
@@ -555,6 +556,7 @@ export function DaysView({ active }: { active: boolean }) {
                   <Icon name="more" size={20} />
                 </summary>
                 <div className="owner-menu-body">
+                  <CalendarSync />
                   <p className="title-pin small">
                     {raw.titlePinned ? "標題已固定" : "標題依當天活動自動產生"}{" "}
                     <PendingButton
