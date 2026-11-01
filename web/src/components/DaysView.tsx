@@ -395,7 +395,7 @@ export function DaysView({ active }: { active: boolean }) {
   // Status chips above the stops: pictures and numbers first, the sentence opens on tap.
   const dayWx = wxFor(weather, d.date);
   const warnN = cs.filter((c) => c.lv === "warn").length;
-  const facts: TapChip[] = [
+  const facts0: TapChip[] = [
     ...(weather ? wxChips(dayWx, <WxLine day={dayWx} />) : []),
     ...(weather && dayWx?.wx && isWet(dayWx.wx)
       ? [{
@@ -494,6 +494,9 @@ export function DaysView({ active }: { active: boolean }) {
         }]
       : []),
   ];
+
+  // A stay with a photo leads the row, so its picture is in view without scrolling.
+  const facts = st.photo ? [...facts0.filter((f) => f.key === "stay"), ...facts0.filter((f) => f.key !== "stay")] : facts0;
 
   return (
     <div className="days-layout">
