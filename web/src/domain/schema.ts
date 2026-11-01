@@ -270,6 +270,8 @@ export const tripDocSchema = z
         checkin: z.object({ from: z.string().regex(/^\d{2}:\d{2}$/), to: z.string().regex(/^\d{2}:\d{2}$/).optional() }).optional(),
         /** The price already includes the friend who drives, so no second share is added. */
         includesDriver: z.boolean().optional(),
+        /** A photo of a hotel Kai chose to show (2026-11-01); the home base never has one in the public view. */
+        photo: photoSchema.optional(),
         status: z.enum(COST_STATUS),
         note: shortText(300),
         /** The home base (UTAS Hobart Apartments): every Tasmania night unless a multi-day trip says otherwise. */

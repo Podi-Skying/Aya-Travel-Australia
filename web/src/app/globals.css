@@ -1306,3 +1306,16 @@ a, button, summary, [role="button"], [role="tab"] { touch-action: manipulation; 
 @media print {
   .tap-row, .route-strip, .day-arrow, .owner-menu { display: none; }
 }
+
+/* Day map: pictures instead of bare numbers (Kai 2026-11-01). */
+.stop-marker { position: relative; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--bg); color: var(--ink); box-shadow: 0 0 0 2px var(--vermilion), 0 1px 4px rgba(24, 23, 20, .35); transition: transform 100ms var(--ease); }
+.stop-marker.has-photo { width: 38px; height: 38px; }
+.stop-marker img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; }
+.stop-marker b { position: absolute; right: -6px; top: -6px; min-width: 16px; height: 16px; padding: 0 3px; border-radius: 8px; background: var(--vermilion); color: #fff; font-size: 10px; font-weight: 700; line-height: 16px; text-align: center; }
+.num-hit:active .stop-marker { transform: scale(.94); }
+.leaflet-marker-icon.num-hit { transition: opacity 150ms var(--ease); }
+.tap-thumb { width: 26px; height: 26px; border-radius: 50%; object-fit: cover; display: block; }
+.tap-panel-photo { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 10px; margin-bottom: 8px; }
+.day-nav-go { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0; }
+.day-nav-go .btn { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; }
+@media (prefers-reduced-motion: reduce) { .stop-marker, .leaflet-marker-icon.num-hit { transition: none; } }

@@ -27,6 +27,7 @@ import { nightStay } from "@/domain/stay";
 import { dayEnds } from "@/domain/home-pins";
 import { PlaceGallery, sizedPhoto } from "./PlaceGallery";
 import { displayName, isLogistics, nameIsTentative } from "@/domain/day-title";
+import { iconOf } from "./stopIcon";
 
 /**
  * One line per leg (Kai 2026-10-26): the road-computed time and distance when known, else the estimate.
@@ -62,13 +63,6 @@ function Legs({ travel, road, nav }: { travel?: Item["travel"]; road?: Leg | nul
     </li>
   );
 }
-
-const iconOf = (i?: Item): string => {
-  if (!i) return "calendar";
-  if (i.name.startsWith("住宿：")) return "bed";
-  if (isLogistics(i)) return MODE_ICON[i.mode] ?? "route";
-  return i.cat ? CATEGORY_META[i.cat].icon : (MODE_ICON[i.mode] ?? "pin");
-};
 
 /** The day as a line of round pictures: photos for main sights, icons for the rest; tap scrolls to the stop. */
 function RouteStrip({ items, legBefore }: { items: Item[]; legBefore: (id: string) => Leg | null }) {
@@ -244,7 +238,7 @@ export function DaysView({ active }: { active: boolean }) {
   const navPt = (s: (typeof route)[number]): NavPoint => (s.kind === "start" && ends.start?.home && !owner ? null : { lat: s.pt[0], lng: s.pt[1] });
   const navTo = (s: (typeof route)[number]): Exclude<NavPoint, null> =>
     s.kind === "end" && ends.end?.home && !owner ? { query: doc.stays[nightStay(doc, raw)]?.name ?? "Hobart" } : { lat: s.pt[0], lng: s.pt[1] };
-  const canNav = owner || !!token;
+  const canNav = true;
   const navBefore = (pos: number) => {
     const m = pos > 0 ? navMode(route[pos].mode) : null;
     return canNav && m ? navUrl(navPt(route[pos - 1]), navTo(route[pos]), m) : null;
@@ -429,11 +423,20 @@ export function DaysView({ active }: { active: boolean }) {
     ...(night !== "none" && st.name
       ? [{
           key: "stay",
-          icon: <Icon name="bed" size={18} />,
+          icon: st.photo ? (
+            // eslint-disable-next-line @next/next/no-img-element -- hotel photo, see Photos.tsx
+            <img className="tap-thumb" src={st.photo.url} alt="" loading="lazy" decoding="async" />
+          ) : (
+            <Icon name="bed" size={18} />
+          ),
           text: st.checkin?.to ? `≤${st.checkin.to}` : st.area || st.name,
           label: `今晚住宿：${st.area || st.name}${st.checkin ? `，入住 ${st.checkin.from}–${st.checkin.to ?? ""}` : ""}`,
           panel: (
             <p className="small">
+              {st.photo && (
+                // eslint-disable-next-line @next/next/no-img-element -- hotel photo, see Photos.tsx
+                <img className="tap-panel-photo" src={st.photo.url} alt="" loading="lazy" decoding="async" />
+              )}
               {st.name}
               {owner && st.address ? `・地址：${st.address}` : "・確切地址已隱藏"}
               {st.checkin ? `・入住 ${st.checkin.from}–${st.checkin.to ?? ""}` : ""}
@@ -490,7 +493,6 @@ export function DaysView({ active }: { active: boolean }) {
           )),
         }]
       : []),
-    ...dayNav.map(({ u, t: navT }) => ({ key: u, icon: <Icon name="route" size={18} />, label: navT, href: u })),
   ];
 
   return (
@@ -572,6 +574,15 @@ export function DaysView({ active }: { active: boolean }) {
           </div>
           {owner && !online && <p className="small muted">離線中：可以查看，但修改需要網路連線。</p>}
           {d.items.length > 0 && <RouteStrip items={d.items} legBefore={roadBefore} />}
+          {dayNav.length > 0 && (
+            <div className="day-nav-go">
+              {dayNav.map(({ u, t: navT }) => (
+                <a key={u} className="btn" href={u} target="_blank" rel="noopener noreferrer">
+                  <Icon name="route" size={18} /> {navT}
+                </a>
+              ))}
+            </div>
+          )}
           {d.items.length ? (
             <ol className="acts">
               {route[0]?.kind === "start" && (

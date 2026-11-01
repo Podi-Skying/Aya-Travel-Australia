@@ -113,7 +113,7 @@ export function StayCards() {
         {stays.map((r) => {
           const s = stayOf(doc, r.key);
           const name = s.home ? "住處" : s.name.replace(/[（(][^（）()]*[）)]/g, "").trim();
-          const ph = photoOf(r.key, name);
+          const ph = s.photo ?? photoOf(r.key, name);
           return (
             <li key={`${r.key}-${r.from}`} className="stay-card">
               <span className="stay-pic">

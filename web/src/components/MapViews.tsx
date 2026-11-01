@@ -3,11 +3,14 @@
 import "leaflet/dist/leaflet.css";
 import { useEffect, useRef, useState } from "react";
 import type * as Leaflet from "leaflet";
-import { PRI, useReducedMotion } from "./ui";
+import { useReducedMotion } from "./ui";
 import type { EffectiveDay } from "@/domain/effective-day";
 import { iconSvg } from "./Icon";
 import { routeCredit, routeStops, useLegs } from "./useLegs";
 import { HOUSE_SVG, type StayPin } from "@/domain/home-pins";
+import { isLogistics } from "@/domain/day-title";
+import { iconOf } from "./stopIcon";
+import { sizedPhoto } from "./PlaceGallery";
 
 /*
  * Leaflet is loaded only in the browser. If it or the tiles fail, the itinerary
@@ -74,6 +77,7 @@ export function DayMap({
   const map = useRef<Leaflet.Map | null>(null);
   const layer = useRef<Leaflet.LayerGroup | null>(null);
   const markers = useRef(new Map<string, Leaflet.Marker>());
+  const declutterRef = useRef<(() => void) | null>(null);
   const [failed, setFailed] = useState(false);
   const reduce = useReducedMotion();
   const dayRef = useRef(day);
@@ -124,19 +128,56 @@ export function DayMap({
         layer.current = L.layerGroup().addTo(map.current);
         markers.current.clear();
         const pts: [number, number][] = [];
+        const { start: pinA, end: pinB } = endsRef.current;
+        const atPin = (i: { lat?: number; lng?: number }) => [pinA, pinB].some((p) => p && Math.abs(p.lat - i.lat!) < 1e-4 && Math.abs(p.lng - i.lng!) < 1e-4);
+        // Stops at one spot share a marker: the main sight's picture, with every stop in its popup.
+        const spots = new Map<string, { i: (typeof day.items)[number]; k: number; all: (typeof day.items)[number][] }>();
         day.items.forEach((i, k) => {
           if (i.lat == null || i.lng == null) return;
           pts.push([i.lat, i.lng]);
-          const m = L.marker([i.lat, i.lng], {
-            // 44px hit area around the 28px numbered pin.
-            icon: L.divIcon({ className: "num-hit", html: `<span class="num-marker sel-day ${day.seg}">${k + 1}</span>`, iconSize: [44, 44] }),
+          const key = `${i.lat.toFixed(4)},${i.lng.toFixed(4)}`;
+          const s = spots.get(key);
+          if (!s) spots.set(key, { i, k, all: [i] });
+          else {
+            s.all.push(i);
+            if (i.major && !s.i.major) Object.assign(s, { i, k });
+          }
+        });
+        const drawn: { m: Leaflet.Marker; major: boolean }[] = [];
+        spots.forEach(({ i, k, all }) => {
+          if (atPin(i) && !i.major) {
+            for (const x of all) markers.current.delete(x.id);
+            return; // the hotel or home pin already marks this spot
+          }
+          const pic = i.major && !isLogistics(i) ? (i.photo ?? i.gallery?.[0]) : undefined;
+          const body = pic ? `<img src="${esc(sizedPhoto(pic.url, 250, pic.w))}" alt="" referrerpolicy="no-referrer"${pic.pos ? ` style="object-position:${esc(pic.pos)}"` : ""}>` : iconSvg(iconOf(i), 18);
+          const m = L.marker([i.lat!, i.lng!], {
+            // 44px hit area around the picture.
+            icon: L.divIcon({ className: "num-hit", html: `<span class="stop-marker${pic ? " has-photo" : ""}">${body}<b>${k + 1}</b></span>`, iconSize: [44, 44] }),
             keyboard: true,
             title: i.name,
+            zIndexOffset: i.major ? 500 : 0,
           })
             .addTo(layer.current!)
-            .bindPopup(`<strong>${esc(i.time)} ${esc(i.name)}</strong><br>${esc(i.en ?? "")}<br>${PRI[i.pri].t}`);
-          markers.current.set(i.id, m);
+            .bindPopup(all.map((x) => `<strong>${esc(x.time)} ${esc(x.name)}</strong>`).join("<br>"));
+          for (const x of all) markers.current.set(x.id, m);
+          drawn.push({ m, major: !!i.major });
         });
+        // Zoomed out: a smaller stop that would sit under a main sight's picture steps aside.
+        const declutter = () => {
+          const kept: Leaflet.Point[] = [];
+          for (const { m } of [...drawn].sort((a, b) => Number(b.major) - Number(a.major))) {
+            const p = map.current!.latLngToLayerPoint(m.getLatLng());
+            const clash = kept.some((q) => q.distanceTo(p) < 34);
+            m.setOpacity(clash ? 0 : 1);
+            const el = m.getElement();
+            if (el) el.style.pointerEvents = clash ? "none" : "";
+            if (!clash) kept.push(p);
+          }
+        };
+        map.current.off("zoomend", declutterRef.current ?? undefined);
+        declutterRef.current = declutter;
+        map.current.on("zoomend", declutter);
         // Driven legs follow the road once computed; walking, transit and not-yet-computed legs are dashed.
         const rs = stopsRef.current;
         const road: [number, number][][] = [];
@@ -174,6 +215,7 @@ export function DayMap({
         map.current.invalidateSize();
         if (pts.length) map.current.flyToBounds(L.latLngBounds(pts).pad(0.25), { maxZoom: 13, animate: !reduce, duration: 1.2 });
         else map.current.setView(BASE[day.seg] ?? BASE.tas, 11);
+        declutter();
       })
       .catch(() => setFailed(true));
     return () => {

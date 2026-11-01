@@ -248,3 +248,17 @@ describe("public view after the 2026-11-01 audit", () => {
     for (const s of Object.values(pub.stays)) expect((s as { lat?: number }).lat).toBeUndefined();
   });
 });
+
+describe("stay photos", () => {
+  it("public views keep a hotel's photo but never the home base's", () => {
+    const d = seedDoc();
+    const photo = { url: "/api/media/x/1.webp", page: "/api/media/x/1.webp", kind: "custom", site: "Kai" } as never;
+    const [homeKey] = Object.entries(d.stays).find(([, s]) => s.home)!;
+    d.stays[homeKey].photo = photo;
+    d.stays.syd = { ...(d.stays.syd ?? { name: "H", area: "A", address: "", nightly: 0, status: "unknown", note: "" }), photo };
+    for (const pub of [toPublicDoc(d), toPublicDoc(d, { photos: true })]) {
+      expect(pub.stays.syd.photo).toBeDefined();
+      expect(Object.values(pub.stays).filter((s) => s.home && s.photo)).toHaveLength(0);
+    }
+  });
+});

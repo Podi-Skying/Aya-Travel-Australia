@@ -129,8 +129,8 @@ async function main() {
       routes++;
       legs += r.computed;
     } catch (e) {
-      console.log(`stopped at ${c.mode} legs (${routes} route calls done): ${(e as Error).message}`);
-      break;
+      // No public transport between two points is normal: note it and carry on with the other legs.
+      console.log(`no ${c.mode} route (${routes} route calls done): ${(e as Error).message}`);
     }
   }
   console.log(`done: ${places} place searches (${found} found), ${routes} route calls (${legs} legs stored in route_cache)`);

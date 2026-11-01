@@ -378,8 +378,8 @@ export async function getMedia(req: Request, ctx: { params: Promise<{ path: stri
     if (!/^[a-z0-9/_-]+\.(webp|jpg|png)$/.test(rel) || rel.includes("..")) return fail(404, "找不到");
     const token = new URL(req.url).searchParams.get("token");
     const want = `/api/media/${rel}`;
-    const shows = (doc: { days: { items: Item[] }[]; attractionPool: { items: Item[] }[] } | null | undefined) =>
-      !!doc && [...doc.days.flatMap((d) => d.items), ...doc.attractionPool.flatMap((p) => p.items)].some((i) => i.photo?.url === want || (i.gallery ?? []).some((g) => g.url === want));
+    const shows = (doc: { days: { items: Item[] }[]; attractionPool: { items: Item[] }[]; stays?: Record<string, { photo?: { url: string } }> } | null | undefined) =>
+      !!doc && (Object.values(doc.stays ?? {}).some((st) => st.photo?.url === want) || [...doc.days.flatMap((d) => d.items), ...doc.attractionPool.flatMap((p) => p.items)].some((i) => i.photo?.url === want || (i.gallery ?? []).some((g) => g.url === want)));
     let ok = false;
     // A share token, or the public site (Kai 2026-10-27: photos for everyone), opens only photos its trip shows.
     if (token) ok = shows((await getPublicTrip(token))?.doc);

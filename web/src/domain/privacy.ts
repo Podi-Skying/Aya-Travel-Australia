@@ -83,7 +83,8 @@ export function toPublicDoc(doc: TripDoc, opts: { photos?: boolean } = {}) {
   // Where they sleep is effectively Kai's residence: share links get the position rounded to ~300 m;
   // public visitors get no position, and the home base is shown only as 「住處」.
   const fuzz = (n: number) => Math.round(n / 0.003) * 0.003;
-  for (const st of Object.values(scrubbed.stays) as { name: string; area: string; home?: boolean; lat?: number; lng?: number }[]) {
+  for (const st of Object.values(scrubbed.stays) as { name: string; area: string; home?: boolean; lat?: number; lng?: number; photo?: unknown }[]) {
+    if (st.home) delete st.photo;
     if (opts.photos && st.lat != null && st.lng != null) {
       st.lat = Math.round(fuzz(st.lat) * 1e4) / 1e4;
       st.lng = Math.round(fuzz(st.lng) * 1e4) / 1e4;
