@@ -34,7 +34,11 @@ function nameRegex(name: string): RegExp {
 }
 
 function scrub(value: unknown, names: string[]): unknown {
-  if (typeof value === "string") return names.reduce((acc, n) => acc.replace(nameRegex(n), PUBLIC_DRIVER_LABEL), value);
+  if (typeof value === "string") {
+    const masked = names.reduce((acc, n) => acc.replace(nameRegex(n), PUBLIC_DRIVER_LABEL), value);
+    // Keep the sentence natural around the mask: no spaces inside Chinese, no honorific on 朋友.
+    return masked === value ? value : masked.replace(/朋友さん/g, PUBLIC_DRIVER_LABEL).replace(/([\u3400-\u9fff])\s*朋友\s*(?=[\u3040-\u30ff\u3400-\u9fff])/g, "$1朋友");
+  }
   if (Array.isArray(value)) return value.map((v) => scrub(v, names));
   if (value && typeof value === "object") {
     const out: Record<string, unknown> = {};

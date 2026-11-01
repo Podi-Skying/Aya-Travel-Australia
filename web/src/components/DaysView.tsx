@@ -1,7 +1,7 @@
 "use client";
 
 import { dayCoverTitle, dayTitle, dayTitleZh } from "@/domain/day-title";
-import { t } from "@/i18n/current";
+import { getLang, t, tx } from "@/i18n/current";
 import { useEffect, useRef, useState } from "react";
 import { useTrip } from "./TripApp";
 import { Icon, MODE_ICON } from "./Icon";
@@ -638,6 +638,7 @@ export function DaysView({ active }: { active: boolean }) {
                 const cnt = countOf(i.id);
                 const big = i.major && !isLogistics(i);
                 const name = displayName(i);
+                const fullName = getLang() === "zh" ? i.name : tx(i, "name", i.name);
                 const waiting = i.status === "pending" || tent || nameIsTentative(i);
                 const flag = bookingFlag(i);
                 const stateIcon = flag ? (
@@ -675,7 +676,7 @@ export function DaysView({ active }: { active: boolean }) {
                 );
                 const more = (
                   <>
-                    {name !== i.name && <p className="small muted">{i.name}</p>}
+                    {name !== fullName && <p className="small muted">{fullName}</p>}
                     {weatherNote(i) && <p className="small wx-note">{weatherNote(i)}</p>}
                     {i.note && <ActNote text={i.note} />}
                     {i.ownerNote && (
@@ -684,7 +685,7 @@ export function DaysView({ active }: { active: boolean }) {
                       </div>
                     )}
                     <ul className="stop-more-list">
-                      {i.en && <li className="en">{i.en}</li>}
+                      {i.en && i.en !== name && i.en !== fullName && <li className="en">{i.en}</li>}
                       <li>
                         <Badge {...VERIFY[i.verify]} /> <Badge {...PRI[i.pri]} /> {i.originPackage && <Badge t="來自待安排景點" c="b-line" />}
                       </li>

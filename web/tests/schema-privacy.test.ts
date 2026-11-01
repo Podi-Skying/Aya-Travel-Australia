@@ -290,3 +290,16 @@ describe("name spellings", () => {
     expect(() => assertPublicSafe({ a: "Xe na" }, d)).toThrow(PrivacyGuardError);
   });
 });
+
+describe("a friend's name in a title", () => {
+  it("reads naturally once masked, in all three languages", () => {
+    const d = seedDoc();
+    d.peopleNames = { ...(d.peopleNames ?? {}), friend: "Xena" } as never;
+    Object.assign(d.days[0].items[0], { name: "和 Xe-na 與她男友晚餐", en: "Dinner with Xe-na and her bf", tr: { en: { name: "Dinner with Xe-na and her bf" }, ja: { name: "Xe-naさんと彼氏とディナー" } } });
+    const i = toPublicDoc(d).days[0].items[0];
+    expect(i.name).toBe("和朋友與她男友晚餐");
+    expect(i.tr?.en?.name).toBe("Dinner with a friend and her bf");
+    expect(i.tr?.ja?.name).toBe("友人と彼氏とディナー");
+    expect(JSON.stringify(i)).not.toMatch(/xe[- ]?na/i);
+  });
+});
