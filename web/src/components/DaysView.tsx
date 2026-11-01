@@ -926,8 +926,8 @@ export function DaysView({ active }: { active: boolean }) {
           </div>
 
           <p className="map-note map-legend small muted">
-            <span role="img" aria-label="實線是開車路線"><Icon name="car" size={14} /> ━</span>{" "}
-            <span role="img" aria-label="虛線是步行或大眾運輸（沿實際路線）"><Icon name="walk" size={14} /> ┅</span>{" "}
+            <span role="img" aria-label="實線是開車、大眾運輸、渡輪和飛機"><Icon name="car" size={14} /> ━</span>{" "}
+            <span role="img" aria-label="虛線是步行"><Icon name="walk" size={14} /> ┅</span>{" "}
             {roadLegs && route.slice(1).some((s, k) => (s.drive || (softTravel(s.mode) && !s.gap)) && !roadLegs[k]) ? "有路段還沒算出路線（可能是今天的 Google 用量上限到了）；可以按「重新計算路線」，或明天再打開這天。" : ""}
           </p>
         </aside>

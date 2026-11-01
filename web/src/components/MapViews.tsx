@@ -6,7 +6,7 @@ import type * as Leaflet from "leaflet";
 import { useReducedMotion } from "./ui";
 import type { EffectiveDay } from "@/domain/effective-day";
 import { iconSvg } from "./Icon";
-import { routeCredit, routeStops, useLegs } from "./useLegs";
+import { routeCredit, routeStops, splitLines, useLegs } from "./useLegs";
 import { HOUSE_SVG, type StayPin } from "@/domain/home-pins";
 import { iconOf } from "./stopIcon";
 import { sizedPhoto } from "./PlaceGallery";
@@ -202,19 +202,11 @@ export function DayMap({
         map.current.off("zoomend", declutterRef.current ?? undefined);
         declutterRef.current = declutter;
         map.current.on("zoomend", declutter);
-        // Driven legs follow the road once computed; walking, transit and not-yet-computed legs are dashed.
-        const rs = stopsRef.current;
-        const road: [number, number][][] = [];
-        const straight: [number, number][][] = [];
-        for (let k = 1; k < rs.length; k++) {
-          const leg = legsRef.current?.[k - 1];
-          // Walking and transit legs follow their real path but stay dashed; driven legs are solid.
-          if (leg?.geometry.length) (leg.source.startsWith("google-routes-") ? straight : road).push(leg.geometry);
-          else straight.push([rs[k - 1].pt, rs[k].pt]);
-        }
+        // Walking is dashed; driving, transit, ferries and flights are solid.
+        const { solid, dashed } = splitLines(stopsRef.current, legsRef.current);
         const red = cssVar("--vermilion", "#b83a2e");
-        if (road.length) L.polyline(road, { color: red, weight: 4, opacity: 0.9 }).addTo(layer.current).bringToBack();
-        if (straight.length) L.polyline(straight, { color: red, weight: 2.5, opacity: 0.7, dashArray: "3 7" }).addTo(layer.current).bringToBack();
+        if (solid.length) L.polyline(solid, { color: red, weight: 4, opacity: 0.9 }).addTo(layer.current).bringToBack();
+        if (dashed.length) L.polyline(dashed, { color: red, weight: 3, opacity: 0.8, dashArray: "3 7" }).addTo(layer.current).bringToBack();
         const { start, end } = endsRef.current;
         for (const p of [start, end].filter((x, k, a): x is StayPin => !!x && a.findIndex((y) => y?.key === x.key) === k)) {
           L.marker([p.lat, p.lng], { icon: L.divIcon({ className: "home-hit", html: `<span class="home-pin${p.home ? " base" : ""}">${HOUSE_SVG}</span>`, iconSize: [44, 44] }), keyboard: true, title: p.home ? "住處" : `住宿：${p.name}`, zIndexOffset: 800 })

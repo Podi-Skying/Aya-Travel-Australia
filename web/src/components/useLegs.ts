@@ -134,7 +134,7 @@ export function stopsOf<T extends { lat?: number; lng?: number; mode: string; no
       gap = true;
       continue;
     }
-    out.push({ pt: [i.lat, i.lng], drive: i.mode === "drive" && !gap && !i.noRoute, gap: !!i.noRoute });
+    out.push({ pt: [i.lat, i.lng], drive: i.mode === "drive" && !gap && !i.noRoute, gap: !!i.noRoute, mode: i.mode });
     gap = false;
   }
   return out;
@@ -209,4 +209,17 @@ export function useRoadLegs(points: Pt[] | null): (Leg | null)[] | null {
     };
   }, [key]);
   return state && state.key === key ? state.legs : null;
+}
+
+/** Map lines (Kai 2026-11-01): walking is dashed, every other way of travelling is solid. */
+export function splitLines(stops: { pt: Pt; mode?: string }[], legs: (Pick<Leg, "geometry" | "source"> | null)[] | null | undefined): { solid: Pt[][]; dashed: Pt[][] } {
+  const solid: Pt[][] = [];
+  const dashed: Pt[][] = [];
+  for (let k = 1; k < stops.length; k++) {
+    const leg = legs?.[k - 1];
+    const line = leg?.geometry.length ? leg.geometry : [stops[k - 1].pt, stops[k].pt];
+    const walking = leg?.geometry.length ? leg.source.endsWith("-walking") : stops[k].mode === "walk";
+    (walking ? dashed : solid).push(line);
+  }
+  return { solid, dashed };
 }

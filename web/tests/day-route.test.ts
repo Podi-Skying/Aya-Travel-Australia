@@ -48,3 +48,21 @@ describe("day route", () => {
     expect(r.at(-1)).toMatchObject({ kind: "end", drive: false });
   });
 });
+
+describe("map line styles", () => {
+  const pt = (n: number) => [n, n] as [number, number];
+  it("dashes only walking", async () => {
+    const { splitLines } = await import("@/components/useLegs");
+    const stops = [{ pt: pt(0) }, { pt: pt(1), mode: "drive" }, { pt: pt(2), mode: "train" }, { pt: pt(3), mode: "walk" }, { pt: pt(4), mode: "ferry" }, { pt: pt(5), mode: "bus" }];
+    const legs = [
+      { geometry: [pt(0), pt(1)], source: "google-routes" },
+      { geometry: [pt(1), pt(2)], source: "google-routes-transit" },
+      { geometry: [pt(2), pt(3)], source: "google-routes-walking" },
+      null,
+      null,
+    ];
+    const { solid, dashed } = splitLines(stops, legs);
+    expect(dashed).toEqual([[pt(2), pt(3)]]);
+    expect(solid).toHaveLength(4);
+  });
+});

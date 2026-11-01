@@ -7,7 +7,7 @@ import { useTrip } from "./TripApp";
 import { Icon, iconSvg } from "./Icon";
 import { PendingButton, useHobartToday, useHydrated, useReducedMotion } from "./ui";
 import { ZOOM_OPTIONS, pinchZoom, cssVar, esc, loadLeaflet, tiles } from "./MapViews";
-import { computeLegs, routeCredit, useLegs, type Pt, routeStops } from "./useLegs";
+import { computeLegs, routeCredit, useLegs, type Pt, routeStops, splitLines } from "./useLegs";
 import { PlaceGallery } from "./PlaceGallery";
 import { creditText } from "./Photos";
 import { project, rubber, spring } from "./motion";
@@ -272,18 +272,10 @@ export function PlacesMap({ active }: { active: boolean }) {
             const here = (i: { lat?: number; lng?: number }) => i.lat != null && i.lng != null && i.lat > -40 === (d.seg === "syd");
             const pts = d.items.filter(here).map((i) => [i.lat!, i.lng!] as [number, number]);
             if (sel) {
-              // Same lines as the day map: computed road legs solid, other legs dashed and straight.
-              const rs = selStops ?? [];
-              const road: [number, number][][] = [];
-              const straight: [number, number][][] = [];
-              for (let k = 1; k < rs.length; k++) {
-                const leg = legs?.[k - 1];
-                // Walking and transit legs follow their real path but stay dashed; driven legs are solid.
-          if (leg?.geometry.length) (leg.source.startsWith("google-routes-") ? straight : road).push(leg.geometry);
-                else straight.push([rs[k - 1].pt, rs[k].pt]);
-              }
-              if (road.length) L.polyline(road, { color: red, weight: 4, opacity: 0.9 }).addTo(dayLayer.current!);
-              if (straight.length) L.polyline(straight, { color: red, weight: 2.5, opacity: 0.7, dashArray: "3 7" }).addTo(dayLayer.current!);
+              // Same lines as the day map: walking dashed, everything else solid.
+              const { solid, dashed } = splitLines(selStops ?? [], legs);
+              if (solid.length) L.polyline(solid, { color: red, weight: 4, opacity: 0.9 }).addTo(dayLayer.current!);
+              if (dashed.length) L.polyline(dashed, { color: red, weight: 3, opacity: 0.8, dashArray: "3 7" }).addTo(dayLayer.current!);
               d.items.forEach((i, k) => {
                 if (!here(i)) return;
                 selPtsHere.push([i.lat!, i.lng!]);
@@ -294,7 +286,7 @@ export function PlacesMap({ active }: { active: boolean }) {
               return;
             }
             // Other days: faded ink, dashed, small dots, no labels.
-            if (pts.length > 1) L.polyline(pts, { color: ink, weight: 2, opacity: selDate ? 0.25 : 0.45, dashArray: "4 6" }).addTo(dayLayer.current!);
+            if (pts.length > 1) L.polyline(pts, { color: ink, weight: 2, opacity: selDate ? 0.25 : 0.45 }).addTo(dayLayer.current!);
             d.items.forEach((i) => {
               if (!here(i)) return;
               all.push([i.lat!, i.lng!]);
