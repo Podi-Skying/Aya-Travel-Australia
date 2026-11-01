@@ -7,6 +7,8 @@ import { nightStay } from "./stay";
  * details may appear. `key` identifies an event across syncs. Pure, so it can be tested without Google.
  */
 
+const CJK = /[\u3000-\u30ff\u3400-\u9fff\uff00-\uffef]/;
+
 export type CalendarEvent = { key: string; body: Record<string, unknown> };
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -25,6 +27,15 @@ function nextDate(date: string): string {
 export function calendarEvents(doc: TripDoc, siteUrl = ""): CalendarEvent[] {
   const out: CalendarEvent[] = [];
   const N = doc.partySize;
+  // English only: stored translations, and text with no translation is left out rather than shown in Chinese.
+  const dict = new Map((doc.textTr ?? []).map((p) => [p.zh, p.en]));
+  const en = (raw?: string | string[]): string => {
+    const text = Array.isArray(raw) ? raw.join(" ") : raw;
+    if (!text) return "";
+    const t = CJK.test(text) ? (dict.get(text) ?? "") : text;
+    return CJK.test(t) ? "" : t;
+  };
+  const titleOf = (i: TripDoc["days"][number]["items"][number]) => en(i.tr?.en?.name) || en(i.en) || "Activity";
   for (const d of doc.days) {
     const endsAtHome = !!stayOf(doc, nightStay(doc, d)).home;
     const timed = d.items.filter((i) => !i.name.startsWith("住宿：") && !(i.dur === 0 && i.time === "00:00"));
@@ -36,17 +47,17 @@ export function calendarEvents(doc: TripDoc, siteUrl = ""): CalendarEvent[] {
       const next = timed[k + 1] ? toMin(timed[k + 1].time) : null;
       const end = i.dur > 0 ? start + i.dur : next !== null && next > start ? next : start + 60;
       const description = [
-        i.note,
-        i.ownerNote,
-        i.status === "confirmed" ? "已確認" : i.status === "pending" ? "待確認" : "",
-        i.cost && i.cost.status !== "unknown" ? `AUD ${lineAmount(i.cost, N)}` : "",
+        en(i.tr?.en?.note ?? i.note),
+        en(i.ownerNote),
+        i.status === "confirmed" ? "Booked" : i.status === "pending" ? "To confirm" : "",
+        i.cost && i.cost.status !== "unknown" ? `Cost: AUD ${lineAmount(i.cost, N)}` : "",
         i.src?.url,
-        siteUrl ? `${siteUrl}/plan?tab=days&day=${d.date}` : "",
+        siteUrl ? `This day: ${siteUrl}/plan?tab=days&day=${d.date}` : "",
       ].filter(Boolean).join("\n");
       out.push({
         key: i.id,
         body: {
-          summary: i.name,
+          summary: titleOf(i),
           start: { dateTime: local(d.date, start), timeZone },
           end: { dateTime: local(d.date, end), timeZone },
           ...(description ? { description } : {}),
@@ -71,8 +82,9 @@ export function calendarEvents(doc: TripDoc, siteUrl = ""): CalendarEvent[] {
   }
   for (const r of runs) {
     const st = stayOf(doc, r.key);
-    const description = [st.address, st.note, st.checkin ? `入住 ${st.checkin.from}–${st.checkin.to ?? ""}` : ""].filter(Boolean).join("\n");
-    out.push({ key: `stay:${r.key}:${r.from}`, body: { summary: `住宿：${st.name}`, start: { date: r.from }, end: { date: nextDate(r.to) }, transparency: "transparent", ...(description ? { description } : {}), ...(st.address ? { location: st.address } : {}) } });
+    const address = en(st.address);
+    const description = [address, en(st.note), st.checkin ? `Check-in ${st.checkin.from}–${st.checkin.to ?? ""}` : ""].filter(Boolean).join("\n");
+    out.push({ key: `stay:${r.key}:${r.from}`, body: { summary: `Stay: ${en(st.name) || "Accommodation"}`, start: { date: r.from }, end: { date: nextDate(r.to) }, transparency: "transparent", ...(description ? { description } : {}), ...(address ? { location: address } : {}) } });
   }
   return out;
 }

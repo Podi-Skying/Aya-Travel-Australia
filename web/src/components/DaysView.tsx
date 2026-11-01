@@ -28,7 +28,8 @@ import { dayEnds } from "@/domain/home-pins";
 import { PlaceGallery, sizedPhoto } from "./PlaceGallery";
 import { displayName, isLogistics, nameIsTentative } from "@/domain/day-title";
 import { iconOf, isLegOnly } from "./stopIcon";
-import { CalendarSync } from "./CalendarSync";
+import { OwnerMenu } from "./OwnerMenu";
+import { useCalendarSync } from "./useCalendarSync";
 
 /**
  * One line per leg (Kai 2026-10-26): the road-computed time and distance when known, else the estimate.
@@ -220,8 +221,9 @@ function ActNote({ text }: { text: string }) {
 }
 
 export function DaysView({ active }: { active: boolean }) {
-  const { doc, mode, currentDay, setCurrentDay, runOp, runOpUndoable, ask, online, myVotes, vote, unvote, counts, canVote, token } = useTrip();
+  const { doc, mode, versionNo, currentDay, setCurrentDay, runOp, runOpUndoable, ask, online, myVotes, vote, unvote, counts, canVote, token } = useTrip();
   const weather = useWeather();
+  const calendar = useCalendarSync(mode === "owner", versionNo);
   const [showNearby, setShowNearby] = useState(false);
   const [focusId, setFocusId] = useState<string | null>(null);
   const [viewer, setViewer] = useState<number | null>(null);
@@ -551,46 +553,43 @@ export function DaysView({ active }: { active: boolean }) {
           <div className="day-chip-line">
             <TapChips items={facts} />
             {editable && (
-              <details className="owner-menu">
-                <summary aria-label="更多動作">
-                  <Icon name="more" size={20} />
-                </summary>
-                <div className="owner-menu-body">
-                  <CalendarSync />
-                  <p className="title-pin small">
-                    {raw.titlePinned ? "標題已固定" : "標題依當天活動自動產生"}{" "}
-                    <PendingButton
-                      className="btn ghost small"
-                      pendingLabel="儲存中…"
-                      onAction={async () => {
+              <OwnerMenu
+                label="更多動作"
+                onOpen={calendar.refresh}
+                groups={[
+                  calendar.enabled
+                    ? [{
+                        key: "sync",
+                        icon: <Icon name={calendar.synced ? "ok" : "calendar"} size={20} />,
+                        label: calendar.busy ? "同步中…" : calendar.synced ? "已同步" : "同步 Google 日曆",
+                        sub: calendar.line,
+                        error: calendar.failed,
+                        quiet: calendar.synced && !calendar.busy,
+                        busy: calendar.busy,
+                        keepOpen: true,
+                        onSelect: calendar.sync,
+                      }]
+                    : [],
+                  [
+                    {
+                      key: "title",
+                      icon: <Icon name="pencil" size={20} />,
+                      label: raw.titlePinned ? "修改標題" : "自訂標題",
+                      badge: raw.titlePinned ? undefined : "自動",
+                      onSelect: async () => {
                         const v = await ask(raw.titlePinned ? "修改或取消固定標題" : "自訂這天的標題", {
                           body: <p className="small muted">留空會改回依當天活動自動產生的標題。</p>,
                           fields: [{ name: "title", label: "標題（最多 60 字）", value: raw.titlePinned ? raw.title : dayTitleZh(raw), maxLength: 60 }],
                         });
-                        if (!v) return null;
-                        return runOp({ op: "setDayTitle", date: raw.date, title: v.title });
-                      }}
-                    >
-                      {raw.titlePinned ? "修改標題" : "自訂標題"}
-                    </PendingButton>
-                  </p>
-                  {clearDaySplit(raw.items).move.length > 0 && (
-                    <PendingButton className="btn ghost small clear-day" pendingLabel="清空中…" onAction={clearDay}>
-                      清空這天…
-                    </PendingButton>
-                  )}
-                  {d.needsDriver && (d.driverOk || raw.driverConfirmation) && (
-                    <PendingButton className="btn ghost small" pendingLabel="儲存中…" onAction={() => runOp({ op: "clearDriver", date: d.date })}>
-                      改回未確認
-                    </PendingButton>
-                  )}
-                  {d.needsDriver && !d.driverOk && (
-                    <PendingButton className="btn small" pendingLabel="確認中…" onAction={confirmDriver}>
-                      ✓ 確認司機與時段
-                    </PendingButton>
-                  )}
-                </div>
-              </details>
+                        if (v) await runOp({ op: "setDayTitle", date: raw.date, title: v.title });
+                      },
+                    },
+                    ...(d.needsDriver && !d.driverOk ? [{ key: "driver", icon: <Icon name="car" size={20} />, label: "確認司機與時段", onSelect: confirmDriver }] : []),
+                    ...(d.needsDriver && (d.driverOk || raw.driverConfirmation) ? [{ key: "undriver", icon: <Icon name="wait" size={20} />, label: "司機改回未確認", onSelect: () => runOp({ op: "clearDriver", date: d.date }) }] : []),
+                  ],
+                  clearDaySplit(raw.items).move.length > 0 ? [{ key: "clear", icon: <Icon name="trash" size={20} />, label: "清空這天…", danger: true, onSelect: clearDay }] : [],
+                ]}
+              />
             )}
           </div>
           {owner && !online && <p className="small muted">離線中：可以查看，但修改需要網路連線。</p>}

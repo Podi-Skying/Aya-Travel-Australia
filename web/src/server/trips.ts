@@ -132,7 +132,7 @@ export async function writeVersion(
       await tx.update(trips).set({ currentVersionId: inserted[0].id, updatedAt: sql`now()` }).where(eq(trips.id, trip.id));
       return { versionNo, summary: next.summary, doc };
     });
-    await scheduleCalendarSync(written.doc);
+    await scheduleCalendarSync(written.doc, written.versionNo);
     return written;
   } catch (e) {
     if (isUniqueViolation(e)) throw new HttpError(409, "行程已在其他地方更新，請重新整理後再試");

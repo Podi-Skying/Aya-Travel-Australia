@@ -960,4 +960,13 @@ export const EN: Record<string, string> = {
   "日出 {0}": "Sunrise {0}",
   "連續開車約 {0}，要加一個至少 30 分鐘的休息站。": "About {0} of driving without a stop: add a rest of at least 30 minutes.",
   "最後一站 {0} 才結束，住宿最晚 {1} 要入住。": "The last stop ends at {0}, but last check-in is {1}.",
+  "已同步": "Synced",
+  "同步 Google 日曆": "Sync Google Calendar",
+  "同步中…": "Syncing…",
+  "有更新未同步": "Changes not synced",
+  "自動": "Auto",
+  "確認司機與時段": "Confirm driver and hours",
+  "司機改回未確認": "Mark driver unconfirmed",
+  "{0} 個活動・{1}": "{0} events · {1}",
+  "同步失敗": "Sync failed",
 };

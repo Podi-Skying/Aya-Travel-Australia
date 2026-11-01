@@ -12,7 +12,7 @@ import { getLookup, putLookup } from "./cache";
 type Fetch = typeof fetch;
 type Config = { calendarId: string; email: string; key: string };
 type Remote = { id: string; extendedProperties?: { private?: { ayaId?: string; ayaHash?: string } } };
-export type SyncResult = { at: string; events: number; created: number; updated: number; deleted: number; error?: string };
+export type SyncResult = { at: string; events: number; created: number; updated: number; deleted: number; versionNo?: number; error?: string };
 
 const API = "https://www.googleapis.com/calendar/v3";
 const b64u = (s: string | Buffer) => Buffer.from(s).toString("base64url");
@@ -39,11 +39,11 @@ async function accessToken(cfg: Config, f: Fetch): Promise<string> {
   return ((await r.json()) as { access_token: string }).access_token;
 }
 
-export async function syncCalendar(doc: TripDoc, opts: { fetch?: Fetch; siteUrl?: string } = {}): Promise<SyncResult | null> {
+export async function syncCalendar(doc: TripDoc, opts: { fetch?: Fetch; siteUrl?: string; versionNo?: number } = {}): Promise<SyncResult | null> {
   const cfg = calendarConfig();
   if (!cfg) return null;
   const f = opts.fetch ?? fetch;
-  const res: SyncResult = { at: new Date().toISOString(), events: 0, created: 0, updated: 0, deleted: 0 };
+  const res: SyncResult = { at: new Date().toISOString(), events: 0, created: 0, updated: 0, deleted: 0, versionNo: opts.versionNo };
   try {
     const token = await accessToken(cfg, f);
     const base = `${API}/calendars/${encodeURIComponent(cfg.calendarId)}/events`;
@@ -96,18 +96,20 @@ export async function syncCalendar(doc: TripDoc, opts: { fetch?: Fetch; siteUrl?
   return res;
 }
 
-export async function calendarStatus(): Promise<{ enabled: boolean; last: SyncResult | null }> {
-  if (!calendarConfig()) return { enabled: false, last: null };
-  const r = await getLookup("gcal", "status").catch(() => null);
-  return { enabled: true, last: (r?.value as SyncResult | undefined) ?? null };
+/** 已同步 only when the last sync worked and reached this version of the trip. */
+export async function calendarStatus(versionNo?: number): Promise<{ enabled: boolean; synced: boolean; last: SyncResult | null }> {
+  if (!calendarConfig()) return { enabled: false, synced: false, last: null };
+  const r = await getLookup<SyncResult>("gcal", "status").catch(() => null);
+  const last = r?.value ?? null;
+  return { enabled: true, synced: !!last && !last.error && last.versionNo === versionNo, last };
 }
 
 /** After a successful trip write: push in the background, without slowing the save. Off without settings. */
-export async function scheduleCalendarSync(doc: TripDoc): Promise<void> {
+export async function scheduleCalendarSync(doc: TripDoc, versionNo: number): Promise<void> {
   if (!calendarConfig()) return;
   try {
     const { after } = await import("next/server");
-    after(() => syncCalendar(doc, { siteUrl: process.env.NEXTAUTH_URL }).then(() => undefined));
+    after(() => syncCalendar(doc, { siteUrl: process.env.NEXTAUTH_URL, versionNo }).then(() => undefined));
   } catch {
     /* outside a request (scripts): the owner's 同步 button covers it */
   }

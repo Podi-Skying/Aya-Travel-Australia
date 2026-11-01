@@ -57,6 +57,23 @@ describe("calendar events", () => {
   });
 });
 
+describe("calendar events in English", () => {
+  it("no title, description or location holds Chinese or Japanese", () => {
+    const d = doc();
+    d.days[0].items[0] = { ...d.days[0].items[0], name: "雪梨月神公園", en: undefined, note: "中文", ownerNote: "只有中文", tr: { en: { name: "Luna Park", note: "English note" }, ja: { name: "ルナパーク" } } } as never;
+    d.days[0].items[1] = { ...d.days[0].items[1], name: "沒有翻譯", en: undefined, note: "沒有翻譯", tr: undefined } as never;
+    const ev = calendarEvents(d, "https://x.test");
+    const first = ev.find((e) => e.key === "one")!.body as { summary: string; description: string };
+    expect(first.summary).toBe("Luna Park");
+    expect(first.description).toContain("English note");
+    expect(ev.find((e) => e.key === "two")!.body.summary).toBe("Activity");
+    for (const e of ev) {
+      const { summary, description, location } = e.body as Record<string, string>;
+      expect(`${summary} ${description ?? ""} ${location ?? ""}`, e.key).not.toMatch(/[\u3040-\u30ff\u3400-\u9fff]/);
+    }
+  });
+});
+
 describe("syncCalendar", () => {
   beforeEach(() => {
     process.env.GOOGLE_CALENDAR_ID = "cal@test";
@@ -65,6 +82,17 @@ describe("syncCalendar", () => {
   afterEach(() => {
     delete process.env.GOOGLE_CALENDAR_ID;
     delete process.env.GOOGLE_CALENDAR_SA_JSON;
+  });
+
+  it("records the synced version, and 已同步 lasts until the trip moves on", async () => {
+    const { getLookup } = await import("@/server/cache");
+    const { calendarStatus } = await import("@/server/gcal");
+    vi.mocked(getLookup).mockResolvedValue({ value: { at: "x", events: 1, created: 1, updated: 0, deleted: 0, versionNo: 7 } } as never);
+    expect((await calendarStatus(7)).synced).toBe(true);
+    expect((await calendarStatus(8)).synced).toBe(false);
+    vi.mocked(getLookup).mockResolvedValue({ value: { at: "x", events: 1, created: 0, updated: 0, deleted: 0, versionNo: 7, error: "Google 日曆錯誤（403）" } } as never);
+    expect((await calendarStatus(7)).synced).toBe(false);
+    vi.mocked(getLookup).mockResolvedValue(null as never);
   });
 
   it("is off without settings", async () => {
