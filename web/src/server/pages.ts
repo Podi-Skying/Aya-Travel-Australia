@@ -1,3 +1,4 @@
+import { catchUpCalendar } from "./gcal";
 import { checkOwner } from "./owner";
 import { missingConfig } from "./config";
 import { getCurrentTrip, type CurrentTrip } from "./trips";
@@ -12,6 +13,7 @@ export type OwnerPage = { kind: "config"; missing: string[] } | { kind: "signin"
   | { kind: "public"; trip: { doc: PublicDoc; versionNo: number }; signedInAs: "nobody" | "other" };
 
 export async function loadOwnerPage(): Promise<OwnerPage> {
+  await catchUpCalendar();
   const missing = missingConfig("owner");
   if (missing.length) return { kind: "config", missing };
   const c = await checkOwner();

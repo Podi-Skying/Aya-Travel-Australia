@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { generateKeyPairSync } from "node:crypto";
 import { calendarEvents } from "@/domain/gcal-events";
-import { calendarConfig, syncCalendar } from "@/server/gcal";
+import { calendarConfig, needsCatchUp, syncCalendar } from "@/server/gcal";
 import { seedDoc } from "./helpers";
 
 vi.mock("@/server/cache", () => ({ putLookup: vi.fn(async () => undefined), getLookup: vi.fn(async () => null) }));
@@ -54,6 +54,28 @@ describe("calendar events", () => {
     expect(by("two").end.dateTime.slice(11, 16)).toBe("14:30");
     expect(by("three").end.dateTime.slice(11, 16)).toBe("15:30");
     expect(ev.some((e) => e.key.startsWith("stay:"))).toBe(true);
+  });
+});
+
+describe("catching up from page views", () => {
+  const at = Date.parse("2026-11-02T00:00:00Z");
+  const rec = (o: object) => ({ at: new Date(at - 60_000).toISOString(), events: 1, created: 0, updated: 0, deleted: 0, versionNo: 7, ...o });
+  it("runs when the calendar is behind or was never synced", () => {
+    expect(needsCatchUp(null, 7, at)).toBe(true);
+    expect(needsCatchUp(rec({ versionNo: 6 }), 7, at)).toBe(true);
+  });
+  it("does nothing when up to date", () => {
+    expect(needsCatchUp(rec({}), 7, at)).toBe(false);
+  });
+  it("backs off after a failure, then tries again", () => {
+    expect(needsCatchUp(rec({ error: "Google 日曆錯誤（403）" }), 7, at)).toBe(false);
+    expect(needsCatchUp(rec({ error: "x" }), 8, at)).toBe(false);
+    expect(needsCatchUp(rec({ error: "x" }), 7, at + 31 * 60_000)).toBe(true);
+  });
+  it("stops at once without settings", async () => {
+    const { catchUpCalendar } = await import("@/server/gcal");
+    delete process.env.GOOGLE_CALENDAR_ID;
+    await expect(catchUpCalendar()).resolves.toBeUndefined();
   });
 });
 

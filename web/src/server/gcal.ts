@@ -15,6 +15,7 @@ type Remote = { id: string; extendedProperties?: { private?: { ayaId?: string; a
 export type SyncResult = { at: string; events: number; created: number; updated: number; deleted: number; versionNo?: number; error?: string };
 
 const API = "https://www.googleapis.com/calendar/v3";
+const FAILURE_BACKOFF_MS = 30 * 60 * 1000;
 const b64u = (s: string | Buffer) => Buffer.from(s).toString("base64url");
 
 export function calendarConfig(): Config | null {
@@ -114,3 +115,34 @@ export async function scheduleCalendarSync(doc: TripDoc, versionNo: number): Pro
     /* outside a request (scripts): the owner's 同步 button covers it */
   }
 }
+
+/** Whether a page view should start a catch-up: the calendar is behind, and the last try did not just fail. */
+export function needsCatchUp(last: SyncResult | null, versionNo: number, now = Date.now()): boolean {
+  if (last && !last.error && last.versionNo === versionNo) return false;
+  if (last?.error && now - Date.parse(last.at) < FAILURE_BACKOFF_MS) return false;
+  return true;
+}
+
+/**
+ * Called on page views, by anyone: trip writes made outside a request reach the calendar on their own. Never
+ * blocks the page or shows the viewer anything. The atomic counter lets one sync start per 10-minute window.
+ */
+export async function catchUpCalendar(): Promise<void> {
+  if (!calendarConfig()) return;
+  try {
+    const [{ after }, { getCurrentTrip }, { ownerIds }, { routeQuota }] = await Promise.all([import("next/server"), import("./trips"), import("./auth"), import("./sharing")]);
+    const id = ownerIds()[0];
+    if (!id) return;
+    after(async () => {
+      const cur = await getCurrentTrip({ githubId: id } as never);
+      if (!cur) return;
+      const last = (await getLookup<SyncResult>("gcal", "status"))?.value ?? null;
+      if (!needsCatchUp(last, cur.versionNo)) return;
+      if (!(await routeQuota("gcal-catch-up", 1, false))) return;
+      await syncCalendar(cur.doc as TripDoc, { siteUrl: process.env.NEXTAUTH_URL, versionNo: cur.versionNo });
+    });
+  } catch {
+    /* a page view must never fail because of the calendar */
+  }
+}
+
