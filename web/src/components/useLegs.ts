@@ -125,7 +125,7 @@ export const legLabel = (l: Leg) => {
  * Stops of a day with coordinates (and passing `keep`); `drive` marks a stop reached by car directly
  * from the previous stop. Any skipped activity in between breaks the route (no leg across it).
  */
-export function stopsOf<T extends { lat?: number; lng?: number; mode: string }>(items: T[], keep: (i: T) => boolean = () => true): Stop[] {
+export function stopsOf<T extends { lat?: number; lng?: number; mode: string; noRoute?: boolean }>(items: T[], keep: (i: T) => boolean = () => true): Stop[] {
   const out: Stop[] = [];
   let gap = false;
   for (const i of items) {
@@ -134,7 +134,7 @@ export function stopsOf<T extends { lat?: number; lng?: number; mode: string }>(
       gap = true;
       continue;
     }
-    out.push({ pt: [i.lat, i.lng], drive: i.mode === "drive" && !gap });
+    out.push({ pt: [i.lat, i.lng], drive: i.mode === "drive" && !gap && !i.noRoute, gap: !!i.noRoute });
     gap = false;
   }
   return out;
@@ -155,7 +155,7 @@ export type RouteStop = Stop & { kind: "start" | "item" | "end"; name: string; m
  * tonight's stay. The first and last legs are driven when the day's first or last stop is reached by car.
  * Stay notes (「住宿：」) are not stops; the stay itself is the end.
  */
-export function routeStops<T extends { id: string; name: string; lat?: number; lng?: number; mode: string }>(
+export function routeStops<T extends { id: string; name: string; lat?: number; lng?: number; mode: string; noRoute?: boolean }>(
   items: T[],
   ends: { start: { lat: number; lng: number; name: string } | null; end: { lat: number; lng: number; name: string } | null },
 ): RouteStop[] {
@@ -168,7 +168,7 @@ export function routeStops<T extends { id: string; name: string; lat?: number; l
       gap = true;
       continue;
     }
-    out.push({ pt: [i.lat, i.lng], drive: i.mode === "drive" && !gap && out.length > 0, gap: gap || out.length === 0, kind: "item", name: i.name, mode: i.mode, itemId: i.id });
+    out.push({ pt: [i.lat, i.lng], drive: i.mode === "drive" && !gap && !i.noRoute && out.length > 0, gap: gap || !!i.noRoute || out.length === 0, kind: "item", name: i.name, mode: i.mode, itemId: i.id });
     gap = false;
   }
   const lastItem = [...out].reverse().find((s) => s.kind === "item");

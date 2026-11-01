@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { longestDrive } from "@/domain/rules";
 import { dayCoverTitle, displayName, nameIsTentative } from "@/domain/day-title";
 
 describe("displayName", () => {
@@ -20,5 +21,12 @@ describe("dayCoverTitle", () => {
   it("keeps full stop names", () => {
     const stop = (name: string) => ({ name, major: true, mode: "drive", pri: "pref" }) as never;
     expect(dayCoverTitle({ title: "x", items: [stop("Bay of Fires 火焰灣（Binalong Bay）"), stop("Little Blue Lake 藍湖")] })).toBe("Bay of Fires 火焰灣 → Little Blue Lake 藍湖");
+  });
+});
+
+describe("longestDrive", () => {
+  it("resets only after a stop of 30 minutes or more", () => {
+    expect(longestDrive([{ driveMin: 100, stopMin: 15 }, { driveMin: 60, stopMin: 30 }, { driveMin: 90, stopMin: 0 }])).toBe(160);
+    expect(longestDrive([{ driveMin: 120, stopMin: 30 }, { driveMin: 120, stopMin: 45 }])).toBe(120);
   });
 });

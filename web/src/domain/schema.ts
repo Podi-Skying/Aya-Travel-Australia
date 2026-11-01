@@ -110,6 +110,10 @@ export const itemSchema = z.object({
   indoor: z.boolean().optional(),
   /** Curated photos (Kai 2026-10-27): "own" shows only the item's photo and gallery; "own+google" adds live Google photos but no Wikimedia search results. */
   photoSources: z.enum(["own", "own+google"]).optional(),
+  /** Reached by a park shuttle or similar: no routed leg, `travel` gives the estimate (Kai 2026-11-01). */
+  noRoute: z.boolean().optional(),
+  /** Dinner: when the kitchen closes or last seating, HH:MM; a later plan is flagged. */
+  closes: z.string().regex(/^\d{2}:\d{2}$/).optional(),
   tr: trSchema,
   /** A guided tour or cruise to book (Kai 2026-10-27): where and when it leaves; shown as a card in 行程方案. */
   tour: z.object({ depart: shortText(120), when: shortText(80) }).optional(),
@@ -262,6 +266,10 @@ export const tripDocSchema = z
         area: shortText(120),
         address: shortText(300),
         nightly: z.number().min(0).max(100000),
+        /** Check-in window, HH:MM (Kai 2026-11-01). `to` is the last check-in; a later arrival is flagged. */
+        checkin: z.object({ from: z.string().regex(/^\d{2}:\d{2}$/), to: z.string().regex(/^\d{2}:\d{2}$/).optional() }).optional(),
+        /** The price already includes the friend who drives, so no second share is added. */
+        includesDriver: z.boolean().optional(),
         status: z.enum(COST_STATUS),
         note: shortText(300),
         /** The home base (UTAS Hobart Apartments): every Tasmania night unless a multi-day trip says otherwise. */

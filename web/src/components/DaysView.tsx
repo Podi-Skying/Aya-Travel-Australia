@@ -17,7 +17,7 @@ import { CATEGORY_META, distanceLabel, nearbyPlaces, type NearbyPlace } from "./
 import { PhotoViewer, mapsPhotoLink, type DayPhoto } from "./Photos";
 import { DayMap } from "./MapViews";
 import { effectiveDay, isTentative } from "@/domain/effective-day";
-import { checks, feasibility } from "@/domain/rules";
+import { checks, feasibility, longestDrive, MAX_DRIVE_MIN } from "@/domain/rules";
 import { basis, dayTotal, lineAmount, stayOf } from "@/domain/budget";
 import { fmtDay, mins, money } from "@/domain/format";
 import type { Item } from "@/domain/schema";
@@ -93,7 +93,7 @@ function RouteStrip({ items, legBefore }: { items: Item[]; legBefore: (id: strin
               <span className="rs-pic">
                 {pic ? (
                   // eslint-disable-next-line @next/next/no-img-element -- hotlinked photo, see Photos.tsx
-                  <img src={sizedPhoto(pic.url, 250, pic.w)} alt="" referrerPolicy="no-referrer" loading="lazy" decoding="async" />
+                  <img src={sizedPhoto(pic.url, 250, pic.w)} style={pic.pos ? { objectPosition: pic.pos } : undefined} alt="" referrerPolicy="no-referrer" loading="lazy" decoding="async" />
                 ) : (
                   <Icon name={iconOf(i)} size={20} />
                 )}
@@ -223,9 +223,8 @@ export function DaysView({ active }: { active: boolean }) {
   const N = doc.partySize;
   const night = nightStay(doc, raw);
   const st = stayOf(doc, night);
-  const cs = checks(doc, d, { showWindow: owner });
+  const cs0 = checks(doc, d, { showWindow: owner });
   const fe = VERIFY[feasibility(doc, d)];
-  const warnN = cs.filter((c) => c.lv === "warn").length;
   const majors = d.items.filter((i) => i.major).length;
   const seg = doc.segments[d.seg];
   const nearby = nearbyPlaces(doc, d.date, 12);
@@ -392,8 +391,16 @@ export function DaysView({ active }: { active: boolean }) {
     return runOp({ op: "confirmDriver", date: d.date, window: r.win });
   }
 
+  // Kai's rule: about 2 hours of driving at most, then a stop of at least 30 minutes.
+  const drives = route.slice(1).map((s, k) => {
+    const item = d.items.find((i) => i.id === s.itemId);
+    return { driveMin: s.drive && roadLegs?.[k] ? Math.round(roadLegs[k]!.durationS / 60) : 0, stopMin: item?.dur ?? 0 };
+  });
+  const longest = longestDrive(drives);
+  const cs = longest > MAX_DRIVE_MIN ? [...cs0, { lv: "warn" as const, t: `連續開車約 ${mins(longest)}，要加一個至少 30 分鐘的休息站。` }] : cs0;
   // Status chips above the stops: pictures and numbers first, the sentence opens on tap.
   const dayWx = wxFor(weather, d.date);
+  const warnN = cs.filter((c) => c.lv === "warn").length;
   const facts: TapChip[] = [
     ...(weather ? wxChips(dayWx, <WxLine day={dayWx} />) : []),
     ...(weather && dayWx?.wx && isWet(dayWx.wx)
@@ -423,12 +430,13 @@ export function DaysView({ active }: { active: boolean }) {
       ? [{
           key: "stay",
           icon: <Icon name="bed" size={18} />,
-          text: st.area || st.name,
-          label: `今晚住宿：${st.area || st.name}`,
+          text: st.checkin?.to ? `≤${st.checkin.to}` : st.area || st.name,
+          label: `今晚住宿：${st.area || st.name}${st.checkin ? `，入住 ${st.checkin.from}–${st.checkin.to ?? ""}` : ""}`,
           panel: (
             <p className="small">
               {st.name}
               {owner && st.address ? `・地址：${st.address}` : "・確切地址已隱藏"}
+              {st.checkin ? `・入住 ${st.checkin.from}–${st.checkin.to ?? ""}` : ""}
               {st.note ? `・${st.note}` : ""}
             </p>
           ),
@@ -495,7 +503,7 @@ export function DaysView({ active }: { active: boolean }) {
             {dayHero?.photo ? (
               <button type="button" className="day-cover-photo" onClick={() => setViewer(dayPhotos.findIndex((p) => p.id === dayHero.id))} aria-label={`放大看照片：${dayHero.name}`}>
                 {/* eslint-disable-next-line @next/next/no-img-element -- hotlinked photo, see Photos.tsx */}
-                <img src={sizedPhoto(dayHero.photo.url, 960, dayHero.photo.w)} alt="" referrerPolicy="no-referrer" fetchPriority="high" decoding="async" data-photo-id={dayHero.id} />
+                <img src={sizedPhoto(dayHero.photo.url, 960, dayHero.photo.w)} style={dayHero.photo.pos ? { objectPosition: dayHero.photo.pos } : undefined} alt="" referrerPolicy="no-referrer" fetchPriority="high" decoding="async" data-photo-id={dayHero.id} />
               </button>
             ) : (
               <span className="day-cover-tile" aria-hidden="true">
@@ -601,6 +609,11 @@ export function DaysView({ active }: { active: boolean }) {
                     <span role="img" aria-label={MODE[i.mode]}>
                       <Icon name={MODE_ICON[i.mode] ?? "route"} size={14} />
                     </span>
+                    {i.mode !== "walk" && /步道|環湖|Walk|散步/.test(i.name) && (
+                      <span role="img" aria-label="步行">
+                        <Icon name="walk" size={14} />
+                      </span>
+                    )}
                     {i.cost && i.cost.status !== "unknown" && (
                       <span role="img" aria-label={`費用 ${money(lineAmount(i.cost, N))}`}>
                         <Icon name="wallet" size={14} /> {money(lineAmount(i.cost, N))}

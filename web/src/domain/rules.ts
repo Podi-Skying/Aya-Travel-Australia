@@ -7,6 +7,23 @@ import { stayOf } from "./budget";
 
 export type Check = { lv: "ok" | "info" | "warn" | "danger"; t: string; alt?: string };
 
+const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+const fromMin = (m: number) => `${String(Math.floor(m / 60) % 24).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+
+/** Kai's rule (2026-11-01): about 2 hours of driving at most, then a stop of at least 30 minutes. */
+export const MAX_DRIVE_MIN = 135;
+export const MIN_REST_MIN = 30;
+export function longestDrive(legs: { driveMin: number; stopMin: number }[]): number {
+  let run = 0;
+  let top = 0;
+  for (const l of legs) {
+    run += l.driveMin;
+    top = Math.max(top, run);
+    if (l.stopMin >= MIN_REST_MIN) run = 0;
+  }
+  return top;
+}
+
 export function checks(doc: Pick<TripDoc, "stays" | "tripOptions">, d: EffectiveDay, opts: { showWindow: boolean }): Check[] {
   const out: Check[] = [];
   const majors = d.items.filter((i) => i.major).length;
@@ -26,6 +43,14 @@ export function checks(doc: Pick<TripDoc, "stays" | "tripOptions">, d: Effective
   if (majors > 4) out.push({ lv: "warn", t: `主要活動 ${majors} 個，超過每日 3–4 個的彈性目標。` });
   else if (heavy && majors > 3) out.push({ lv: "warn", t: `當天有渡輪／健行／長途移動，主要活動 ${majors} 個可能太滿。` });
   const st = stayOf(doc, nightStay(doc, d));
+  const endOf = (i: { time: string; dur: number }) => toMin(i.time) + i.dur;
+  for (const i of d.items)
+    if (i.closes && endOf(i) > toMin(i.closes)) out.push({ lv: "warn", t: `「${i.name}」排到 ${fromMin(endOf(i))}，但 ${i.closes} 就打烊或最後入座。` });
+  const lateTo = st.checkin?.to;
+  if (lateTo && !d.items.some((i) => /入住/.test(i.name) && toMin(i.time) <= toMin(lateTo))) {
+    const last = d.items.filter((i) => !i.name.startsWith("住宿：")).at(-1);
+    if (last && endOf(last) > toMin(lateTo)) out.push({ lv: "warn", t: `最後一站 ${fromMin(endOf(last))} 才結束，住宿最晚 ${lateTo} 要入住。` });
+  }
   if (st.nightly > 0 && st.status !== "confirmed") out.push({ lv: "info", t: `住宿「${st.area}」尚未預訂，價格為估計值。` });
   if (d.items.some((i) => i.cost && i.cost.status === "unknown")) out.push({ lv: "info", t: "部分費用未知，未計入總額。" });
   if (d.open && !d.items.length) out.push({ lv: "info", t: "尚未安排活動，可保留彈性休息或之後加入。" });

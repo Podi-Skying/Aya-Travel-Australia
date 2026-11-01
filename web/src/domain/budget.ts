@@ -65,7 +65,7 @@ export function budgetLines(doc: TripDoc, N: number): BudgetLine[] {
       }
       if (what === "stay" && night !== "none") {
         const st = stayOf(doc, night);
-        if (st.nightly > 0)
+        if (st.nightly > 0 && !st.includesDriver)
           lines.push({ day: d.date, seg: d.seg, idx, cat: "stay", label: "Kai 負擔：司機住宿", c: { amount: st.nightly, unit: "night", status: "estimate", note: "假設司機另住一間同價位的房" }, total: 0 });
       }
       if (what === "tickets") {

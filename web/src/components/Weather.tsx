@@ -66,6 +66,7 @@ export function wxChips(day: { place: string; wx: DayWx | null; unavailable?: bo
     ...(wx.pop != null ? [{ key: "pop", icon: <Icon name="droplet" size={18} />, text: `${wx.pop}%`, label: `降雨機率 ${wx.pop}%`, tone: isWet(wx) ? ("wet" as const) : undefined }] : []),
     ...(isWindy(wx) ? [{ key: "wind", icon: <Icon name="wind" size={18} />, text: `${wx.wind ?? "–"}`, label: `最大風速 ${wx.wind ?? "–"} km/h`, tone: "warn" as const }] : []),
     ...(wx.uv != null && wx.uv >= 6 ? [{ key: "uv", icon: <Icon name="uv" size={18} />, text: `${Math.round(wx.uv)}`, label: `紫外線 ${Math.round(wx.uv)}` }] : []),
+    ...(wx.sunrise ? [{ key: "sunrise", icon: <Icon name="sunrise" size={18} />, text: wx.sunrise, label: `日出 ${wx.sunrise}` }] : []),
     ...(wx.sunset ? [{ key: "sunset", icon: <Icon name="sunset" size={18} />, text: wx.sunset, label: `日落 ${wx.sunset}` }] : []),
   ];
 }

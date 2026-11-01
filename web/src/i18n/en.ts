@@ -957,4 +957,7 @@ export const EN: Record<string, string> = {
   "估計花費（{n} 人）：{0}": "Estimated cost ({n} people): {0}",
   "未計入未知價格": "Unknown prices not included",
   "大約": "About",
+  "日出 {0}": "Sunrise {0}",
+  "連續開車約 {0}，要加一個至少 30 分鐘的休息站。": "About {0} of driving without a stop: add a rest of at least 30 minutes.",
+  "最後一站 {0} 才結束，住宿最晚 {1} 要入住。": "The last stop ends at {0}, but last check-in is {1}.",
 };

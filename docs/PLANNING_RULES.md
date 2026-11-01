@@ -50,3 +50,13 @@ Trip-specific rules:
 - UTAS Hobart Apartments is AUD $0 for the owner and Aya only on nights they stay there.
 - Budget other accommodation separately.
 - Split fuel, parking, ferry, and similar shared vehicle costs among the participants in that driving leg, not automatically across the entire group.
+
+## Kai's standing rules (2026-11-01)
+
+Apply these to every plan, including unapplied plan cards when they are applied.
+
+- **Driving breaks:** at most about 2 hours of continuous driving, then a stop of at least 30 minutes at a rest area or town. The day view warns when a day breaks this.
+- **Sunrise and sunset:** use that day's times for that day's place (Open-Meteo, free). Plan dawn and dusk stops on them; long November days can be used.
+- **Dinner:** check kitchen closing or last-seating times, plan dinner before them, and show them under 更多. Items with `closes` are flagged when planned later.
+- **Check-in:** record each stay's window in `checkin` and arrive before the last check-in. Late arrivals are flagged.
+- **Cradle Mountain:** walks are on foot. Park at the visitor centre and take the shuttle; private cars are barred during shuttle hours (see parks.tas.gov.au).
