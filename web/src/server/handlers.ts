@@ -202,7 +202,7 @@ export async function postRoutes(req: Request) {
     const owner = !!c?.ok && sameOrigin(req);
     const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || "unknown";
     // Reads are limited per client; the owner's computation quota is charged only when OSRM will be called.
-    if (!owner && !(await routeQuota(`routes-ip:${sha256(ip)}`, 120))) return fail(429, "操作太頻繁，請稍後再試");
+    if (!owner && !(await routeQuota(`routes-ip:${sha256(ip)}`, 600))) return fail(429, "操作太頻繁，請稍後再試");
     const hit = await getLegs(points, { compute: false, mode });
     const refresh = owner && b.refresh === true;
     const missing = hit.legs.some((l) => !l);
