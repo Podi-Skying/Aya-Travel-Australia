@@ -303,3 +303,15 @@ describe("a friend's name in a title", () => {
     expect(JSON.stringify(i)).not.toMatch(/xe[- ]?na/i);
   });
 });
+
+describe("other private names", () => {
+  it("are masked and guarded, and the list itself is not sent", () => {
+    const d = seedDoc();
+    (d as { privateNames?: string[] }).privateNames = ["Zorro"];
+    d.days[0].items[0].note = "和 Zorro 一日遊";
+    const pub = toPublicDoc(d);
+    expect(JSON.stringify(pub)).not.toMatch(/zorro/i);
+    expect(pub.privateNames ?? []).toEqual([]);
+    expect(() => assertPublicSafe({ a: "Zorro" }, d)).toThrow(PrivacyGuardError);
+  });
+});

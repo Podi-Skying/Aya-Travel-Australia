@@ -70,8 +70,8 @@ export function toPublicDoc(doc: TripDoc, opts: { photos?: boolean } = {}) {
   // Keep only the confirmation outcome, computed before the confirmation is removed.
   const okByDate = new Map(doc.days.map((d) => [d.date, effectiveDay(d).driverOk]));
   // Free text written by the owner may mention a driver; mask names everywhere.
-  const names = [...Object.keys(doc.drivers), ...Object.values(doc.peopleNames ?? {})].filter(Boolean).sort((a, b) => b.length - a.length);
-  const scrubbed = scrub({ ...doc, drivers: {}, peopleNames: {} }, names) as TripDoc & { drivers: Record<string, never> };
+  const names = [...Object.keys(doc.drivers), ...Object.values(doc.peopleNames ?? {}), ...(doc.privateNames ?? [])].filter(Boolean).sort((a, b) => b.length - a.length);
+  const scrubbed = scrub({ ...doc, drivers: {}, peopleNames: {}, privateNames: [] }, names) as TripDoc & { drivers: Record<string, never> };
   // No photo of where they sleep (home base, hotels): it would show the building and so the place.
   const aboutStay = (i: { name: string; en?: string }) => isStayItem(i, doc);
   const noStayPhoto = <T extends { name: string; en?: string }>(i: T): T => {
@@ -192,6 +192,9 @@ export function assertPublicSafe(out: unknown, source: TripDoc): void {
     if (name && hasName(name)) throw new PrivacyGuardError("driver name present");
   }
   for (const name of Object.values(source.peopleNames ?? {})) {
+    if (name && hasName(name)) throw new PrivacyGuardError("person name present");
+  }
+  for (const name of source.privateNames ?? []) {
     if (name && hasName(name)) throw new PrivacyGuardError("person name present");
   }
   for (const st of Object.values(source.stays)) {

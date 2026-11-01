@@ -155,6 +155,8 @@ export const attachmentSchema = z.object({
 
 export const daySchema = z.object({
   date: dateStr,
+  /** People along who have no avatar, shown as +N. */
+  extraPeople: z.number().int().min(1).max(20).optional(),
   seg: z.string().min(1).max(20),
   title: z.string().min(1).max(120),
   tr: trSchema,
@@ -252,6 +254,8 @@ export const tripDocSchema = z
     ),
     /** Owner-only display names for people other than Kai and Aya; emptied for guests. */
     peopleNames: z.record(z.string(), shortText(40)).default({}),
+    /** Other people's names (colleagues) and spellings, hidden from public views like drivers'. */
+    privateNames: z.array(shortText(40)).max(40).optional(),
     drivers: z.record(
       z.string(),
       z.object({

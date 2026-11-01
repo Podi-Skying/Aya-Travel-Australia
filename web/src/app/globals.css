@@ -1366,3 +1366,5 @@ a, button, summary, [role="button"], [role="tab"] { touch-action: manipulation; 
 .need-book ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .need-book li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-height: 36px; font-size: .88rem; }
 .nb-name { flex: 1 1 8em; min-width: 0; }
+.day-cover-people { display: inline-flex; align-items: center; gap: 4px; }
+.people-plus { display: grid; place-items: center; min-width: 30px; height: 30px; padding: 0 6px; border-radius: 15px; background: rgba(250, 247, 240, .9); color: var(--ink); font-size: .78rem; font-weight: 600; }

@@ -559,6 +559,7 @@ export function DaysView({ active }: { active: boolean }) {
             </div>
             <span className="day-cover-people">
               <AvatarStack people={dayPeople} size={30} />
+              {raw.extraPeople ? <span className="people-plus" role="img" aria-label={`另外還有 ${raw.extraPeople} 人`}>+{raw.extraPeople}</span> : null}
             </span>
             <button className="day-arrow prev" type="button" disabled={currentDay === 0} onClick={() => setCurrentDay(currentDay - 1)} aria-label="前一天">
               <Icon name="chevron-left" size={22} />
