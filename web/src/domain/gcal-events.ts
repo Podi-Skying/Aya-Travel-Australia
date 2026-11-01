@@ -85,7 +85,7 @@ export function calendarEvents(doc: TripDoc, siteUrl = ""): CalendarEvent[] {
     const st = stayOf(doc, r.key);
     const address = en(st.address);
     const description = [address, en(st.note), st.checkin ? `Check-in ${st.checkin.from}–${st.checkin.to ?? ""}` : ""].filter(Boolean).join("\n");
-    out.push({ key: `stay:${r.key}:${r.from}`, body: { summary: `Stay: ${en(st.name) || "Accommodation"}`, start: { date: r.from }, end: { date: nextDate(r.to) }, transparency: "transparent", ...(description ? { description } : {}), ...(address ? { location: address } : {}) } });
+    out.push({ key: `stay:${r.key}:${r.from}`, body: { summary: `${st.nightly > 0 && st.status !== "confirmed" ? "⚠ Not booked: " : ""}Stay: ${en(st.name) || "Accommodation"}`, start: { date: r.from }, end: { date: nextDate(r.to) }, transparency: "transparent", ...(description ? { description } : {}), ...(address ? { location: address } : {}) } });
   }
   return out;
 }
