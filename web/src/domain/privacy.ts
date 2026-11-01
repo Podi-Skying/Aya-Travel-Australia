@@ -29,7 +29,7 @@ function nameRegex(name: string): RegExp {
       }
       return `[${[...forms].map(escapeRe).join("")}]`;
     })
-    .join("");
+    .join("[-\\s・·]?"); // Mi-na, Mi na: a name split by a hyphen or space is the same name
   return new RegExp(cls, "g");
 }
 
@@ -183,11 +183,12 @@ export function assertPublicSafe(out: unknown, source: TripDoc): void {
   const json = JSON.stringify(out);
   if (/"(address|driverConfirmation|ownerNote)"\s*:/.test(json)) throw new PrivacyGuardError("private key present");
   const text = norm(json);
+  const hasName = (name: string) => new RegExp([...norm(name)].map(escapeRe).join("[-\\s・·]?")).test(text);
   for (const name of Object.keys(source.drivers)) {
-    if (name && text.includes(norm(name))) throw new PrivacyGuardError("driver name present");
+    if (name && hasName(name)) throw new PrivacyGuardError("driver name present");
   }
   for (const name of Object.values(source.peopleNames ?? {})) {
-    if (name && text.includes(norm(name))) throw new PrivacyGuardError("person name present");
+    if (name && hasName(name)) throw new PrivacyGuardError("person name present");
   }
   for (const st of Object.values(source.stays)) {
     const a = norm(st.address.trim());

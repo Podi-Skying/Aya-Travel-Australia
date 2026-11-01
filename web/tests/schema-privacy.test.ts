@@ -277,3 +277,16 @@ describe("hotel photos on stops", () => {
     expect(pub.days[0].items[1].photo).toBeUndefined();
   });
 });
+
+describe("name spellings", () => {
+  it("hides a name split by a hyphen or a space, in the document and the guard", () => {
+    const d = seedDoc();
+    d.peopleNames = { ...(d.peopleNames ?? {}), friend: "Xena" } as never;
+    d.days[0].items[0].name = "Dinner with Xe-na";
+    d.days[0].items[0].note = "和 Xe na、XENA 見面";
+    const it0 = toPublicDoc(d).days[0].items[0];
+    expect(JSON.stringify([it0.name, it0.note])).not.toMatch(/xe[- ]?na/i);
+    expect(() => assertPublicSafe({ a: "Xe-na" }, d)).toThrow(PrivacyGuardError);
+    expect(() => assertPublicSafe({ a: "Xe na" }, d)).toThrow(PrivacyGuardError);
+  });
+});
