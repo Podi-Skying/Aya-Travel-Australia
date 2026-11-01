@@ -1325,3 +1325,4 @@ a, button, summary, [role="button"], [role="tab"] { touch-action: manipulation; 
 .reel-slice { box-shadow: 0 0 0 2px var(--deep); }
 .reel-slice.on { box-shadow: 0 0 0 3px var(--deep); }
 .reel-badge { background: var(--deep); }
+.plan-stage .opt-card.chosen { box-shadow: 0 0 0 2px var(--plan-deep, var(--vermilion)); }

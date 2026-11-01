@@ -6,7 +6,7 @@ import type * as Leaflet from "leaflet";
 import { useTrip } from "./TripApp";
 import { Icon, iconSvg } from "./Icon";
 import { PendingButton, useHobartToday, useHydrated, useReducedMotion } from "./ui";
-import { cssVar, esc, loadLeaflet, tiles } from "./MapViews";
+import { ZOOM_OPTIONS, pinchZoom, cssVar, esc, loadLeaflet, tiles } from "./MapViews";
 import { computeLegs, routeCredit, useLegs, type Pt, routeStops } from "./useLegs";
 import { PlaceGallery } from "./PlaceGallery";
 import { creditText } from "./Photos";
@@ -241,7 +241,8 @@ export function PlacesMap({ active }: { active: boolean }) {
       .then((L) => {
         if (cancelled || !box.current) return;
         if (!map.current) {
-          map.current = L.map(box.current, { zoomAnimation: !reduce, zoomControl: !narrow }).setView([-38, 147], 5);
+          map.current = L.map(box.current, { ...ZOOM_OPTIONS, zoomAnimation: !reduce, zoomControl: !narrow }).setView([-38, 147], 5);
+          pinchZoom(map.current);
           tiles(L).addTo(map.current);
           map.current.on("moveend", () => setBounds(map.current!.getBounds()));
           map.current.on("popupopen", (e) => {

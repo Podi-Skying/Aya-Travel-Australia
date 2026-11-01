@@ -23,6 +23,30 @@ export function loadLeaflet(): Promise<L> {
   return leafletPromise;
 }
 
+/** Fine zoom steps so a trackpad's two-finger scroll zooms smoothly; a mouse wheel works the same way. */
+export const ZOOM_OPTIONS = { zoomSnap: 0.1, zoomDelta: 0.5, wheelDebounceTime: 20, wheelPxPerZoomLevel: 120 } as const;
+
+/** A trackpad pinch arrives as ctrl+wheel with small steps: zoom the map at the cursor, never the browser page. */
+export function pinchZoom(map: Leaflet.Map) {
+  const box = map.getContainer();
+  let target: number | null = null;
+  box.addEventListener(
+    "wheel",
+    (e) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      e.stopPropagation();
+      target = (target ?? map.getZoom()) - e.deltaY * 0.02;
+      target = Math.max(map.getMinZoom(), Math.min(map.getMaxZoom(), target));
+      map.setZoomAround(map.mouseEventToContainerPoint(e), target, { animate: false });
+      window.clearTimeout(pinchEnd);
+      pinchEnd = window.setTimeout(() => (target = null), 200);
+    },
+    { capture: true, passive: false },
+  );
+  let pinchEnd = 0;
+}
+
 export function tiles(L: L) {
   // OpenStreetMap standard tiles. Their usage policy requires a Referer header, which the
   // site's Referrer-Policy (strict-origin-when-cross-origin) now sends as the origin only.
@@ -110,7 +134,8 @@ export function DayMap({
         if (cancelled || !box.current) return;
         if (!map.current) {
           // On phones one finger scrolls the page past the map; two fingers move it.
-          map.current = L.map(box.current, { scrollWheelZoom: false, zoomAnimation: !reduce, dragging: !L.Browser.mobile }).setView(BASE.tas, 9);
+          map.current = L.map(box.current, { ...ZOOM_OPTIONS, zoomAnimation: !reduce, dragging: !L.Browser.mobile }).setView(BASE.tas, 9);
+          pinchZoom(map.current);
           tiles(L).addTo(map.current);
           map.current.on("popupopen", (e) => {
             (e.popup.getElement() as HTMLElement | undefined)?.querySelector<HTMLButtonElement>("[data-add-id]")?.addEventListener("click", (ev) => {
