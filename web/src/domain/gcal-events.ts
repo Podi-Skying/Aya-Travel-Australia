@@ -1,7 +1,7 @@
 import type { TripDoc } from "./schema";
 import { stayOf, lineAmount } from "./budget";
 import { nightStay } from "./stay";
-import { bookingFlag } from "./booking";
+import { calendarPrefix } from "./booking";
 
 /*
  * The trip as Google Calendar events (Kai 2026-11-01): one-way, into a dedicated private calendar, so owner
@@ -58,7 +58,7 @@ export function calendarEvents(doc: TripDoc, siteUrl = ""): CalendarEvent[] {
       out.push({
         key: i.id,
         body: {
-          summary: `${bookingFlag(i)?.level === "required" ? "⚠ Not booked: " : ""}${titleOf(i)}`,
+          summary: `${calendarPrefix(i)}${titleOf(i)}`,
           start: { dateTime: local(d.date, start), timeZone },
           end: { dateTime: local(d.date, end), timeZone },
           ...(description ? { description } : {}),

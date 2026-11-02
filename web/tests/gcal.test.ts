@@ -1,3 +1,4 @@
+import { bookingFlag, calendarPrefix } from "@/domain/booking";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { generateKeyPairSync } from "node:crypto";
 import { calendarEvents } from "@/domain/gcal-events";
@@ -186,5 +187,12 @@ describe("booking warning", () => {
     expect(ev.find((e) => e.key === "two")!.body.summary).toBe("Tower");
     d.days[0].items[0].status = "confirmed";
     expect(calendarEvents(d).find((e) => e.key === "one")!.body.summary).toBe("Tour");
+  });
+
+  it("an order awaiting confirmation and an unconfirmed pickup keep their own warnings until confirmed", () => {
+    expect(bookingFlag({ name: "x", flag: "pending" })?.label).toBe("確認中");
+    expect(calendarPrefix({ name: "x", flag: "pending" })).toBe("⚠ Pending confirmation: ");
+    expect(calendarPrefix({ name: "x", flag: "pickup" })).toBe("⚠ Pickup to confirm: ");
+    expect(bookingFlag({ name: "x", flag: "pending", status: "confirmed" })).toBeNull();
   });
 });

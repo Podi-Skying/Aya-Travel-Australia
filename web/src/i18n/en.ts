@@ -983,4 +983,6 @@ export const EN: Record<string, string> = {
   "左右滑換照片・雙指縮放・點照片看是哪裡": "Swipe for the next photo · pinch to zoom · tap to see where",
   "還原大小": "Reset zoom",
   "依分組檢視待安排景點（可整組排入）": "Unscheduled places by group (schedule a whole group)",
+  "確認中": "Awaiting confirmation",
+  "上車地點待確認": "Pickup point to confirm",
 };

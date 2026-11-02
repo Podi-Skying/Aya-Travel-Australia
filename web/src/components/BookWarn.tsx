@@ -4,7 +4,7 @@ const TRIANGLE = '<path d="M12 2.6 23 21.4H1z" fill="#f2b100" stroke="#3a2c00" s
 
 /** The one warning icon: amber, so it never reads as a plan colour or the red route line. */
 export function BookWarn({ flag, size = 18, text }: { flag: BookingFlag | string; size?: number; text?: boolean }) {
-  const label = typeof flag === "string" ? flag : `${flag.label}：一定要訂`;
+  const label = typeof flag === "string" ? flag : flag.label.startsWith("未訂") ? `${flag.label}：一定要訂` : flag.label;
   return (
     <span className="book-warn" title={label}>
       <svg width={size} height={size} viewBox="0 0 24 24" role="img" aria-label={label} dangerouslySetInnerHTML={{ __html: TRIANGLE }} />
