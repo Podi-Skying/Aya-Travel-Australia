@@ -471,8 +471,8 @@ html, body { overflow-x: clip; }
 .owner-note { border-left: 2px solid var(--rule); color: var(--ink-2); }
 
 /* Map + unscheduled places (DESIGN.md「地圖與待安排景點」). */
-.places { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 0; height: min(78vh, 780px); border-radius: 16px; overflow: hidden; border: 1px solid var(--line); position: relative; }
-.places-map { height: 100%; border: 0; border-radius: 0; }
+.places { height: 100%; overflow: hidden; position: relative; }
+.places-map { position: absolute; inset: 0; height: 100%; border: 0; border-radius: 0; touch-action: none; }
 .places-panel { height: 100%; overflow-y: auto; background: var(--bg); border-left: 1px solid var(--line); display: flex; flex-direction: column; }
 .sheet-head { position: sticky; top: 0; z-index: 2; padding: 12px 14px 8px; background: rgba(250, 247, 240, .92); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
 .sheet-body { padding: 4px 14px 24px; }
@@ -519,8 +519,6 @@ html, body { overflow-x: clip; }
 .leaflet-marker-icon.place-pin.sel { background: var(--vermilion); color: var(--bg); transform-origin: center; z-index: 1000 !important; box-shadow: 0 0 0 4px rgba(184, 58, 46, .2), 0 2px 6px rgba(41, 40, 35, .3); }
 .places .map-alt { margin-top: 16px; }
 @media (max-width: 720px) {
-  .places, .places.narrow { display: block; height: calc(100dvh - var(--chrome-h) - var(--tabbar-h, 0px)); margin: 0 -16px; border-radius: 0; border: 0; }
-  .places-map { position: absolute; inset: 0; }
   .places-panel { position: absolute; left: 0; right: 0; top: 0; height: 100%; z-index: 600; border-left: 0; border-radius: 16px 16px 0 0; overflow: hidden;
     background: rgba(250, 247, 240, .94); -webkit-backdrop-filter: blur(20px) saturate(160%); backdrop-filter: blur(20px) saturate(160%); box-shadow: 0 -6px 24px rgba(41, 40, 35, .14); will-change: transform; }
   .places-panel.detent-full { overflow-y: auto; }
@@ -1369,3 +1367,26 @@ a, button, summary, [role="button"], [role="tab"] { touch-action: manipulation; 
 .day-cover-people { display: inline-flex; align-items: center; gap: 4px; }
 .people-plus { display: grid; place-items: center; min-width: 30px; height: 30px; padding: 0 6px; border-radius: 15px; background: rgba(250, 247, 240, .9); color: var(--ink); font-size: .78rem; font-weight: 600; }
 .stop-plus { flex: none; padding: 1px 7px; border-radius: 11px; background: var(--paper-raised); color: var(--ink); font-size: .75rem; font-weight: 600; }
+
+/* 地圖 and 畫廊 fill the space between the header and the tab bar (Kai 2026-11-02). */
+html:has(.lang-root.immersive), html:has(.lang-root.immersive) body { overflow: hidden; overscroll-behavior: none; }
+.lang-root.immersive .panel:not([hidden]) { position: fixed; left: 0; right: 0; top: var(--chrome-h); bottom: var(--tabbar-h, 0px); overflow: hidden; animation: none; }
+.lang-root.immersive main#main { padding: 0; }
+.lang-root.immersive .offline-banner { position: fixed; top: var(--chrome-h); left: 12px; right: 72px; z-index: 700; }
+.lang-root.immersive .drift { height: 100%; overflow: hidden; }
+.lang-root.immersive .drift-field, .lang-root.immersive .drift-wait { height: 100%; margin: 0; border-radius: 0; }
+.lang-root.immersive .drift-grid { height: 100%; margin: 0; padding: 12px; overflow-y: auto; }
+
+.map-ctl { position: absolute; top: 12px; right: 12px; z-index: 600; display: grid; width: 44px; overflow: hidden; border-radius: 14px; border: 1px solid rgba(41, 40, 35, .12); background: rgba(250, 247, 240, .86); -webkit-backdrop-filter: blur(20px) saturate(160%); backdrop-filter: blur(20px) saturate(160%); box-shadow: 0 4px 16px rgba(41, 40, 35, .16); }
+.map-ctl button { display: grid; place-items: center; width: 100%; height: 44px; padding: 0; border: 0; background: transparent; color: var(--ink); cursor: pointer; transition: background-color 100ms ease-out; }
+.map-ctl button + button { border-top: 1px solid rgba(41, 40, 35, .1); }
+.map-ctl button:active { background: rgba(41, 40, 35, .1); }
+.map-ctl button:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
+.map-ctl-msg { position: absolute; top: 12px; right: 68px; z-index: 600; max-width: calc(100% - 92px); padding: 8px 12px; border-radius: 12px; background: var(--bg); box-shadow: 0 2px 8px rgba(41, 40, 35, .16); font-size: .8rem; }
+.place-float { position: absolute; left: 12px; right: 12px; bottom: 28px; z-index: 650; max-width: 420px; max-height: calc(100% - 44px); overflow-y: auto; overscroll-behavior: contain; border-radius: 16px; box-shadow: 0 12px 32px -8px rgba(41, 40, 35, .4); }
+.place-float .place-card { margin: 0; animation: none; }
+@media (prefers-reduced-transparency: reduce) { .map-ctl { background: var(--bg); -webkit-backdrop-filter: none; backdrop-filter: none; } }
+@media (prefers-contrast: more) { .map-ctl { border-color: var(--ink); } }
+
+.drift-reset { position: absolute; top: 8px; left: 8px; z-index: 3; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 1px solid rgba(41, 40, 35, .12); border-radius: 50%; background: rgba(250, 247, 240, .86); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); color: var(--ink); cursor: pointer; }
+.drift-plane { touch-action: none; }

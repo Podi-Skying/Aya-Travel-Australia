@@ -1,26 +1,23 @@
 "use client";
 
 import { dayTitle } from "@/domain/day-title";
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type * as Leaflet from "leaflet";
 import { useTrip } from "./TripApp";
 import { Icon, iconSvg } from "./Icon";
 import { PendingButton, useHobartToday, useHydrated, useReducedMotion } from "./ui";
-import { ZOOM_OPTIONS, pinchZoom, cssVar, esc, loadLeaflet, tiles } from "./MapViews";
-import { computeLegs, routeCredit, useLegs, type Pt, routeStops, splitLines } from "./useLegs";
+import { ZOOM_OPTIONS, blockPagePinch, pinchZoom, cssVar, esc, loadLeaflet, tiles } from "./MapViews";
+import { useLegs, type Pt, routeStops, splitLines } from "./useLegs";
 import { PlaceGallery } from "./PlaceGallery";
 import { creditText } from "./Photos";
-import { project, rubber, spring } from "./motion";
-import { Pool } from "./Pool";
 import { effectiveDay } from "@/domain/effective-day";
 import { dayEnds, HOUSE_SVG, stayPins } from "@/domain/home-pins";
-import { fmtDay, fmtMD } from "@/domain/format";
+import { fmtDay } from "@/domain/format";
 import type { Category, Item, Package, TripDoc } from "@/domain/schema";
 
 /*
- * Map and unscheduled places in one view (DESIGN.md「地圖與待安排景點」), Apple Maps style:
- * the map fills the screen; a side panel (desktop) or a bottom sheet with detents (phone) holds a
- * searchable, categorised list that stays in sync with the markers.
+ * The 地圖 tab (Kai 2026-11-02): only the map, between the header and the tab bar, with one stack of controls at
+ * the top right. A tapped unscheduled place opens its card over the map. The grouped list lives in 行程方案.
  */
 
 export const CATEGORY_META: Record<Category, { t: string; icon: string }> = {
@@ -35,7 +32,6 @@ export const CATEGORY_META: Record<Category, { t: string; icon: string }> = {
   art: { t: "藝術", icon: "cat-art" },
   activity: { t: "體驗・活動", icon: "cat-activity" },
 };
-const CAT_KEYS = Object.keys(CATEGORY_META) as Category[];
 const OTHER = "other";
 
 export type Place = { i: Item; p: Package };
@@ -115,30 +111,15 @@ function writeUrl(f: Filters) {
   history.replaceState(history.state, "", `${location.pathname}?${q.toString()}${location.hash}`);
 }
 
+/** Fitted views stay clear of the control stack at the top right. */
+const CLEAR_CONTROLS: { paddingTopLeft: [number, number]; paddingBottomRight: [number, number] } = { paddingTopLeft: [24, 28], paddingBottomRight: [72, 28] };
 const CLUSTER_PX = 44;
 const CLUSTER_UNTIL_ZOOM = 11;
-
-function useNarrow() {
-  const [narrow, setNarrow] = useState(false);
-  useEffect(() => {
-    const mq = matchMedia("(max-width: 720px)");
-    const on = () => setNarrow(mq.matches);
-    on();
-    mq.addEventListener("change", on);
-    return () => mq.removeEventListener("change", on);
-  }, []);
-  return narrow;
-}
 
 export function PlacesMap({ active }: { active: boolean }) {
   const { doc, gotoDay, mode, online, runOp } = useTrip();
   const reduce = useReducedMotion();
-  const narrow = useNarrow();
   const [f, setF] = useState<Filters>(readUrl);
-  const [q, setQ] = useState("");
-  const [inView, setInView] = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
-  const [bounds, setBounds] = useState<Leaflet.LatLngBounds | null>(null);
   const [failed, setFailed] = useState(false);
   const editable = mode === "owner" && online;
   const patch = (x: Partial<Filters>) => setF((o) => ({ ...o, ...x }));
@@ -153,38 +134,15 @@ export function PlacesMap({ active }: { active: boolean }) {
   // The selected day as in 每日行程: from last night's stay to tonight's (Kai 2026-10-26).
   const selStops = selDay ? routeStops(selDay.items.filter((i) => i.lat == null || i.lat > -40 === (selDay.seg === "syd")), dayEnds(doc, selDay.date)) : null;
   const legs = useLegs(selStops);
-  // Road totals only when every drive pair has a cached leg (non-drive pairs are never routed).
-  const drivePairs = selStops ? selStops.slice(1).map((s) => s.drive) : [];
-  const roadTotal =
-    legs && drivePairs.some(Boolean) && drivePairs.every((dr, k) => !dr || legs[k])
-      ? legs.reduce((a, l, k) => (drivePairs[k] && l ? { m: a.m + l.distanceM, s: a.s + l.durationS } : a), { m: 0, s: 0 })
-      : null;
   const legsKey = legs ? legs.map((l) => (l ? l.durationS : "-")).join(",") : "";
   const [me, setMe] = useState<Pt | null>(null);
   const [meMsg, setMeMsg] = useState("");
-  const pickDay = (date: string | null) => {
-    setTodayMode(false);
-    patch({ mday: date });
-  };
-  // Keep the selected day's chip visible in the horizontal strip.
-  useEffect(() => {
-    if (!active) return;
-    // Measure after layout: the panel may have just become visible.
-    const id = setTimeout(() => {
-      const strip = wrap.current?.querySelector<HTMLElement>(".day-strip");
-      const on = strip?.querySelector<HTMLElement>(".chip.on");
-      if (!strip || !on || !strip.clientWidth) return;
-      const d = on.getBoundingClientRect().left - strip.getBoundingClientRect().left;
-      strip.scrollLeft += d - (strip.clientWidth - on.clientWidth) / 2;
-    }, 60);
-    return () => clearTimeout(id);
-  }, [selDate, active]);
   // 全覽: every scheduled day of every region; the redraw then fits the whole trip.
   const fitAll = () => {
     setTodayMode(false);
     fitKey.current = "";
     patch({ mday: null, seg: "all", days: true, pool: true, cat: "all", place: null });
-    if (!f.mday && f.seg === "all" && f.days && f.pool && f.cat === "all" && !f.place && allBounds.current) map.current?.fitBounds(allBounds.current.pad(0.1), { animate: !reduce });
+    if (!f.mday && f.seg === "all" && f.days && f.pool && f.cat === "all" && !f.place && allBounds.current) map.current?.fitBounds(allBounds.current, { ...CLEAR_CONTROLS, animate: !reduce });
   };
   const locate = () => {
     if (!("geolocation" in navigator)) return setMeMsg("這個瀏覽器不支援定位");
@@ -203,19 +161,8 @@ export function PlacesMap({ active }: { active: boolean }) {
 
   useEffect(() => writeUrl(f), [f]);
 
-  const segKeys = Object.keys(doc.segments).filter((k) => doc.days.some((d) => d.seg === k));
   const places: Place[] = useMemo(() => doc.attractionPool.flatMap((p) => p.items.map((i) => ({ i, p }))), [doc.attractionPool]);
-  const inSeg = (pl: Place) => f.seg === "all" || pl.p.seg === f.seg;
-  const matchQ = (pl: Place) => {
-    const s = q.trim().toLowerCase();
-    return !s || [pl.i.name, pl.i.en, pl.i.note, pl.p.title].some((x) => x?.toLowerCase().includes(s));
-  };
-  const catOf = (pl: Place) => pl.i.cat ?? OTHER;
-  const base = places.filter((pl) => inSeg(pl) && matchQ(pl));
-  const shown = f.pool ? base.filter((pl) => f.cat === "all" || catOf(pl) === f.cat) : [];
-  const listed = inView && bounds ? shown.filter((pl) => pl.i.lat != null && bounds.contains([pl.i.lat, pl.i.lng!])) : shown;
-  const counts = new Map<string, number>();
-  base.forEach((pl) => counts.set(catOf(pl), (counts.get(catOf(pl)) ?? 0) + 1));
+  const shown = f.pool ? places.filter((pl) => (f.seg === "all" || pl.p.seg === f.seg) && (f.cat === "all" || (pl.i.cat ?? OTHER) === f.cat)) : [];
   const selected = f.place ? places.find((pl) => pl.i.id === f.place) ?? null : null;
 
   /* ---------------------------------------------------------------- map */
@@ -241,10 +188,10 @@ export function PlacesMap({ active }: { active: boolean }) {
       .then((L) => {
         if (cancelled || !box.current) return;
         if (!map.current) {
-          map.current = L.map(box.current, { ...ZOOM_OPTIONS, zoomAnimation: !reduce, zoomControl: !narrow }).setView([-38, 147], 5);
+          map.current = L.map(box.current, { ...ZOOM_OPTIONS, zoomAnimation: !reduce, zoomControl: false }).setView([-38, 147], 5);
           pinchZoom(map.current);
+          blockPagePinch(box.current);
           tiles(L).addTo(map.current);
-          map.current.on("moveend", () => setBounds(map.current!.getBounds()));
           map.current.on("popupopen", (e) => {
             (e.popup.getElement() as HTMLElement | undefined)?.querySelector<HTMLAnchorElement>("[data-goto]")?.addEventListener("click", (ev) => {
               ev.preventDefault();
@@ -359,10 +306,9 @@ export function PlacesMap({ active }: { active: boolean }) {
         else if (goMe.current && me) {
           goMe.current = false;
           m.setView(me, Math.max(m.getZoom(), 12), { animate: !reduce });
-        } else if (refit && selPtsHere.length) m.fitBounds(L.latLngBounds(selPtsHere).pad(0.25), { animate: !reduce, maxZoom: 13 });
-        else if (refit && all.length) m.fitBounds(L.latLngBounds(all).pad(0.1), { animate: !reduce });
+        } else if (refit && selPtsHere.length) m.fitBounds(L.latLngBounds(selPtsHere), { ...CLEAR_CONTROLS, animate: !reduce, maxZoom: 13 });
+        else if (refit && all.length) m.fitBounds(L.latLngBounds(all), { ...CLEAR_CONTROLS, animate: !reduce });
         draw();
-        setBounds(m.getBounds());
       })
       .catch(() => setFailed(true));
     return () => {
@@ -370,7 +316,7 @@ export function PlacesMap({ active }: { active: boolean }) {
     };
     // pinsKey captures the filtered places; selected is part of it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, doc.days, f.days, f.seg, pinsKey, reduce, narrow, selDate, legsKey, me]);
+  }, [active, doc.days, f.days, f.seg, pinsKey, reduce, selDate, legsKey, me]);
 
   useEffect(
     () => () => {
@@ -380,309 +326,49 @@ export function PlacesMap({ active }: { active: boolean }) {
     [],
   );
 
-  /* ---------------------------------------------------------------- phone sheet */
-  const sheet = useRef<HTMLDivElement>(null);
-  const wrap = useRef<HTMLDivElement>(null);
-  const y = useRef(0); // translateY of the sheet; 0 = full height
-  const anim = useRef<(() => void) | null>(null);
-  const drag = useRef<{ id: number; y0: number; started: boolean; hist: { t: number; y: number }[] } | null>(null);
-  const [detent, setDetent] = useState<"peek" | "half" | "full">("peek");
-  const detents = useCallback(() => {
-    const H = wrap.current?.clientHeight ?? 600;
-    const full = H * 0.06;
-    return { peek: H - 132, half: H * 0.48, full, H };
-  }, []);
-  const place = useCallback(() => {
-    if (sheet.current) sheet.current.style.transform = narrow ? `translate3d(0, ${y.current}px, 0)` : "";
-  }, [narrow]);
-  const goDetent = useCallback(
-    (to: "peek" | "half" | "full", v0 = 0) => {
-      const target = detents()[to];
-      setDetent(to);
-      anim.current?.();
-      if (reduce) {
-        y.current = target;
-        place();
-        return;
-      }
-      anim.current = spring(y.current, v0, target, 0.35, (v) => {
-        y.current = v;
-        place();
-      });
-    },
-    [detents, place, reduce],
-  );
-  useEffect(() => {
-    if (!narrow) return place();
-    y.current = detents()[detent];
-    place();
-    const ro = new ResizeObserver(() => {
-      y.current = detents()[detent];
-      place();
-    });
-    if (wrap.current) ro.observe(wrap.current);
-    return () => ro.disconnect();
-    // Re-measure only when the layout mode changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [narrow, active]);
-  // Picking a place (marker or list) opens the sheet to half so the card is visible.
-  const selectPlace = useCallback(
-    (id: string) => {
-      setF((o) => ({ ...o, place: id }));
-      if (narrow && detent === "peek") goDetent("half");
-    },
-    [narrow, detent, goDetent],
-  );
-  useEffect(() => {
-    handlers.current.select = selectPlace;
-  });
-  const onRow = (e: { currentTarget: HTMLElement }) => selectPlace(e.currentTarget.dataset.id!);
-
-  function down(e: ReactPointerEvent) {
-    if (!narrow || e.button !== 0) return;
-    anim.current?.();
-    drag.current = { id: e.pointerId, y0: e.clientY - y.current, started: false, hist: [{ t: e.timeStamp, y: e.clientY }] };
-  }
-  function move(e: ReactPointerEvent) {
-    const g = drag.current;
-    if (!g || g.id !== e.pointerId) return;
-    const raw = e.clientY - g.y0;
-    if (!g.started) {
-      if (Math.abs(raw - y.current) < 6) return;
-      g.started = true;
-      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    }
-    g.hist.push({ t: e.timeStamp, y: e.clientY });
-    if (g.hist.length > 6) g.hist.shift();
-    const { peek, full } = detents();
-    y.current = raw < full ? full - rubber(full - raw, 400) : raw > peek ? peek + rubber(raw - peek, 400) : raw;
-    place();
-  }
-  function up(e: ReactPointerEvent) {
-    const g = drag.current;
-    drag.current = null;
-    if (!g || g.id !== e.pointerId) return;
-    if (!g.started) return;
-    const a = g.hist[0];
-    const b = g.hist[g.hist.length - 1];
-    const v = (b.y - a.y) / (Math.max(1, b.t - a.t) / 1000);
-    const projected = y.current + project(v);
-    const d = detents();
-    const near = (["full", "half", "peek"] as const).reduce((best, k) => (Math.abs(d[k] - projected) < Math.abs(d[best] - projected) ? k : best), "peek" as "peek" | "half" | "full");
-    goDetent(near, v);
-  }
-
   /* ---------------------------------------------------------------- render */
-  const groups = CAT_KEYS.filter((c) => listed.some((pl) => catOf(pl) === c)).map((c) => ({ c, xs: listed.filter((pl) => catOf(pl) === c) }));
-  const others = listed.filter((pl) => catOf(pl) === OTHER);
-  const noCoords = shown.filter((pl) => pl.i.lat == null);
   const sug = selected ? suggestDay(doc, selected) : null;
 
   return (
-    <div className={`places${narrow ? " narrow" : ""}`} ref={wrap}>
+    <div className="places">
       <div className="places-map map" ref={box} role="region" aria-label="地圖：已排行程與待安排景點">
-        {failed && <div className="map-fallback">地圖無法載入（可能離線）。右側清單仍可使用。</div>}
+        {failed && <div className="map-fallback">地圖無法載入（可能離線）。</div>}
       </div>
-      <div className="map-tools" role="toolbar" aria-label="地圖工具">
-        <button type="button" className="map-tool" onClick={fitAll}>
-          全覽
+      <div className="map-ctl" role="toolbar" aria-label="地圖工具">
+        <button type="button" aria-label="放大" title="放大" onClick={() => map.current?.zoomIn(1, { animate: !reduce })}>
+          <Icon name="plus" size={22} />
         </button>
-        {inTrip && (
-          <button
-            type="button"
-            className={`map-tool${selDate === today ? " on" : ""}`}
-            aria-pressed={selDate === today}
-            onClick={() => (selDate === today ? pickDay(null) : pickDay(today))}
-          >
-            只看今天
-          </button>
-        )}
-        <button type="button" className="map-tool" onClick={locate}>
-          我的位置
+        <button type="button" aria-label="縮小" title="縮小" onClick={() => map.current?.zoomOut(1, { animate: !reduce })}>
+          <Icon name="minus" size={22} />
         </button>
-        {meMsg && (
-          <span className="map-tool-msg" role="status">
-            {meMsg}
-          </span>
-        )}
+        <button type="button" aria-label="全覽" title="全覽" onClick={fitAll}>
+          <Icon name="fit" size={22} />
+        </button>
+        <button type="button" aria-label="我的位置" title="我的位置" onClick={locate}>
+          <Icon name="locate" size={22} />
+        </button>
       </div>
-      <aside className={`places-panel detent-${detent}`} ref={sheet} aria-label="待安排景點">
-        <div className="sheet-head" onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
-          {narrow && (
-            <button
-              type="button"
-              className="grabber"
-              aria-label={detent === "full" ? "收起清單" : "展開清單"}
-              onClick={() => goDetent(detent === "full" ? "peek" : detent === "peek" ? "half" : "full")}
-            >
-              <span aria-hidden="true" />
-            </button>
-          )}
-          <label className="search">
-            <Icon name="search" size={18} />
-            <span className="sr-only">搜尋景點</span>
-            <input
-              type="search"
-              value={q}
-              placeholder={`搜尋 ${places.length} 個待安排景點`}
-              onChange={(e) => setQ(e.target.value)}
-              onFocus={() => narrow && detent === "peek" && goDetent("half")}
-            />
-          </label>
+      {meMsg && (
+        <span className="map-ctl-msg" role="status">
+          {meMsg}
+        </span>
+      )}
+      {selected && (
+        <div className="place-float">
+          <PlaceCard
+            key={selected.i.id}
+            place={selected}
+            suggestion={sug}
+            editable={editable}
+            onClose={() => patch({ place: null })}
+            onSchedule={async (date) => {
+              const ok = await runOp({ op: "scheduleItem", key: selected.p.key, itemId: selected.i.id, date });
+              if (ok) patch({ place: null });
+              return ok;
+            }}
+          />
         </div>
-        <div className="sheet-body">
-          <div className="day-strip" role="group" aria-label="選一天">
-            <button type="button" className={`chip${!selDate ? " on" : ""}`} aria-pressed={!selDate} onClick={() => pickDay(null)}>
-              全部
-            </button>
-            {doc.days.map((d) => (
-              <button
-                key={d.date}
-                type="button"
-                className={`chip${d.date === selDate ? " on" : ""}${d.items.length ? "" : " open"}`}
-                aria-pressed={d.date === selDate}
-                aria-label={`${fmtDay(d.date)} ${dayTitle(d)}`}
-                onClick={() => pickDay(d.date === selDate ? null : d.date)}
-              >
-                {fmtMD(d.date)}
-              </button>
-            ))}
-          </div>
-          {selDay && (
-            <p className="day-strip-sum small">
-              <strong>{fmtDay(selDay.date)}</strong> {dayTitle(selDay)}
-              {roadTotal && roadTotal.s > 0 && (
-                <span className="muted" role="img" aria-label={`開車路段約 ${Math.round(roadTotal.m / 1000)} 公里、${Math.round((roadTotal.s / 3600) * 10) / 10} 小時（道路計算）`}>
-                  {" "}<Icon name="car" size={14} /> {Math.round(roadTotal.m / 1000)} km・{Math.round((roadTotal.s / 3600) * 10) / 10} h
-                </span>
-              )}{" "}
-              <a
-                href="#"
-                aria-label="查看當天行程"
-                onClick={(e) => {
-                  e.preventDefault();
-                  gotoDay(selIdx);
-                }}
-              >
-                <Icon name="calendar" size={16} /> →
-              </a>
-              {editable && selStops && legs && drivePairs.some((dr, k) => dr && !legs[k]) && (
-                <PendingButton className="btn ghost small" pendingLabel="計算中…" onAction={() => computeLegs(selStops)}>
-                  計算道路路線
-                </PendingButton>
-              )}
-              {legs?.some((l) => l && l.source !== "same-place") && <span className="route-credit">{routeCredit(legs)}</span>}
-            </p>
-          )}
-          {selected && (
-            <PlaceCard
-              key={selected.i.id}
-              place={selected}
-              suggestion={sug}
-              editable={editable}
-              onClose={() => {
-                const id = f.place;
-                patch({ place: null });
-                requestAnimationFrame(() => wrap.current?.querySelector<HTMLElement>(`.place-row[data-id="${id}"]`)?.focus());
-              }}
-              onSchedule={async (date) => {
-                const ok = await runOp({ op: "scheduleItem", key: selected.p.key, itemId: selected.i.id, date });
-                if (ok) patch({ place: null });
-                return ok;
-              }}
-            />
-          )}
-          <div className="chips" role="group" aria-label="地區">
-            {["all", ...segKeys].map((k) => (
-              <button key={k} type="button" className={`chip ${f.seg === k ? "on" : ""}`} aria-pressed={f.seg === k} onClick={() => patch({ seg: k })}>
-                {k === "all" ? "全部地區" : doc.segments[k].name}
-              </button>
-            ))}
-            <button type="button" className={`chip ${f.days ? "on" : ""}`} aria-pressed={f.days} onClick={() => patch({ days: !f.days })}>
-              <i className="lg-days" aria-hidden="true" /> 已排行程
-            </button>
-            <button type="button" className={`chip ${f.pool ? "on" : ""}`} aria-pressed={f.pool} onClick={() => patch({ pool: !f.pool })}>
-              <i className="lg-pool" aria-hidden="true" /> 待安排
-            </button>
-            <span className="chip lg-only" aria-hidden="true">
-              <i className="lg-home" /> 住處
-            </span>
-          </div>
-          <button type="button" className={`chip filter-toggle${f.cat !== "all" || inView ? " on" : ""}`} aria-expanded={showFilters} onClick={() => setShowFilters(!showFilters)}>
-            篩選{f.cat !== "all" ? `：${CATEGORY_META[f.cat as Category]?.t ?? "未分類"}` : ""}
-            {inView ? "・畫面內" : ""}
-          </button>
-          {showFilters && (
-            <>
-              <div className="chips cats" role="group" aria-label="分類">
-                <button type="button" className={`chip ${f.cat === "all" ? "on" : ""}`} aria-pressed={f.cat === "all"} onClick={() => patch({ cat: "all" })}>
-                  全部 {base.length}
-                </button>
-                {CAT_KEYS.filter((c) => counts.get(c)).map((c) => (
-                  <button key={c} type="button" className={`chip ${f.cat === c ? "on" : ""}`} aria-pressed={f.cat === c} onClick={() => patch({ cat: f.cat === c ? "all" : c })}>
-                    <Icon name={CATEGORY_META[c].icon} size={16} /> {CATEGORY_META[c].t} {counts.get(c)}
-                  </button>
-                ))}
-              </div>
-              <label className="in-view">
-                <input type="checkbox" checked={inView} onChange={(e) => setInView(e.target.checked)} /> 只列出地圖畫面內的景點
-              </label>
-            </>
-          )}
-
-
-          {selected ? (
-            <button
-              type="button"
-              className="back-to-list"
-              onClick={() => {
-                const id = f.place;
-                patch({ place: null });
-                requestAnimationFrame(() => wrap.current?.querySelector<HTMLElement>(`.place-row[data-id="${id}"]`)?.focus());
-              }}
-            >
-              ← 返回清單（{listed.length}）
-            </button>
-          ) : !f.pool ? (
-            <p className="muted small">已關閉「待安排」圖層。</p>
-          ) : !listed.length ? (
-            <p className="muted small">{inView ? "地圖畫面內沒有符合的景點，移動或縮小地圖看看。" : "沒有符合的景點。"}</p>
-          ) : (
-            [...groups, ...(others.length ? [{ c: OTHER as Category | typeof OTHER, xs: others }] : [])].map(({ c, xs }) => (
-              <section key={c} className="place-group">
-                <h2>
-                  {c !== OTHER && <Icon name={CATEGORY_META[c as Category].icon} size={16} />} {c === OTHER ? "未分類" : CATEGORY_META[c as Category].t}
-                  <span className="muted"> {xs.length}</span>
-                </h2>
-                <ul>
-                  {xs.map((pl) => (
-                    <li key={pl.i.id}>
-                      <button type="button" className={`place-row${pl.i.id === f.place ? " sel" : ""}`} aria-pressed={pl.i.id === f.place} data-id={pl.i.id} onClick={onRow}>
-                        <span className="nm">{pl.i.name}</span>
-                        <span className="sub">
-                          {pl.p.title.replace(/（Google 地圖收藏）/, "")}
-                          {pl.i.lat == null ? "・沒有座標" : ""}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ))
-          )}
-          {noCoords.length > 0 && <p className="muted small">沒有座標、地圖上沒畫出來：{noCoords.map((pl) => pl.i.name).join("、")}</p>}
-          <ul className="map-legend-row small">
-            <li role="img" aria-label="實心點是已排行程（點一下可跳到當天）"><i className="lg-dot" /> 已排</li>
-            <li role="img" aria-label="空心紅圈是待安排景點"><i className="lg-ring" /> 待安排</li>
-            <li role="img" aria-label="數字圓圈是聚在一起的景點，點一下會放大"><i className="lg-num">3</i> 群聚</li>
-            <li role="img" aria-label="朱紅房子是住處（每晚住的地方）"><Icon name="home" size={16} /> 住處</li>
-          </ul>
-          <details className="map-alt">
-            <summary>依分組檢視（可整組排入）</summary>
-            <Pool />
-          </details>
-        </div>
-      </aside>
+      )}
     </div>
   );
 }

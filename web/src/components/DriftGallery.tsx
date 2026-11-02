@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEve
 import { useTrip } from "./TripApp";
 import { LoadingTile, cardSrc } from "./PlaceGallery";
 import { project, rubber, spring } from "./motion";
+import { blockPagePinch } from "./MapViews";
 import { useOnceHint, useReducedMotion } from "./ui";
 import { Icon } from "./Icon";
 import { commonsFor } from "@/client/photos";
@@ -29,7 +30,8 @@ const MAX_SPEED = 3000; // px of depth per second: a flick travels at most about
 const DRAG_DEPTH = 1.6; // px of depth per px of finger
 const DRAG_START = 10; // px before a press counts as a drag (a tap stays a tap)
 
-const IDLE_SPEED = 40;
+const IDLE_SPEED = 70; // about one photo every 4 s (Kai 2026-11-02: noticeably faster, still easy to see)
+const ZOOM_MAX = 4;
 const IDLE_AFTER_MS = 1500; // the drift comes back this long after the last touch, in the same direction
 
 /** The axis of a drag, chosen once after DRAG_START px; null until then. It stays locked, so a diagonal swipe never jitters. */
@@ -42,6 +44,27 @@ export function lockAxis(dx: number, dy: number): "x" | "y" | null {
 export function planeShot<T>(prev: { n: number; shot: T } | undefined, n: number, list: T[]): { n: number; shot: T } {
   if (prev && prev.n === n) return prev;
   return { n, shot: list[((n % list.length) + list.length) % list.length] };
+}
+
+/**
+ * Where a horizontal swipe lands: the plane nearest the projected stop, and always at least the next plane
+ * in the swipe's direction once it has moved (a short slow swipe still changes the photo).
+ */
+export function snapTarget(start: number, cam: number, v: number, gap: number): number {
+  const target = Math.round((cam + project(v)) / gap) * gap;
+  const dir = Math.sign(cam - start) || Math.sign(v);
+  const base = Math.round(start / gap) * gap;
+  if (dir > 0) return Math.max(target, base + gap);
+  if (dir < 0) return Math.min(target, base - gap);
+  return target;
+}
+
+/** Pinch: the point between the fingers stays under them. Below 1 and above ZOOM_MAX the zoom resists. */
+export function pinchView(base: { z: number; x: number; y: number }, startDist: number, dist: number, startMid: { x: number; y: number }, mid: { x: number; y: number }) {
+  const raw = base.z * (dist / Math.max(1, startDist));
+  const z = raw < 1 ? 1 - rubber(1 - raw, 1) : raw > ZOOM_MAX ? ZOOM_MAX + rubber(raw - ZOOM_MAX, 1) : raw;
+  const k = z / base.z;
+  return { z, x: mid.x - (startMid.x - base.x) * k, y: mid.y - (startMid.y - base.y) * k };
 }
 
 type Sample = { t: number; pos: number };
@@ -139,7 +162,7 @@ export function DriftGallery({ active }: { active: boolean }) {
       )}
       {!reduce && hint && shots.length > 0 && (
         <p className="drift-hint" onClick={doneHint} role="note">
-          滑動漂流・點照片看是哪裡
+          左右滑換照片・雙指縮放・點照片看是哪裡
         </p>
       )}
       {shots.length === 0 ? (
@@ -330,6 +353,9 @@ function Field({ shots, active, paused, onPick }: { shots: Shot[]; active: boole
   // (photos arrive in batches) never swaps photos that are on screen.
   const shown = useRef<{ n: number; shot: Shot }[]>([]);
   const pausedRef = useRef(paused);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const resetRef = useRef<() => void>(() => undefined);
+  const [zoomed, setZoomed] = useState(false);
   useEffect(() => {
     shotsRef.current = shots;
     planesRef.current = planeCount;
@@ -343,7 +369,47 @@ function Field({ shots, active, paused, onPick }: { shots: Shot[]; active: boole
     let last = performance.now();
     let lastTouch = -Infinity;
     let dir = 1;
-    let press: { id: number; x0: number; y0: number; axis: "x" | "y" | null; x: number; y: number; samples: Sample[] } | null = null;
+    let press: { id: number; x0: number; y0: number; axis: "x" | "y" | null; x: number; y: number; start: number; samples: Sample[] } | null = null;
+    // Every finger on the field. Two fingers are a pinch; after one lifts, the other does nothing until it lifts too.
+    const fingers = new Map<number, { x: number; y: number }>();
+    let pinch: { dist: number; mid: { x: number; y: number }; base: { z: number; x: number; y: number } } | null = null;
+    const view = { z: 1, x: 0, y: 0 };
+    let stopGlide: (() => void) | null = null;
+    let stopView: (() => void)[] = [];
+    const unpinch = blockPagePinch(box);
+    const paintView = () => {
+      if (stageRef.current) stageRef.current.style.transform = view.z === 1 && !view.x && !view.y ? "" : `translate3d(${view.x.toFixed(1)}px, ${view.y.toFixed(1)}px, 0) scale(${view.z.toFixed(3)})`;
+    };
+    const settleView = (z: number, x: number, y: number) => {
+      stopView.forEach((f) => f());
+      setZoomed(z > 1.01);
+      stopView = [
+        spring(view.z, 0, z, 0.35, (v) => {
+          view.z = v;
+          paintView();
+        }),
+        spring(view.x, 0, x, 0.35, (v) => {
+          view.x = v;
+          paintView();
+        }),
+        spring(view.y, 0, y, 0.35, (v) => {
+          view.y = v;
+          paintView();
+        }),
+      ];
+    };
+    /** Keep the zoomed field on screen; at 1× it returns to the centre. */
+    const settleInside = () => {
+      const z = Math.max(1, Math.min(ZOOM_MAX, view.z));
+      const mx = (w * (z - 1)) / 2 + (z > 1 ? w * 0.4 : 0);
+      const my = (h * (z - 1)) / 2 + (z > 1 ? h * 0.4 : 0);
+      settleView(z, Math.max(-mx, Math.min(mx, view.x)), Math.max(-my, Math.min(my, view.y)));
+    };
+    resetRef.current = () => settleView(1, 0, 0);
+    const spread = () => {
+      const [a, b] = [...fingers.values()];
+      return { dist: Math.hypot(a.x - b.x, a.y - b.y), mid: { x: (a.x + b.x) / 2 - w / 2, y: (a.y + b.y) / 2 - h / 2 } };
+    };
     const wanted = new Set<string>();
     /** Fetch and decode ahead, so a photo is ready when its plane comes into view. */
     const preload = (src: string) => {
@@ -364,12 +430,12 @@ function Field({ shots, active, paused, onPick }: { shots: Shot[]; active: boole
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
       // While a finger holds the field it alone moves the camera.
-      if (!press?.axis) {
+      if (!press?.axis && !stopGlide) {
         cam.current += vel.current * dt;
         if (Math.abs(vel.current) > IDLE_SPEED) vel.current *= Math.exp(-FRICTION * dt);
         else {
           // Below drift speed: settle, then the drift eases back in the direction of the last motion, never reversing.
-          const idle = !press && !pausedRef.current && now - lastTouch > IDLE_AFTER_MS ? IDLE_SPEED * dir : 0;
+          const idle = !fingers.size && view.z <= 1.01 && !pausedRef.current && now - lastTouch > IDLE_AFTER_MS ? IDLE_SPEED * dir : 0;
           vel.current += (idle - vel.current) * Math.min(1, dt);
         }
         if (Math.abs(vel.current) > 1) dir = Math.sign(vel.current);
@@ -428,19 +494,54 @@ function Field({ shots, active, paused, onPick }: { shots: Shot[]; active: boole
     const onVis = () => (document.hidden ? cancelAnimationFrame(raf) : start());
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
+      // A trackpad pinch arrives as ctrl+wheel.
+      if (e.ctrlKey) {
+        stopView.forEach((f) => f());
+        view.z = Math.max(1, Math.min(ZOOM_MAX, view.z - e.deltaY * 0.01));
+        if (view.z === 1) view.x = view.y = 0;
+        setZoomed(view.z > 1.01);
+        paintView();
+        return;
+      }
       vel.current = Math.max(-MAX_SPEED, Math.min(MAX_SPEED, vel.current + (e.deltaY + e.deltaX) * 6));
       lastTouch = performance.now();
     };
     // One finger, one axis (locked after DRAG_START), 1:1 from there: swipe up or left goes forward.
     const onDown = (e: PointerEvent) => {
-      if (press) return;
-      // Pressing stops the drift at once (interruptible).
-      vel.current = 0;
+      const r = box.getBoundingClientRect();
+      fingers.set(e.pointerId, { x: e.clientX - r.left, y: e.clientY - r.top });
       lastTouch = performance.now();
+      if (fingers.size === 2) {
+        // A second finger turns the press into a pinch: the swipe so far is dropped, and no tap or momentum follows.
+        press = null;
+        vel.current = 0;
+        box.dataset.dragged = "1";
+        stopGlide?.();
+        stopGlide = null;
+        stopView.forEach((f) => f());
+        const s = spread();
+        pinch = { dist: s.dist, mid: s.mid, base: { ...view } };
+        return;
+      }
+      if (fingers.size > 1) return;
+      // Pressing stops the drift or a glide at once (interruptible).
+      stopGlide?.();
+      stopGlide = null;
+      vel.current = 0;
       delete box.dataset.dragged;
-      press = { id: e.pointerId, x0: e.clientX, y0: e.clientY, axis: null, x: e.clientX, y: e.clientY, samples: [] };
+      press = { id: e.pointerId, x0: e.clientX, y0: e.clientY, axis: null, x: e.clientX, y: e.clientY, start: cam.current, samples: [] };
     };
     const onMove = (e: PointerEvent) => {
+      if (fingers.has(e.pointerId)) {
+        const r = box.getBoundingClientRect();
+        fingers.set(e.pointerId, { x: e.clientX - r.left, y: e.clientY - r.top });
+      }
+      if (pinch && fingers.size >= 2) {
+        const s = spread();
+        Object.assign(view, pinchView(pinch.base, pinch.dist, s.dist, pinch.mid, s.mid));
+        paintView();
+        return;
+      }
       if (!press || e.pointerId !== press.id) return;
       if (!press.axis) {
         press.axis = lockAxis(e.clientX - press.x0, e.clientY - press.y0);
@@ -457,10 +558,27 @@ function Field({ shots, active, paused, onPick }: { shots: Shot[]; active: boole
       press.y = e.clientY;
     };
     const onUp = (e: PointerEvent) => {
+      fingers.delete(e.pointerId);
+      if (pinch && fingers.size < 2) {
+        pinch = null;
+        lastTouch = performance.now();
+        settleInside();
+      }
       if (!press || e.pointerId !== press.id) return;
       // The camera carries on at the finger's speed: no seam between dragging and gliding. A cancelled touch just stops.
-      vel.current = e.type === "pointercancel" ? 0 : releaseVelocity(press.samples, e.timeStamp);
+      const v = e.type === "pointercancel" ? 0 : releaseVelocity(press.samples, e.timeStamp);
       lastTouch = performance.now();
+      if (press.axis === "x" && e.type !== "pointercancel") {
+        // A horizontal swipe switches photos: momentum picks the plane, a spring carries the finger's speed there.
+        vel.current = 0;
+        const done = () => {
+          stopGlide = null;
+          lastTouch = performance.now();
+        };
+        stopGlide = spring(cam.current, v, snapTarget(press.start, cam.current, v, GAP), 0.5, (x) => {
+          cam.current = x;
+        }, done);
+      } else vel.current = v;
       press = null;
     };
     box.addEventListener("wheel", onWheel, { passive: false });
@@ -472,6 +590,9 @@ function Field({ shots, active, paused, onPick }: { shots: Shot[]; active: boole
     start();
     return () => {
       cancelAnimationFrame(raf);
+      stopGlide?.();
+      stopView.forEach((f) => f());
+      unpinch();
       box.removeEventListener("wheel", onWheel);
       box.removeEventListener("pointerdown", onDown);
       window.removeEventListener("pointermove", onMove);
@@ -506,7 +627,7 @@ function Field({ shots, active, paused, onPick }: { shots: Shot[]; active: boole
         }
       }}
     >
-      <div className="drift-stage">
+      <div className="drift-stage" ref={stageRef}>
         {Array.from({ length: planeCount }, (_, i) => (
           <button
             key={i}
@@ -526,6 +647,11 @@ function Field({ shots, active, paused, onPick }: { shots: Shot[]; active: boole
           </button>
         ))}
       </div>
+      {zoomed && (
+        <button type="button" className="drift-reset" aria-label="還原大小" title="還原大小" onPointerDown={(e) => e.stopPropagation()} onClick={() => resetRef.current()}>
+          <Icon name="fit" size={20} />
+        </button>
+      )}
     </div>
   );
 }

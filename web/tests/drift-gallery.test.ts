@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { lockAxis, planeShot, releaseVelocity, sameImage, tripShots } from "@/components/DriftGallery";
+import { lockAxis, pinchView, planeShot, releaseVelocity, sameImage, snapTarget, tripShots } from "@/components/DriftGallery";
 import type { Item, Photo } from "@/domain/schema";
 
 /* 畫廊 photo list (2026-10-26) */
@@ -51,5 +51,22 @@ describe("gallery gestures and photos", () => {
     expect(planeShot(first, 3, ["new", "a", "b", "c", "d"]).shot).toBe("d");
     expect(planeShot(first, 4, ["a", "b", "c", "d"]).shot).toBe("a");
     expect(planeShot(undefined, -1, ["a", "b", "c", "d"]).shot).toBe("d");
+  });
+
+  it("a swipe always reaches the next photo, and speed carries it further", () => {
+    expect(snapTarget(0, 20, 0, 260)).toBe(260);
+    expect(snapTarget(0, -20, 0, 260)).toBe(-260);
+    expect(snapTarget(0, 100, 3000, 260)).toBeGreaterThan(260);
+    expect(snapTarget(520, 620, 0, 260)).toBe(780);
+  });
+
+  it("a pinch keeps the point between the fingers in place and resists past its limits", () => {
+    const base = { z: 1, x: 0, y: 0 };
+    const v = pinchView(base, 100, 200, { x: 50, y: 20 }, { x: 50, y: 20 });
+    expect(v.z).toBe(2);
+    expect(v.x).toBe(-50);
+    expect(v.y).toBe(-20);
+    expect(pinchView(base, 100, 10, { x: 0, y: 0 }, { x: 0, y: 0 }).z).toBeGreaterThan(0.45);
+    expect(pinchView(base, 100, 2000, { x: 0, y: 0 }, { x: 0, y: 0 }).z).toBeLessThan(5);
   });
 });

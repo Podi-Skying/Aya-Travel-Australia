@@ -978,4 +978,9 @@ export const EN: Record<string, string> = {
   "{n} 項要預訂": "{n} to book",
   "{n} 項要預訂但還沒訂。": "{n} still to book.",
   "{0}：一定要訂": "{0}: must book",
+  "放大": "Zoom in",
+  "縮小": "Zoom out",
+  "左右滑換照片・雙指縮放・點照片看是哪裡": "Swipe for the next photo · pinch to zoom · tap to see where",
+  "還原大小": "Reset zoom",
+  "依分組檢視待安排景點（可整組排入）": "Unscheduled places by group (schedule a whole group)",
 };

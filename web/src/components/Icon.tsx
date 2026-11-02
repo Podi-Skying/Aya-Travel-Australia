@@ -49,6 +49,10 @@ const PATHS: Record<string, string> = {
   bed: "M3 19V6 M3 15h18v4 M21 15v-2a3 3 0 0 0-3-3h-8v5 M7 12.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z",
   more: "M6 12h.01 M12 12h.01 M18 12h.01",
   eye: "M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z",
+  plus: "M12 5v14 M5 12h14",
+  minus: "M5 12h14",
+  fit: "M4 9V4h5 M15 4h5v5 M20 15v5h-5 M9 20H4v-5",
+  locate: "M12 18a6 6 0 1 0 0-12 6 6 0 0 0 0 12z M12 2.500V6 M12 18v3.500 M2.500 12H6 M18 12h3.500 M12 13.500a1.500 1.500 0 1 0 0-3 1.500 1.500 0 0 0 0 3z",
   "chevron-down": "M5 9l7 7 7-7",
   // Place categories (CATEGORY_META in Places.tsx).
   "cat-nature": "M12 3l6 9h-3l4 6H5l4-6H6z M12 18v3",

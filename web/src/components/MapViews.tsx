@@ -49,6 +49,15 @@ export function pinchZoom(map: Leaflet.Map) {
   let pinchEnd = 0;
 }
 
+/** iOS Safari ignores viewport zoom limits: inside this element a pinch stays with the element, never the page. */
+export function blockPagePinch(el: HTMLElement) {
+  const stop = (e: Event) => e.preventDefault();
+  for (const t of ["gesturestart", "gesturechange", "gestureend"]) el.addEventListener(t, stop, { passive: false });
+  return () => {
+    for (const t of ["gesturestart", "gesturechange", "gestureend"]) el.removeEventListener(t, stop);
+  };
+}
+
 export function tiles(L: L) {
   // OpenStreetMap standard tiles. Their usage policy requires a Referer header, which the
   // site's Referrer-Policy (strict-origin-when-cross-origin) now sends as the origin only.

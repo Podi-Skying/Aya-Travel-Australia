@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useTrip } from "./TripApp";
 import { AvatarStack } from "./People";
+import { Pool } from "./Pool";
 import { Badge, PendingButton, TapChips, useReducedMotion } from "./ui";
 import { useSyncExternalStore } from "react";
 
@@ -101,6 +102,11 @@ export function TripOptions() {
           {tour ? <TourDetail key={tour.key} item={tour.item} /> : <OptionDetail key={current!.option.key} c={current!} jump={jump?.key === current!.option.key ? jump.n : 0} />}
         </>
       )}
+      {/* Moved from the map (Kai 2026-11-02: the 地圖 tab keeps only the map). */}
+      <details className="section map-alt">
+        <summary>依分組檢視待安排景點（可整組排入）</summary>
+        <Pool />
+      </details>
     </div>
   );
 }

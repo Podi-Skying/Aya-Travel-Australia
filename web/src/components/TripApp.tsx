@@ -396,9 +396,12 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
     tabsRef.current?.querySelectorAll<HTMLElement>('[role="tab"]')[j]?.focus();
   };
 
+  // 地圖 and 畫廊 fill the space between the header and the tab bar (Kai 2026-11-02): no banner, no footer.
+  const immersive = tab === "map" || tab === "gallery";
+
   return (
     <TripCtx.Provider value={ctx}>
-      <div key={lang} className="lang-root">
+      <div key={lang} className={`lang-root${immersive ? " immersive" : ""}`}>
       <DomTranslator content={content} />
       <a className="skip" href="#main">
         {tt("跳到主要內容")}
@@ -431,7 +434,7 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
           <div className={`save-bar${busy ? " on" : ""}`} aria-hidden="true" />
         </nav>
       </SiteHeader>
-      <Hero doc={doc} note={mode === "public" ? (canVote ? "你正在檢視 Aya 的旅程（唯讀）。可以對活動按「我有興趣」！" : "你正在檢視 Aya 的旅程（唯讀公開版，住址與司機資訊已隱藏）。") : null} />
+      {!immersive && <Hero doc={doc} note={mode === "public" ? (canVote ? "你正在檢視 Aya 的旅程（唯讀）。可以對活動按「我有興趣」！" : "你正在檢視 Aya 的旅程（唯讀公開版，住址與司機資訊已隱藏）。") : null} />}
       {(!online || fromCache) && (
         <div className="offline-banner" role="status">
           <TapChips items={[{ key: "off", icon: <Icon name="wait" size={18} />, text: fmtTs(lastSyncAt), label: "離線副本", tone: "warn", panel: <p className="small">離線副本，可能不是最新資料（最後同步：{fmtTs(lastSyncAt)}）</p> }]} />
@@ -463,30 +466,26 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
           <DriftGallery active={tab === "gallery"} />
         </Panel>
       </main>
-      <footer className="foot">
-        <TapChips
-          items={[{
-            key: "sync",
-            icon: <Icon name="clock" size={16} />,
-            text: `${fmtTs(lastSyncAt)}・v${versionNo}`,
-            label: `最後同步：${fmtTs(lastSyncAt)}`,
-            panel: (
-              <p>
-                最後同步：{fmtTs(lastSyncAt)}
-                {!online || fromCache ? "（離線副本，可能不是最新資料）" : ""}。目前沒有即時資料連線，所有價格與時間皆為估計。
-                <br />
-                版本 v{versionNo}・{mode === "owner" ? "擁有者模式" : "唯讀分享"}
-              </p>
-            ),
-          }]}
-        />
-        {mode === "owner" && (
-          <p>
-            {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- next-auth route, full navigation */}
-            <a href="/api/auth/signout">登出</a>
-          </p>
-        )}
-      </footer>
+      {!immersive && (
+        <footer className="foot">
+          <TapChips
+            items={[{
+              key: "sync",
+              icon: <Icon name="clock" size={16} />,
+              text: `${fmtTs(lastSyncAt)}・v${versionNo}`,
+              label: `最後同步：${fmtTs(lastSyncAt)}`,
+              panel: (
+                <p>
+                  最後同步：{fmtTs(lastSyncAt)}
+                  {!online || fromCache ? "（離線副本，可能不是最新資料）" : ""}。目前沒有即時資料連線，所有價格與時間皆為估計。
+                  <br />
+                  版本 v{versionNo}・{mode === "owner" ? "擁有者模式" : "唯讀分享"}
+                </p>
+              ),
+            }]}
+          />
+        </footer>
+      )}
       {dialog}
       {toastNode}
       </div>
