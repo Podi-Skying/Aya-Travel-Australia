@@ -41,13 +41,13 @@ describe("gallery photo sources", () => {
 
   it("accepts /api/media photos in galleries, shows them on public documents, and tokenises them on share pages", () => {
     const doc = seedDoc() as TripDoc;
-    doc.days[0].items[0].gallery = [{ url: "/api/media/balloon-aloft/06-redballoon-sunrise.webp", page: "/api/media/balloon-aloft/06-redballoon-sunrise.webp", site: "Kai 提供", kind: "custom" }];
+    doc.days[0].items[0].gallery = [{ url: "/api/media/hunter-balloon/04-bubbles-lake-sunrise.webp", page: "/api/media/hunter-balloon/04-bubbles-lake-sunrise.webp", site: "Kai 提供", kind: "custom" }];
     const r = parseTripDoc(doc);
     expect(r.ok).toBe(true);
     expect(parseTripDoc({ ...doc, days: doc.days.map((d, i) => (i ? d : { ...d, items: [{ ...d.items[0], gallery: [{ url: "/etc/passwd", page: "/x", site: "x", kind: "custom" }] }] })) }).ok).toBe(false);
-    expect(JSON.stringify(toPublicDoc(r.ok ? r.doc : doc))).toContain("balloon-aloft");
+    expect(JSON.stringify(toPublicDoc(r.ok ? r.doc : doc))).toContain("hunter-balloon");
     const t = withMediaToken(doc, "tok");
-    expect(t.days[0].items[0].gallery![0].url).toBe("/api/media/balloon-aloft/06-redballoon-sunrise.webp?token=tok");
+    expect(t.days[0].items[0].gallery![0].url).toBe("/api/media/hunter-balloon/04-bubbles-lake-sunrise.webp?token=tok");
   });
 });
 
@@ -77,7 +77,7 @@ describe("gallery endpoints", () => {
 
   it("/api/media serves Kai's photos to the owner, and to a share token only when its trip shows them", async () => {
     const path = (p: string) => ({ params: Promise.resolve({ path: p.split("/") }) });
-    const file = "balloon-aloft/06-redballoon-sunrise.webp";
+    const file = "hunter-balloon/04-bubbles-lake-sunrise.webp";
     signedOut();
     expect((await H.getMedia(req("GET", `/api/media/${file}`), path(file))).status).toBe(401);
     // Not referenced by the trip yet: refused for the token.
