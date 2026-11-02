@@ -29,7 +29,7 @@ import { PlaceGallery, sizedPhoto } from "./PlaceGallery";
 import { displayName, isLogistics, nameIsTentative } from "@/domain/day-title";
 import { iconOf, isLegOnly } from "./stopIcon";
 import { OwnerMenu } from "./OwnerMenu";
-import { bookingFlag } from "@/domain/booking";
+import { bookingFlag, bookingHref } from "@/domain/booking";
 import { BookWarn } from "./BookWarn";
 import { useCalendarSync } from "./useCalendarSync";
 
@@ -111,13 +111,18 @@ function RouteStrip({ items, legBefore }: { items: Item[]; legBefore: (id: strin
                   <Icon name={iconOf(i)} size={20} />
                 )}
               </span>
-              {bookingFlag(i) && (
+              {bookingFlag(i) && !bookingHref(i) && (
                 <span className="rs-warn">
                   <BookWarn flag={bookingFlag(i)!} size={18} />
                 </span>
               )}
               {main && <span className="rs-name">{displayName(i)}</span>}
             </button>
+            {bookingHref(i) && (
+              <span className="rs-warn rs-warn-link">
+                <BookWarn flag={bookingFlag(i)!} size={18} href={bookingHref(i)} />
+              </span>
+            )}
           </li>
         );
       })}
@@ -642,6 +647,7 @@ export function DaysView({ active }: { active: boolean }) {
                 const fullName = getLang() === "zh" ? i.name : tx(i, "name", i.name);
                 const waiting = i.status === "pending" || tent || nameIsTentative(i);
                 const flag = bookingFlag(i);
+                const bookAt = bookingHref(i);
                 const stateIcon = flag ? (
                   <BookWarn flag={flag} size={22} />
                 ) : i.status === "confirmed" ? (
@@ -818,7 +824,7 @@ export function DaysView({ active }: { active: boolean }) {
                           </div>
                           <h4>{name}</h4>
                           {i.extraPeople ? <span className="stop-plus" role="img" aria-label={`另外還有 ${i.extraPeople} 人`}>+{i.extraPeople}</span> : null}
-                          {flag && <BookWarn flag={flag} size={16} text />}
+                          {flag && <BookWarn flag={flag} size={16} text href={bookAt} />}
                           {chips}
                           {interest}
                           <details className="act-more">
@@ -839,7 +845,7 @@ export function DaysView({ active }: { active: boolean }) {
                               )}
                               <span className="stop-line-name">{name}</span>
                               {i.extraPeople ? <span className="stop-plus" role="img" aria-label={`另外還有 ${i.extraPeople} 人`}>+{i.extraPeople}</span> : null}
-                              {flag ? <BookWarn flag={flag} size={20} text /> : stateIcon}
+                              {flag ? <BookWarn flag={flag} size={20} text href={bookAt} /> : stateIcon}
                               <span className="stop-line-more" aria-hidden="true">
                                 <Icon name="chevron-right" size={16} />
                               </span>

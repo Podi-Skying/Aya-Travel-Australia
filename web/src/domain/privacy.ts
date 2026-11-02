@@ -44,6 +44,8 @@ function scrub(value: unknown, names: string[]): unknown {
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(value)) {
       if (k === "driverConfirmation" || k === "address" || k === "ownerNote") continue;
+      // A private listing (an Airbnb room) is the owner's; public operators and venues stay.
+      if (k === "bookingUrl" && typeof v === "string" && /(^|\.)airbnb\./i.test(new URL(v).hostname)) continue;
       if (k === "needsDriver") {
         if (typeof v === "string" && v) out[k] = PUBLIC_DRIVER_LABEL;
         continue;

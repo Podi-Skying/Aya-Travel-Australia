@@ -11,6 +11,12 @@ export function bookingFlag(i: Pick<Item, "name" | "book" | "status" | "cat" | "
   return { level: i.book, label };
 }
 
+/** The ⚠ opens this page while the item still needs booking; an awaited order or pickup has nothing left to book. */
+export function bookingHref(i: Pick<Item, "name" | "book" | "status" | "cat" | "flag" | "bookingUrl">): string | null {
+  const flag = bookingFlag(i);
+  return flag && flag.label.startsWith("未訂") && i.bookingUrl ? i.bookingUrl : null;
+}
+
 /** The calendar title's warning, in English like the rest of the calendar. */
 export function calendarPrefix(i: Pick<Item, "name" | "book" | "status" | "cat" | "flag">): string {
   const flag = bookingFlag(i);

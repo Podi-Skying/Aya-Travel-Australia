@@ -1390,3 +1390,15 @@ html:has(.lang-root.immersive), html:has(.lang-root.immersive) body { overflow: 
 
 .drift-reset { position: absolute; top: 8px; left: 8px; z-index: 3; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 1px solid rgba(41, 40, 35, .12); border-radius: 50%; background: rgba(250, 247, 240, .86); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); color: var(--ink); cursor: pointer; }
 .drift-plane { touch-action: none; }
+
+/* ⚠ that opens the booking page (Kai 2026-11-03): a 44px target with a "去訂購 ↗" cue. */
+.book-link { min-height: 44px; min-width: 44px; justify-content: center; padding: 0 8px; margin: -8px 0; border-radius: 12px; color: #7a5a00; text-decoration: none; }
+.book-link:active { background: rgba(242, 177, 0, .18); }
+.book-link:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
+.book-go { font-size: .72rem; font-weight: 600; white-space: nowrap; text-decoration: underline; text-underline-offset: 2px; }
+.route-strip li { position: relative; }
+.rs-warn-link { z-index: 1; line-height: normal; }
+.rs-warn-link .book-link { min-width: 44px; padding: 0; margin: -12px 0 0 -12px; }
+.rs-warn-link .book-go { display: none; }
+.pop-book { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; color: #7a5a00 !important; font-weight: 600; }
+.pop-book svg { flex: none; }

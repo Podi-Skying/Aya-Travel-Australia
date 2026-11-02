@@ -324,4 +324,15 @@ describe("other private names", () => {
     expect(JSON.stringify(pub)).not.toMatch(/zelda/i);
     expect(pub.days[0].items[0].extraPeople).toBe(3);
   });
+
+describe("booking links", () => {
+  it("guests keep public venues' links but never a private listing", () => {
+    const d = seedDoc();
+    (d.days[0].items[0] as { bookingUrl?: string }).bookingUrl = "https://www.airbnb.com.au/rooms/123";
+    (d.days[0].items[1] as { bookingUrl?: string }).bookingUrl = "https://portarthur.org.au/";
+    const pub = toPublicDoc(d);
+    expect(JSON.stringify(pub)).not.toContain("airbnb");
+    expect((pub.days[0].items[1] as { bookingUrl?: string }).bookingUrl).toBe("https://portarthur.org.au/");
+  });
+});
 });

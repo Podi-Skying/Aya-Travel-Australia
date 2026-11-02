@@ -1,6 +1,6 @@
 "use client";
 
-import { bookingFlag } from "@/domain/booking";
+import { bookingFlag, bookingHref } from "@/domain/booking";
 import { fmtDay, fmtMD } from "@/domain/format";
 import { BookWarn } from "./BookWarn";
 import { useTrip } from "./TripApp";
@@ -18,7 +18,7 @@ export function NeedBooking() {
       <ul>
         {rows.map(({ d, idx, i, flag }) => (
           <li key={i.id}>
-            <BookWarn flag={flag} size={16} />
+            <BookWarn flag={flag} size={16} href={bookingHref(i)} />
             <a
               href="#"
               onClick={(e) => {
@@ -30,11 +30,6 @@ export function NeedBooking() {
             </a>
             <span className="nb-name">{i.name}</span>
             {i.bookBy && <span className="small muted">≤ {fmtMD(i.bookBy)}</span>}
-            {i.src?.url && (
-              <a href={i.src.url} target="_blank" rel="noopener noreferrer">
-                預訂
-              </a>
-            )}
           </li>
         ))}
       </ul>

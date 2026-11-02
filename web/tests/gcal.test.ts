@@ -1,4 +1,4 @@
-import { bookingFlag, calendarPrefix } from "@/domain/booking";
+import { bookingFlag, bookingHref, calendarPrefix } from "@/domain/booking";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { generateKeyPairSync } from "node:crypto";
 import { calendarEvents } from "@/domain/gcal-events";
@@ -194,5 +194,13 @@ describe("booking warning", () => {
     expect(calendarPrefix({ name: "x", flag: "pending" })).toBe("⚠ Pending confirmation: ");
     expect(calendarPrefix({ name: "x", flag: "pickup" })).toBe("⚠ Pickup to confirm: ");
     expect(bookingFlag({ name: "x", flag: "pending", status: "confirmed" })).toBeNull();
+  });
+
+  it("the ⚠ links to the booking page only while there is something to book", () => {
+    const url = "https://portarthur.org.au/";
+    expect(bookingHref({ name: "x", book: "required", bookingUrl: url })).toBe(url);
+    expect(bookingHref({ name: "x", book: "required", bookingUrl: url, status: "confirmed" })).toBeNull();
+    expect(bookingHref({ name: "x", book: "required", bookingUrl: url, flag: "pending" })).toBeNull();
+    expect(bookingHref({ name: "x", book: "required" })).toBeNull();
   });
 });

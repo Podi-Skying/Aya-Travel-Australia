@@ -9,7 +9,7 @@ import { iconSvg } from "./Icon";
 import { routeCredit, routeStops, splitLines, useLegs } from "./useLegs";
 import { HOUSE_SVG, type StayPin } from "@/domain/home-pins";
 import { iconOf } from "./stopIcon";
-import { bookingFlag } from "@/domain/booking";
+import { bookingFlag, bookingHref } from "@/domain/booking";
 import { bookWarnSvg } from "./BookWarn";
 import { sizedPhoto } from "./PlaceGallery";
 
@@ -194,7 +194,7 @@ export function DayMap({
             zIndexOffset: i.major ? 500 : 0,
           })
             .addTo(layer.current!)
-            .bindPopup(all.map((x) => `<strong>${esc(x.time)} ${esc(x.name)}</strong>`).join("<br>"));
+            .bindPopup(all.map((x) => `<strong>${esc(x.time)} ${esc(x.name)}</strong>${bookingHref(x) ? `<br><a class="pop-book" href="${esc(bookingHref(x)!)}" target="_blank" rel="noopener noreferrer">${bookWarnSvg(16)} ${esc(bookingFlag(x)!.label)}・去訂購 ↗</a>` : ""}`).join("<br>"));
           for (const x of all) markers.current.set(x.id, m);
           drawn.push({ m, major: !!i.major });
         });

@@ -116,6 +116,8 @@ export const itemSchema = z.object({
   book: z.enum(["required", "recommended", "none"]).optional(),
   /** Booked but not settled: an order awaiting confirmation, or a pickup point still to confirm. Warns until status is confirmed. */
   flag: z.enum(["pending", "pickup"]).optional(),
+  /** Where to book it (official operator or venue first), opened from the ⚠ in a new tab. */
+  bookingUrl: z.url({ protocol: /^https$/ }).optional(),
   /** The latest sensible day to book. */
   bookBy: dateStr.optional(),
   /** Dinner: when the kitchen closes or last seating, HH:MM; a later plan is flagged. */
