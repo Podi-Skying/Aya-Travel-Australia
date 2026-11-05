@@ -335,4 +335,19 @@ describe("booking links", () => {
     expect((pub.days[0].items[1] as { bookingUrl?: string }).bookingUrl).toBe("https://portarthur.org.au/");
   });
 });
+
+describe("private whole words", () => {
+  it("mask the name as a word with its case, and leave other words alone", () => {
+    const d = seedDoc();
+    (d as { privateWords?: string[] }).privateWords = ["Pip"];
+    d.days[0].items[0].note = "Brunch with Pip; enjoy the pipes";
+    const pub = toPublicDoc(d);
+    const json = JSON.stringify(pub);
+    expect(json).not.toMatch(/\bPip\b/);
+    expect(json).toContain("pipes");
+    expect(pub.privateWords ?? []).toEqual([]);
+    expect(() => assertPublicSafe({ a: "with Pip" }, d)).toThrow(PrivacyGuardError);
+    expect(() => assertPublicSafe({ a: "Pipeline" }, d)).not.toThrow();
+  });
+});
 });

@@ -262,6 +262,8 @@ export const tripDocSchema = z
     peopleNames: z.record(z.string(), shortText(40)).default({}),
     /** Other people's names (colleagues) and spellings, hidden from public views like drivers'. */
     privateNames: z.array(shortText(40)).max(40).optional(),
+    /** Names that are also parts of words (Joy, enjoy): masked only as a whole word with this exact case. */
+    privateWords: z.array(shortText(40)).max(40).optional(),
     drivers: z.record(
       z.string(),
       z.object({

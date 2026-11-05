@@ -33,13 +33,16 @@ function nameRegex(name: string): RegExp {
   return new RegExp(cls, "g");
 }
 
-function scrub(value: unknown, names: string[]): unknown {
+/** A whole word with its exact case, so "Joy" is masked and "enjoy" is not. */
+const wordRegex = (w: string) => new RegExp(`(?<![A-Za-z])${escapeRe(w)}(?![A-Za-z])`, "g");
+
+function scrub(value: unknown, names: string[], words: string[] = []): unknown {
   if (typeof value === "string") {
-    const masked = names.reduce((acc, n) => acc.replace(nameRegex(n), PUBLIC_DRIVER_LABEL), value);
+    const masked = words.reduce((acc, w) => acc.replace(wordRegex(w), PUBLIC_DRIVER_LABEL), names.reduce((acc, n) => acc.replace(nameRegex(n), PUBLIC_DRIVER_LABEL), value));
     // Keep the sentence natural around the mask: no spaces inside Chinese, no honorific on 朋友.
     return masked === value ? value : masked.replace(/朋友さん/g, PUBLIC_DRIVER_LABEL).replace(/([\u3400-\u9fff])\s*朋友\s*(?=[\u3040-\u30ff\u3400-\u9fff])/g, "$1朋友");
   }
-  if (Array.isArray(value)) return value.map((v) => scrub(v, names));
+  if (Array.isArray(value)) return value.map((v) => scrub(v, names, words));
   if (value && typeof value === "object") {
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(value)) {
@@ -50,7 +53,7 @@ function scrub(value: unknown, names: string[]): unknown {
         if (typeof v === "string" && v) out[k] = PUBLIC_DRIVER_LABEL;
         continue;
       }
-      out[k] = scrub(v, names);
+      out[k] = scrub(v, names, words);
     }
     return out;
   }
@@ -73,7 +76,7 @@ export function toPublicDoc(doc: TripDoc, opts: { photos?: boolean } = {}) {
   const okByDate = new Map(doc.days.map((d) => [d.date, effectiveDay(d).driverOk]));
   // Free text written by the owner may mention a driver; mask names everywhere.
   const names = [...Object.keys(doc.drivers), ...Object.values(doc.peopleNames ?? {}), ...(doc.privateNames ?? [])].filter(Boolean).sort((a, b) => b.length - a.length);
-  const scrubbed = scrub({ ...doc, drivers: {}, peopleNames: {}, privateNames: [] }, names) as TripDoc & { drivers: Record<string, never> };
+  const scrubbed = scrub({ ...doc, drivers: {}, peopleNames: {}, privateNames: [], privateWords: [] }, names, (doc.privateWords ?? []).filter(Boolean)) as TripDoc & { drivers: Record<string, never> };
   // No photo of where they sleep (home base, hotels): it would show the building and so the place.
   const aboutStay = (i: { name: string; en?: string }) => isStayItem(i, doc);
   const noStayPhoto = <T extends { name: string; en?: string }>(i: T): T => {
@@ -198,6 +201,9 @@ export function assertPublicSafe(out: unknown, source: TripDoc): void {
   }
   for (const name of source.privateNames ?? []) {
     if (name && hasName(name)) throw new PrivacyGuardError("person name present");
+  }
+  for (const w of source.privateWords ?? []) {
+    if (w && wordRegex(w).test(json)) throw new PrivacyGuardError("person name present");
   }
   for (const st of Object.values(source.stays)) {
     const a = norm(st.address.trim());
