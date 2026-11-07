@@ -10,6 +10,7 @@ import { routeCredit, routeStops, splitLines, useLegs } from "./useLegs";
 import { HOUSE_SVG, type StayPin } from "@/domain/home-pins";
 import { iconOf } from "./stopIcon";
 import { bookingFlag, bookingHref } from "@/domain/booking";
+import { stopHours, type HoursInfo } from "@/domain/hours";
 import { bookWarnSvg } from "./BookWarn";
 import { sizedPhoto } from "./PlaceGallery";
 
@@ -93,7 +94,9 @@ export function DayMap({
   nearby = [],
   onAdd,
   ends = { start: null, end: null },
+  hours = {},
 }: {
+  hours?: Record<string, HoursInfo>;
   day: EffectiveDay;
   active: boolean;
   focusId: string | null;
@@ -194,7 +197,7 @@ export function DayMap({
             zIndexOffset: i.major ? 500 : 0,
           })
             .addTo(layer.current!)
-            .bindPopup(all.map((x) => `<strong>${esc(x.time)} ${esc(x.name)}</strong>${bookingHref(x) ? `<br><a class="pop-book" href="${esc(bookingHref(x)!)}" target="_blank" rel="noopener noreferrer">${bookWarnSvg(16)} ${esc(bookingFlag(x)!.label)}・去訂購 ↗</a>` : ""}`).join("<br>"));
+            .bindPopup(all.map((x) => `<strong>${esc(x.time)} ${esc(x.name)}</strong>${stopHours(x, hours[x.id], day.date) ? `<br><span class="pop-hours">${iconSvg("hours", 14)} ${esc(stopHours(x, hours[x.id], day.date)!.text)}</span>` : ""}${bookingHref(x) ? `<br><a class="pop-book" href="${esc(bookingHref(x)!)}" target="_blank" rel="noopener noreferrer">${bookWarnSvg(16)} ${esc(bookingFlag(x)!.label)}・去訂購 ↗</a>` : ""}`).join("<br>"));
           for (const x of all) markers.current.set(x.id, m);
           drawn.push({ m, major: !!i.major });
         });

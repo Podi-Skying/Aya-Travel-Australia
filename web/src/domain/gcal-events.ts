@@ -2,6 +2,7 @@ import type { TripDoc } from "./schema";
 import { stayOf, lineAmount } from "./budget";
 import { nightStay } from "./stay";
 import { calendarPrefix } from "./booking";
+import { hoursLineEn, type HoursInfo } from "./hours";
 
 /*
  * The trip as Google Calendar events (Kai 2026-11-01): one-way, into a dedicated private calendar, so owner
@@ -25,7 +26,7 @@ function nextDate(date: string): string {
   return local(date, 24 * 60).slice(0, 10);
 }
 
-export function calendarEvents(doc: TripDoc, siteUrl = ""): CalendarEvent[] {
+export function calendarEvents(doc: TripDoc, siteUrl = "", hours: Record<string, HoursInfo> = {}): CalendarEvent[] {
   const out: CalendarEvent[] = [];
   const N = doc.partySize;
   // English only: stored translations, and text with no translation is left out rather than shown in Chinese.
@@ -50,6 +51,7 @@ export function calendarEvents(doc: TripDoc, siteUrl = ""): CalendarEvent[] {
       const description = [
         en(i.tr?.en?.note ?? i.note),
         en(i.ownerNote),
+        hoursLineEn(hours[i.id], d.date),
         i.status === "confirmed" ? "Booked" : i.status === "pending" ? "To confirm" : "",
         i.cost && i.cost.status !== "unknown" ? `Cost: AUD ${lineAmount(i.cost, N)}` : "",
         i.src?.url,

@@ -1,6 +1,7 @@
 import { createHash, createSign } from "node:crypto";
 import type { TripDoc } from "@/domain/schema";
 import { calendarEvents } from "@/domain/gcal-events";
+import { hoursForDoc } from "./hours";
 import { getLookup, putLookup } from "./cache";
 
 /*
@@ -70,7 +71,7 @@ export async function syncCalendar(doc: TripDoc, opts: { fetch?: Fetch; siteUrl?
       }
       page = data.nextPageToken ?? "";
     } while (page);
-    const wanted = calendarEvents(doc, opts.siteUrl);
+    const wanted = calendarEvents(doc, opts.siteUrl, await hoursForDoc(doc, true).catch(() => ({})));
     res.events = wanted.length;
     for (const { key, body } of wanted) {
       const hash = createHash("sha256").update(JSON.stringify(body)).digest("hex").slice(0, 32);

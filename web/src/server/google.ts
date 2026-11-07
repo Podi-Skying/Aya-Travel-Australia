@@ -1,5 +1,6 @@
 import { getLookup, putLookup } from "./cache";
 import { noteGoogleHit, takeGoogleCall, type GoogleApi, type GoogleScope } from "./usage";
+import { toPeriods, type HoursInfo } from "@/domain/hours";
 
 /*
  * Google Maps Platform, server side only (docs/PLAN-2026-10-26-google.md). The key comes from
@@ -186,3 +187,33 @@ export async function googleLegs(points: Pt[], f: GFetch = defaultFetch, travel:
 
 /** Route rows from Google are treated as missing after 30 days (Maps Platform caching limits). */
 export const GOOGLE_ROUTE_TTL_MS = 30 * 86_400_000;
+
+/* ---------------------------------------------------------------- Opening hours (Kai 2026-11-07) */
+
+/** Place content may be cached for at most 30 days; nothing refreshes it automatically (Kai: cache, never recompute). */
+export const HOURS_TTL_MS = 30 * 24 * 3600_000;
+
+/** Opening hours for a place (Place Details, hours fields only), stored in lookup_cache. Called by the owner only. */
+export async function placeHours(placeId: string, opts: { refresh?: boolean } = {}, f: GFetch = defaultFetch): Promise<HoursInfo | null> {
+  const key = googleKey();
+  if (!key || !/^[A-Za-z0-9_-]{10,300}$/.test(placeId)) return null;
+  const hit = await getLookup<HoursInfo>("place-hours", placeId).catch(() => null);
+  if (hit?.fresh && !opts.refresh) {
+    await noteGoogleHit("place_hours");
+    return hit.value;
+  }
+  type Raw = { regularOpeningHours?: { weekdayDescriptions?: string[]; periods?: Parameters<typeof toPeriods>[0] }; businessStatus?: string; utcOffsetMinutes?: number };
+  const det = await call<Raw>(
+    "place_hours",
+    `https://places.googleapis.com/v1/places/${placeId}?languageCode=zh-TW`,
+    { headers: { "X-Goog-Api-Key": key, "X-Goog-FieldMask": "regularOpeningHours,businessStatus,utcOffsetMinutes" } },
+    f,
+  );
+  const value: HoursInfo = {
+    week: (det.regularOpeningHours?.weekdayDescriptions ?? []).slice(0, 7).map((x) => x.slice(0, 120)),
+    periods: toPeriods(det.regularOpeningHours?.periods).slice(0, 30),
+    ...(det.businessStatus ? { status: det.businessStatus } : {}),
+  };
+  await putLookup("place-hours", placeId, value, "Google Place Details (opening hours)", HOURS_TTL_MS);
+  return value;
+}

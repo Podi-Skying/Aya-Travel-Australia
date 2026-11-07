@@ -986,4 +986,11 @@ export const EN: Record<string, string> = {
   "確認中": "Awaiting confirmation",
   "上車地點待確認": "Pickup point to confirm",
   "去訂購 ↗": "Book now ↗",
+  "不在營業時間內": "Outside opening hours",
+  "有不在營業時間內的行程": "A stop is outside opening hours",
+  "更新營業時間": "Refresh opening hours",
+  "更新中…": "Refreshing…",
+  "全天開放": "Open 24 hours",
+  "戶外・無營業時間": "Outdoors · no opening hours",
+  "已永久歇業": "Permanently closed",
 };

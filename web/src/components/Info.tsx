@@ -9,6 +9,7 @@ import { SkyWatch } from "./SkyWatch";
 import { Checklist } from "./Checklist";
 import { GoogleUsage } from "./GoogleUsage";
 import { NeedBooking } from "./NeedBooking";
+import { HoursWarn } from "./HoursWarn";
 import { BudgetBars, FlightCards, StayCards } from "./InfoCards";
 
 export function Info() {
@@ -23,6 +24,7 @@ export function Info() {
   return (
     <>
       {(mode === "owner" || token) && <NeedBooking />}
+      <HoursWarn />
       <FlightCards />
       <StayCards />
       <WeatherStrip onPick={(date) => gotoDay(doc.days.findIndex((d) => d.date === date))} />

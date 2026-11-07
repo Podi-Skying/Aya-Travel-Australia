@@ -32,6 +32,8 @@ import { OwnerMenu } from "./OwnerMenu";
 import { bookingFlag, bookingHref } from "@/domain/booking";
 import { BookWarn } from "./BookWarn";
 import { useCalendarSync } from "./useCalendarSync";
+import { useHours, refreshHours } from "@/client/hours";
+import { outsideHours, stopHours } from "@/domain/hours";
 
 /**
  * One line per leg (Kai 2026-10-26): the road-computed time and distance when known, else the estimate.
@@ -234,6 +236,7 @@ function ActNote({ text }: { text: string }) {
 
 export function DaysView({ active }: { active: boolean }) {
   const { doc, mode, versionNo, currentDay, setCurrentDay, runOp, runOpUndoable, ask, online, myVotes, vote, unvote, counts, canVote, token } = useTrip();
+  const hours = useHours(token);
   const weather = useWeather();
   const calendar = useCalendarSync(mode === "owner", versionNo);
   const [showNearby, setShowNearby] = useState(false);
@@ -659,8 +662,28 @@ export function DaysView({ active }: { active: boolean }) {
                       <Icon name="wait" size={16} label={tent ? "暫定（司機未確認）" : "待確認"} />
                     </span>
                   ) : null;
+                const shownHours = stopHours(i, hours[i.id], d.date);
+                const offHours = outsideHours(i, hours[i.id], d.date);
                 const chips = (
                   <div className="stop-chips">
+                    {shownHours &&
+                      (hours[i.id]?.week.length ? (
+                        <details className={`hours-chip k-${shownHours.kind}`}>
+                          <summary aria-label={`營業時間：${shownHours.text}`}>
+                            <Icon name="hours" size={14} /> {shownHours.text}
+                          </summary>
+                          <ul>
+                            {hours[i.id].week.map((w) => (
+                              <li key={w}>{w}</li>
+                            ))}
+                          </ul>
+                        </details>
+                      ) : (
+                        <span className={`hours-chip k-${shownHours.kind}`} role="img" aria-label={`營業時間：${shownHours.text}`}>
+                          <Icon name="hours" size={14} /> {shownHours.text}
+                        </span>
+                      ))}
+                    {offHours && <BookWarn flag="不在營業時間內" size={14} />}
                     <span aria-label={`停留 ${mins(i.dur)}`} role="img">
                       <Icon name="clock" size={14} /> {mins(i.dur)}
                     </span>
@@ -690,6 +713,11 @@ export function DaysView({ active }: { active: boolean }) {
                       <div className="note owner-note">
                         <Icon name="info" size={16} /> 只有你看得到：{i.ownerNote}
                       </div>
+                    )}
+                    {mode === "owner" && online && i.lat != null && !isLogistics(i) && (
+                      <PendingButton className="btn ghost small" pendingLabel="更新中…" onAction={async () => { await refreshHours(i.id); }}>
+                        <Icon name="hours" size={16} /> 更新營業時間
+                      </PendingButton>
                     )}
                     <ul className="stop-more-list">
                       {i.en && i.en !== name && i.en !== fullName && <li className="en">{i.en}</li>}
@@ -924,6 +952,7 @@ export function DaysView({ active }: { active: boolean }) {
         )}
         <aside className="day-map-wrap">
           <DayMap
+            hours={hours}
             day={d}
             ends={ends}
             active={active}

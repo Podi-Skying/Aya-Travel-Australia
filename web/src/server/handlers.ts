@@ -3,7 +3,8 @@ import { errorResponse, fail, HttpError, json, ownerRoute, readJson, sameOrigin 
 import { checkOwner } from "./owner";
 import { getLegs, MAX_POINTS, validPoints } from "./routes";
 import { getKpOutlook } from "./sky";
-import { googleKey, placePhoto, placePhotos, sameRef, type PlaceRef } from "./google";
+import { findPlaceId, googleKey, placeHours, placePhoto, placePhotos, sameRef, type PlaceRef } from "./google";
+import { hoursForDoc } from "./hours";
 import { commonsPhotos } from "./commons";
 import { dailyCap, hobartDay, monthCost, noteGoogleHit, usageSince } from "./usage";
 import { getLookup } from "./cache";
@@ -281,6 +282,41 @@ export const getPlacePhoto = ownerRoute(async (req, owner) => {
   const p = await placePhoto(hit.value.placeId).catch(() => null);
   if (!p) return fail(404, "沒有照片");
   return json(p, 200, { "cache-control": "private, max-age=1800" });
+});
+
+/* ---------- opening hours (Kai 2026-11-07) ---------- */
+
+/** Cached opening hours for what the viewer can see (owner, share link or public home). Never calls Google. */
+export async function getHours(req: Request) {
+  try {
+    const token = new URL(req.url).searchParams.get("token");
+    let doc: TripDoc | null = null;
+    let owner = false;
+    if (token) doc = ((await getPublicTrip(token))?.doc as TripDoc | undefined) ?? null;
+    else {
+      const c = missingConfig("owner").length ? null : await checkOwner();
+      owner = !!c?.ok;
+      doc = c?.ok ? ((await getCurrentTrip(c.owner))?.doc ?? null) : (((await getPublicHomeTrip())?.doc as TripDoc | undefined) ?? null);
+    }
+    if (!doc) return fail(401, "需要分享連結或登入");
+    return json({ hours: await hoursForDoc(doc, owner) }, 200, { "cache-control": "private, max-age=600" });
+  } catch (e) {
+    return errorResponse(e);
+  }
+}
+
+/** The owner refreshes one place's hours (one Google call); nothing refreshes them automatically. */
+export const postHours = ownerRoute(async (req, owner) => {
+  const body = (await readJson(req, 1_000)) as { item?: unknown };
+  const item = typeof body.item === "string" ? body.item : "";
+  if (!/^[A-Za-z0-9_-]{1,40}$/.test(item)) return fail(400, "缺少活動 id");
+  const cur = await getCurrentTrip(owner);
+  const it = cur && findIn(cur.doc, item);
+  if (!it || it.lat == null || it.lng == null) return fail(404, "找不到地點");
+  const placeId = await findPlaceId(item, it.name, it.lat, it.lng);
+  if (!placeId) return fail(404, "Google 地圖上找不到這個地點");
+  const h = await placeHours(placeId, { refresh: true });
+  return json({ hours: h });
 });
 
 /* ---------- gallery photos (docs/PLAN-2026-10-26-galleries.md) ---------- */

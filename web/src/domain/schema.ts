@@ -118,6 +118,8 @@ export const itemSchema = z.object({
   flag: z.enum(["pending", "pickup"]).optional(),
   /** Where to book it (official operator or venue first), opened from the ⚠ in a new tab. */
   bookingUrl: z.url({ protocol: /^https$/ }).optional(),
+  /** Opening hours from the venue itself (Kai 2026-11-07), shown on the stop; Google hours fill in where this is empty. */
+  hours: shortText(160).optional(),
   /** The latest sensible day to book. */
   bookBy: dateStr.optional(),
   /** Dinner: when the kitchen closes or last seating, HH:MM; a later plan is flagged. */

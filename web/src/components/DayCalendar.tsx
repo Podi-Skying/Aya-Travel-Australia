@@ -10,6 +10,8 @@ import { useHobartToday, useReducedMotion } from "./ui";
 import { Icon } from "./Icon";
 import { TapChips } from "./ui";
 import { bookingFlag } from "@/domain/booking";
+import { useHours } from "@/client/hours";
+import { outsideHours } from "@/domain/hours";
 import { BookWarn } from "./BookWarn";
 import { dayStatus, monthGrid, moveInGrid, weekIndexOf, type DayStatus } from "@/domain/calendar";
 import { effectiveDay } from "@/domain/effective-day";
@@ -40,7 +42,8 @@ function useNarrow() {
 }
 
 export function DayCalendar() {
-  const { doc, currentDay, setCurrentDay } = useTrip();
+  const { doc, currentDay, setCurrentDay, token } = useTrip();
+  const hours = useHours(token);
   const weather = useWeather();
   const today = useHobartToday();
   const reduce = useReducedMotion();
@@ -309,6 +312,11 @@ export function DayCalendar() {
                       ) : null;
                     })()}
                     {warn[c.dayIdx] && <span className="dot" />}
+                    {!x2.items.some((i) => bookingFlag(i)) && x2.items.some((i) => outsideHours(i, hours[i.id], x2.date)) && (
+                      <span className="cal-book">
+                        <BookWarn flag="有不在營業時間內的行程" size={13} />
+                      </span>
+                    )}
                     {x2.items.some((i) => bookingFlag(i)) && (
                       <span className="cal-book">
                         <BookWarn flag="有未預訂項目" size={13} />

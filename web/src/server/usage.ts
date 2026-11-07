@@ -19,6 +19,7 @@ export const GOOGLE_APIS = {
   place_details: { sku: "Place Details Essentials", perThousand: 5, freePerMonth: 10_000 },
   place_photo: { sku: "Place Details Photos", perThousand: 7, freePerMonth: 1_000 },
   routes: { sku: "Compute Routes Essentials", perThousand: 5, freePerMonth: 10_000 },
+  place_hours: { sku: "Place Details Enterprise (opening hours)", perThousand: 20, freePerMonth: 1_000 },
 } as const;
 export type GoogleApi = keyof typeof GOOGLE_APIS;
 

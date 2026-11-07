@@ -1402,3 +1402,13 @@ html:has(.lang-root.immersive), html:has(.lang-root.immersive) body { overflow: 
 .rs-warn-link .book-go { display: none; }
 .pop-book { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; color: #7a5a00 !important; font-weight: 600; }
 .pop-book svg { flex: none; }
+
+/* Opening hours on a stop (Kai 2026-11-07). */
+.hours-chip { display: inline-flex; align-items: center; gap: 4px; font-size: .78rem; color: var(--ink-2); }
+details.hours-chip { display: inline-block; }
+.hours-chip summary { display: inline-flex; align-items: center; gap: 4px; min-height: 32px; cursor: pointer; list-style: none; }
+.hours-chip summary::-webkit-details-marker { display: none; }
+.hours-chip ul { list-style: none; margin: 4px 0 0; padding: 6px 10px; border-radius: 10px; background: var(--paper-raised); font-size: .74rem; }
+.hours-chip.k-closed { color: #9a5a00; font-weight: 600; }
+.pop-hours { display: inline-flex; align-items: center; gap: 4px; font-size: .8rem; color: var(--ink-2); }
+@media (pointer: coarse) { .hours-chip summary { min-height: 44px; } }
