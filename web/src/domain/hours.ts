@@ -23,7 +23,8 @@ export type ShownHours = { text: string; kind: "venue" | "google" | "always" | "
 export function stopHours(i: Stop, h: HoursInfo | undefined, date: string): ShownHours | null {
   const wd = WD_ZH[dowOf(date)];
   if (i.hours?.trim()) return { text: i.hours.trim(), kind: "venue" };
-  if (i.mode === "flight" || i.tour) return { text: `出發 ${i.time}`, kind: "booked" };
+  // A whole-day note (00:00, no length) is not a departure.
+  if (i.mode === "flight" || i.tour) return i.dur === 0 && i.time === "00:00" ? null : { text: `出發 ${i.time}`, kind: "booked" };
   if (h?.status === "CLOSED_PERMANENTLY") return { text: "已永久歇業", kind: "closed" };
   if (h && alwaysOpen(h)) return { text: "全天開放", kind: "always" };
   if (h?.periods.length) {

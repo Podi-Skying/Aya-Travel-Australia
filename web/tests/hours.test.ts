@@ -14,6 +14,7 @@ describe("opening hours on a stop", () => {
   it("prefers the venue's own hours and shows departures for flights and tours", () => {
     expect(stopHours(stop("10:50", { hours: "11:00 開門" }), zoo, "2026-11-07")?.text).toBe("11:00 開門");
     expect(stopHours(stop("11:45", { mode: "flight" }), undefined, "2026-11-06")?.text).toBe("出發 11:45");
+    expect(stopHours(stop("00:00", { mode: "flight", dur: 0 }), undefined, "2026-11-03")).toBeNull();
   });
   it("labels round-the-clock places and outdoor places without hours", () => {
     expect(stopHours(stop("09:00"), { week: [], periods: [{ d: 0, o: "00:00" }] }, "2026-11-12")?.text).toBe("全天開放");
