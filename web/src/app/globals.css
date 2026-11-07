@@ -1412,3 +1412,119 @@ details.hours-chip { display: inline-block; }
 .hours-chip.k-closed { color: #9a5a00; font-weight: 600; }
 .pop-hours { display: inline-flex; align-items: center; gap: 4px; font-size: .8rem; color: var(--ink-2); }
 @media (pointer: coarse) { .hours-chip summary { min-height: 44px; } }
+
+/* 天氣 (Kai 2026-11-08, docs/PLAN-2026-11-08-weather.md): icons and numbers first; floating controls are a translucent material. */
+.tw { display: grid; gap: 12px; padding-bottom: 16px; }
+.tw-loading { padding: 24px 16px; }
+.tw-strip { position: sticky; top: var(--chrome-h, 0px); z-index: 400; display: flex; gap: 6px; overflow-x: auto; scroll-snap-type: x proximity; overscroll-behavior-x: contain; scrollbar-width: none; padding: 8px 16px; margin: 0 -16px; background: rgba(250, 247, 240, .86); -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%); cursor: grab; user-select: none; -webkit-user-select: none; }
+.tw-strip::-webkit-scrollbar { display: none; }
+.tw-chip { position: relative; flex: 0 0 56px; scroll-snap-align: center; display: grid; justify-items: center; gap: 1px; min-height: 52px; padding: 6px 0; border: 0; border-radius: 14px; background: none; color: var(--ink-2); font: inherit; cursor: pointer; transition: transform var(--t-press) ease-out, background-color var(--t-ui) var(--ease); }
+.tw-chip:active { transform: scale(.94); }
+.tw-chip .wd { font-size: .6875rem; letter-spacing: .02em; }
+.tw-chip .dt { font-size: 1rem; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -.01em; color: var(--ink); }
+.tw-chip.on { background: var(--ink); }
+.tw-chip.on .wd, .tw-chip.on .dt { color: var(--bg); }
+.tw-chip .trip-dot { position: absolute; bottom: 4px; width: 5px; height: 5px; border-radius: 50%; background: var(--vermilion); }
+.tw-chip.on .trip-dot { background: #f3c9c2; }
+
+.tw-map-wrap { position: relative; margin: 0 -16px; }
+.tw-map { position: relative; z-index: 0; isolation: isolate; height: min(62vh, 560px); min-height: 360px; background: var(--surface-2); }
+.tw-float { position: absolute; z-index: 450; top: 10px; left: 10px; right: 10px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; pointer-events: none; }
+.tw-float > * { pointer-events: auto; }
+.tw-seg { position: relative; display: inline-grid; grid-template-columns: 1fr 1fr; padding: 3px; border-radius: 999px; background: rgba(250, 247, 240, .72); -webkit-backdrop-filter: blur(20px) saturate(170%); backdrop-filter: blur(20px) saturate(170%); box-shadow: 0 2px 10px -2px rgba(41, 40, 35, .22), inset 0 1px 0 rgba(255, 255, 255, .6); }
+.tw-seg-thumb { position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc(50% - 3px); border-radius: 999px; background: var(--ink); will-change: transform; }
+.tw-seg button { position: relative; z-index: 1; display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-height: 40px; padding: 0 14px; border: 0; border-radius: 999px; background: none; color: var(--ink); font: inherit; font-size: .875rem; font-weight: 500; white-space: nowrap; cursor: pointer; transition: color var(--t-ui) var(--ease), transform var(--t-press) ease-out; }
+.tw-seg button:active { transform: scale(.95); }
+.tw-seg button.on { color: var(--bg); }
+.tw-kp { padding: 6px 12px; border-radius: 999px; background: rgba(41, 40, 35, .78); color: var(--bg); font-size: .8125rem; font-weight: 500; font-variant-numeric: tabular-nums; -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
+.tw-legend { position: absolute; z-index: 450; left: 10px; bottom: 22px; display: flex; gap: 6px; align-items: center; padding: 6px 10px; border-radius: 999px; background: rgba(250, 247, 240, .78); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); font-size: .75rem; }
+.tw-legend span { width: 10px; height: 10px; border-radius: 50%; margin-left: 4px; }
+.tw-legend .clear, .tw-mk.night.clear, .tw-sky-dot.clear, .sky.clear { --sky: #2f6b4f; }
+.tw-legend .some, .tw-mk.night.some, .tw-sky-dot.some, .sky.some { --sky: #b07a12; }
+.tw-legend .cloudy, .tw-mk.night.cloudy, .tw-sky-dot.cloudy, .sky.cloudy { --sky: #8a857a; }
+.tw-legend span { background: var(--sky); }
+
+/* Markers: a small paper chip; pressed state on press, cross-fade when the day changes. */
+.tw-pin { background: none; border: 0; }
+.tw-pin:focus-visible { outline: 2px solid var(--vermilion); outline-offset: 2px; border-radius: 12px; }
+.tw-mk { position: relative; display: grid; justify-items: center; width: 46px; padding: 3px 0 2px; border-radius: 12px; background: rgba(250, 247, 240, .92); box-shadow: 0 1px 6px -1px rgba(41, 40, 35, .35); color: var(--ink); line-height: 1; transition: transform var(--t-press) ease-out; cursor: pointer; }
+.tw-pin:active .tw-mk { transform: scale(.92); }
+.tw-mk .wx-icon { color: var(--ink-2); }
+.tw-mk.wet .wx-icon { color: var(--vermilion); }
+.tw-mk .tw-t { display: flex; gap: 3px; font-size: .75rem; font-variant-numeric: tabular-nums; }
+.tw-mk .tw-t b { font-weight: 600; }
+.tw-mk .tw-t i { font-style: normal; color: var(--ink-muted); }
+.tw-mk .tw-warn { position: absolute; top: -6px; right: -6px; display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: var(--vermilion); color: #fff; font-size: 10px; }
+.tw-mk .tw-warn.frost { right: auto; left: -6px; background: #3d6c8f; }
+.tw-mk.is-here { box-shadow: 0 0 0 2px var(--vermilion), 0 2px 8px -1px rgba(41, 40, 35, .4); }
+.tw-here { position: absolute; top: -15px; left: 50%; transform: translateX(-50%); padding: 1px 6px; border-radius: 999px; background: var(--vermilion); color: #fff; font-size: .625rem; font-weight: 600; white-space: nowrap; }
+.tw-mk.night { width: 40px; height: 40px; padding: 0; border-radius: 50%; place-items: center; background: var(--sky, #8a857a); }
+.tw-mk.night .tw-sky { color: #fff; font-size: .8125rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.tw-mk.night .tw-sky small { font-size: .6rem; font-weight: 500; }
+.tw-mk.night.na { background: var(--line); }
+.tw-mk.night.na .tw-sky { color: var(--ink-muted); }
+.tw-fade .tw-mk { animation: tw-fade 160ms var(--ease); }
+@keyframes tw-fade { from { opacity: .35; } to { opacity: 1; } }
+.tw-popup .leaflet-popup-content-wrapper { border-radius: 14px; background: rgba(250, 247, 240, .94); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); box-shadow: 0 8px 24px -8px rgba(41, 40, 35, .45); }
+.tw-popup .leaflet-popup-content { margin: 10px 12px; }
+.tw-pop { display: grid; gap: 2px; min-width: 150px; font-size: .8125rem; }
+.tw-pop strong { font-size: .9375rem; }
+.tw-pop dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 6px 0 0; }
+.tw-pop dt { color: var(--ink-muted); }
+.tw-pop dd { margin: 0; font-variant-numeric: tabular-nums; text-align: right; }
+
+/* Region cards: one glance per region, five days in a row. */
+.tw-regions { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 10px; }
+.tw-card { display: grid; gap: 8px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 16px; background: var(--paper-raised); color: var(--ink); font: inherit; text-align: left; cursor: pointer; transition: transform var(--t-press) ease-out; }
+.tw-card:active { transform: scale(.98); }
+.tw-card.here { border-color: var(--vermilion); }
+.tw-card-head { display: flex; align-items: center; gap: 8px; }
+.tw-card-head strong { font-size: 1.0625rem; letter-spacing: -.01em; }
+.tw-card-warn { margin-left: auto; display: inline-flex; gap: 6px; color: var(--vermilion); }
+.tw-here-tag { padding: 1px 7px; border-radius: 999px; background: var(--vermilion); color: #fff; font-size: .6875rem; font-weight: 600; }
+.tw-card-main { display: flex; align-items: center; gap: 10px; }
+.tw-card-t { font-variant-numeric: tabular-nums; }
+.tw-card-t b { font-size: 1.5rem; font-weight: 600; letter-spacing: -.02em; }
+.tw-card-t i { font-style: normal; color: var(--ink-muted); font-size: 1rem; }
+.tw-rain { color: var(--ink-2); font-size: .8125rem; font-variant-numeric: tabular-nums; }
+.tw-card .tw-rain.wet, .tw-sheet .wet { color: var(--vermilion); }
+.tw-sky-dot { width: 22px; height: 22px; border-radius: 50%; background: var(--sky, var(--line)); }
+.tw-mini { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; padding-top: 6px; border-top: 1px solid var(--line); }
+.tw-mini > span { display: grid; justify-items: center; gap: 2px; padding: 2px 0; border-radius: 8px; font-variant-numeric: tabular-nums; }
+.tw-mini > span.on { background: var(--bg); }
+.tw-mini small { font-size: .6875rem; color: var(--ink-muted); }
+
+/* Region sheet: rises from the bottom, follows the finger, leaves the same way. */
+.tw-scrim { position: fixed; inset: 0; z-index: 940; background: rgba(41, 40, 35, .32); opacity: 0; }
+.tw-sheet { position: fixed; z-index: 950; left: 0; right: 0; bottom: 0; max-height: 78vh; display: grid; grid-template-rows: auto auto 1fr; padding: 6px 16px calc(16px + env(safe-area-inset-bottom)); border-radius: 20px 20px 0 0; background: rgba(250, 247, 240, .94); -webkit-backdrop-filter: blur(24px) saturate(170%); backdrop-filter: blur(24px) saturate(170%); box-shadow: 0 -10px 40px -12px rgba(41, 40, 35, .45); will-change: transform; outline: none; }
+.tw-sheet, .tw-grab, .tw-sheet-head { touch-action: none; cursor: grab; }
+.tw-sheet-list { cursor: auto; }
+@media (min-width: 721px) { .tw-sheet { left: 50%; right: auto; width: 520px; margin-left: -260px; } }
+.tw-grab { justify-self: center; width: 40px; height: 5px; margin: 4px 0 6px; border-radius: 3px; background: var(--rule); opacity: .6; }
+.tw-sheet-head { display: flex; align-items: center; gap: 10px; }
+.tw-sheet-head strong { font-size: 1.25rem; letter-spacing: -.015em; }
+.tw-sheet-head .btn { margin-left: auto; }
+.tw-sheet-list { list-style: none; margin: 8px 0 0; padding: 0; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; }
+.tw-sheet-list li { display: grid; grid-template-columns: 1fr auto auto; grid-template-areas: "nm ic t" "f f f"; align-items: center; gap: 4px 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.tw-sheet-list li.here .nm { color: var(--vermilion); }
+.tw-sheet-list .nm { grid-area: nm; display: flex; gap: 6px; align-items: center; font-weight: 500; }
+.tw-sheet-list .wx-icon { grid-area: ic; }
+.tw-sheet-list .tw-card-t { grid-area: t; }
+.tw-sheet-list .tw-card-t b { font-size: 1.125rem; }
+.tw-sheet-list .facts { grid-area: f; display: flex; flex-wrap: wrap; gap: 4px 12px; color: var(--ink-2); font-size: .8125rem; font-variant-numeric: tabular-nums; }
+.tw-sheet-list .facts .warn { color: var(--vermilion); font-weight: 600; }
+.tw-sheet-list .facts .sky { color: var(--sky, var(--ink-2)); }
+
+.tw-foot { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; padding-top: 4px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tw-chip, .tw-seg button, .tw-mk, .tw-card { transition: none; }
+  .tw-chip:active, .tw-seg button:active, .tw-pin:active .tw-mk, .tw-card:active { transform: none; }
+  .tw-fade .tw-mk { animation: none; }
+  .tw-sheet, .tw-scrim { transition: opacity 160ms linear; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .tw-strip, .tw-seg, .tw-legend, .tw-sheet, .tw-popup .leaflet-popup-content-wrapper { background: var(--bg); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .tw-kp { background: var(--ink); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .tw-mk { background: var(--bg); }
+}

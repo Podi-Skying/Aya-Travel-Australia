@@ -19,6 +19,8 @@ async function main() {
     console.log(r ? JSON.stringify({ ...r, value: r.value }, null, 2) : "not cached");
   } else if (cmd === "put" && rest.length >= 3) {
     const [kind, key, raw] = rest;
+    // The weather lease is written only by the server (src/server/tas-weather.ts).
+    if (kind === "tas-weather-lock") throw new Error("tas-weather-lock is reserved");
     const opt = (name: string) => {
       const i = rest.indexOf(name);
       return i >= 0 ? rest[i + 1] : undefined;

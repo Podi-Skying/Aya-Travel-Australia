@@ -18,6 +18,8 @@ import { todayStr } from "@/domain/format";
 import type { Op } from "@/domain/ops";
 import type { Item, TripDoc } from "@/domain/schema";
 import { isStayItem } from "@/domain/privacy";
+import { tasWeatherResponse } from "./tas-weather";
+import { secondsToHobartMidnight } from "@/domain/tas-weather";
 
 /* Route handler bodies, kept outside app/ so integration tests can call them directly. */
 
@@ -169,6 +171,20 @@ export async function postMyVotes(req: Request, ctx: Ctx) {
 export async function getSky() {
   try {
     return json(await getKpOutlook(), 200, { "cache-control": "public, s-maxage=600, stale-while-revalidate=3600" });
+  } catch (e) {
+    return errorResponse(e);
+  }
+}
+
+/** Tasmania-wide forecast (Kai 2026-11-08): public, no trip data; edge copies never outlive the Hobart date. */
+export async function getTasWeather() {
+  try {
+    const r = await tasWeatherResponse();
+    if (!r) return fail(503, "天氣暫時無法取得");
+    const S = secondsToHobartMidnight();
+    const N = Math.min(1800, S);
+    const M = Math.min(3600, Math.max(0, S - N));
+    return json(r, 200, { "cache-control": `public, s-maxage=${N}, stale-while-revalidate=${M}` });
   } catch (e) {
     return errorResponse(e);
   }

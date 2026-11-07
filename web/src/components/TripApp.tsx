@@ -21,6 +21,7 @@ import { TripOptions } from "./TripOptions";
 import { PlanQuiz } from "./PlanQuiz";
 import { Icon } from "./Icon";
 import { DriftGallery } from "./DriftGallery";
+import { TasWeather } from "./TasWeather";
 
 /*
  * Client shell for both the owner view and the read-only share view.
@@ -70,6 +71,7 @@ const TABS = [
   { key: "days", label: "每日行程", short: "每日", icon: "calendar" },
   { key: "options", label: "行程方案", short: "方案", icon: "route" },
   { key: "map", label: "地圖與景點", short: "地圖", icon: "map" },
+  { key: "weather", label: "天氣", short: "天氣", icon: "umbrella" }, // Tasmania-wide forecast and aurora sky (Kai 2026-11-08)
   { key: "info", label: "資訊與警示", short: "資訊", icon: "info" },
   { key: "quiz", label: "旅遊規劃小測驗", short: "測驗", icon: "compass" }, // open to guests too (Kai 2026-10-27; public start: Hobart city centre)
   { key: "gallery", label: "畫廊", short: "畫廊", icon: "image" }, // photos are for everyone (Kai 2026-10-27)
@@ -455,6 +457,9 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
         </Panel>
         <Panel id="map" show={tab === "map"}>
           <PlacesMap active={tab === "map"} />
+        </Panel>
+        <Panel id="weather" show={tab === "weather"}>
+          <TasWeather active={tab === "weather"} />
         </Panel>
         <Panel id="info" show={tab === "info"}>
           <Info />

@@ -26,6 +26,12 @@ const PATHS: Record<ReturnType<typeof wxLabel>["icon"], string> = {
   snow: "M7 14h11a4 4 0 0 0 .4-8 6 6 0 0 0-11.5 1.3A3.4 3.4 0 0 0 7 14zM9 18h.01M12 20h.01M15 18h.01",
 };
 
+/** The same icon as markup, for Leaflet markers. */
+export function wxIconSvg(code: number, size = 18): string {
+  const l = wxLabel(code);
+  return `<svg class="wx-icon wx-${l.icon}" viewBox="0 0 24 24" width="${size}" height="${size}" aria-hidden="true"><path d="${PATHS[l.icon]}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+}
+
 export function WxIcon({ code, size = 18 }: { code: number; size?: number }) {
   const l = wxLabel(code);
   return (
