@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hoursLineEn, outsideHours, stopHours, toPeriods, type HoursInfo } from "@/domain/hours";
+import { hoursLineEn, hoursVisible, outsideHours, stopHours, toPeriods, type HoursInfo } from "@/domain/hours";
 
 const P = (d: number, o: string, c: string) => ({ d, o, cd: d, c });
 const zoo: HoursInfo = { week: [], periods: [1, 2, 3, 4, 5, 6, 0].map((d) => P(d, "10:00", "16:00")) };
@@ -33,5 +33,19 @@ describe("opening hours on a stop", () => {
   });
   it("reads Google's periods", () => {
     expect(toPeriods([{ open: { day: 3, hour: 10, minute: 0 }, close: { day: 3, hour: 16, minute: 0 } }])).toEqual([{ d: 3, o: "10:00", cd: 3, c: "16:00" }]);
+  });
+  it("keeps a late-night period open past midnight", () => {
+    const bar: HoursInfo = { week: [], periods: [{ d: 0, o: "22:00", cd: 1, c: "02:00" }] };
+    expect(outsideHours(stop("01:00"), bar, "2026-11-09")).toBe(false);
+    expect(outsideHours(stop("03:00"), bar, "2026-11-09")).toBe(true);
+    expect(outsideHours(stop("23:00"), bar, "2026-11-08")).toBe(false);
+    expect(stopHours(stop("23:00"), bar, "2026-11-08")?.text).toBe("週日 22:00–次日02:00");
+  });
+  it("hides hours of private stops from guests", () => {
+    expect(hoursVisible({ people: ["kai"] }, false, false)).toBe(false);
+    expect(hoursVisible({}, false, true)).toBe(false);
+    expect(hoursVisible({ noHours: true }, true, false)).toBe(false);
+    expect(hoursVisible({ people: ["kai", "aya"] }, false, false)).toBe(true);
+    expect(hoursVisible({ people: ["kai"] }, true, false)).toBe(true);
   });
 });

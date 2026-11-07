@@ -1,7 +1,7 @@
-import { listLookups } from "./cache";
+import { deleteExpiredLookups, listLookups } from "./cache";
 import { sameRef, type PlaceRef } from "./google";
 import { isStayItem } from "@/domain/privacy";
-import type { HoursInfo } from "@/domain/hours";
+import { hoursVisible, type HoursInfo } from "@/domain/hours";
 import type { TripDoc } from "@/domain/schema";
 
 type Doc = Pick<TripDoc, "days" | "attractionPool" | "stays">;
@@ -11,12 +11,14 @@ type Doc = Pick<TripDoc, "days" | "attractionPool" | "stays">;
  * Guests get no hours for the places where they sleep, and only places matched at the shown position.
  */
 export async function hoursForDoc(doc: Doc, owner: boolean, now = new Date()): Promise<Record<string, HoursInfo>> {
+  // Google place content may be kept 30 days at most: expired rows are deleted, not just ignored.
+  await deleteExpiredLookups("place-hours", now).catch(() => {});
   const refs = new Map((await listLookups("place-id")).map((r) => [r.key, r.value as PlaceRef]));
   const hours = new Map((await listLookups("place-hours")).filter((r) => !r.expiresAt || r.expiresAt > now).map((r) => [r.key, r.value as HoursInfo]));
   const out: Record<string, HoursInfo> = {};
   for (const it of [...doc.days.flatMap((d) => d.items), ...doc.attractionPool.flatMap((p) => p.items)]) {
     const ref = refs.get(it.id);
-    if ((it as { noHours?: boolean }).noHours || !ref?.placeId || it.lat == null || it.lng == null || (!owner && isStayItem(it, doc))) continue;
+    if (!ref?.placeId || it.lat == null || it.lng == null || !hoursVisible(it, owner, isStayItem(it, doc))) continue;
     // Guests see redacted names, so only the position is compared for them.
     if (!sameRef(ref, owner ? it.name : (ref.name ?? ""), it.lat, it.lng)) continue;
     const h = hours.get(ref.placeId);

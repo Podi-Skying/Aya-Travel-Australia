@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, lt } from "drizzle-orm";
 import { getDb, schema } from "./db/client";
 
 /*
@@ -21,6 +21,12 @@ export async function putLookup(kind: string, key: string, value: unknown, sourc
   const db = await getDb();
   const row = { kind, key, value, source, fetchedAt: now, expiresAt: ttlMs == null ? null : new Date(now.getTime() + ttlMs) };
   await db.insert(lookupCache).values(row).onConflictDoUpdate({ target: [lookupCache.kind, lookupCache.key], set: row });
+}
+
+/** Removes expired rows of one kind (third-party content with a storage limit). */
+export async function deleteExpiredLookups(kind: string, now = new Date()) {
+  const db = await getDb();
+  await db.delete(lookupCache).where(and(eq(lookupCache.kind, kind), lt(lookupCache.expiresAt, now)));
 }
 
 export async function listLookups(kind?: string) {

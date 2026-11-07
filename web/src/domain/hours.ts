@@ -15,7 +15,9 @@ type Stop = { hours?: string; time: string; dur: number; mode: string; cat?: str
 
 export const alwaysOpen = (h?: HoursInfo) => !!h?.periods.some((p) => p.d === 0 && p.o === "00:00" && !p.c);
 const periodsOn = (h: HoursInfo, dow: number) => h.periods.filter((p) => p.d === dow);
-const span = (ps: Period[]) => ps.map((p) => `${p.o}–${p.c ?? "24:00"}`).join("、");
+/** A period that closes on a later day than it opens (22:00–02:00). */
+const overnight = (p: Period) => p.c != null && p.cd != null && p.cd !== p.d;
+const span = (ps: Period[]) => ps.map((p) => `${p.o}–${overnight(p) ? "次日" : ""}${p.c ?? "24:00"}`).join("、");
 
 export type ShownHours = { text: string; kind: "venue" | "google" | "always" | "closed" | "outdoor" | "booked" };
 
@@ -42,9 +44,11 @@ export function outsideHours(i: Stop, h: HoursInfo | undefined, date: string): b
   if (h.status === "CLOSED_PERMANENTLY") return true;
   if (!h.periods.length || alwaysOpen(h)) return false;
   const ps = periodsOn(h, dowOf(date));
-  if (!ps.length) return true;
+  if (!ps.length && !h.periods.some((p) => overnight(p) && p.cd === dowOf(date))) return true;
   const t = toMin(i.time);
-  return !ps.some((p) => t >= toMin(p.o) - 15 && (!p.c || p.cd !== p.d || t < toMin(p.c)));
+  // Still open from the night before (Sunday 22:00 – Monday 02:00 covers Monday 01:00).
+  const fromYesterday = h.periods.some((p) => overnight(p) && p.cd === dowOf(date) && t < toMin(p.c!));
+  return !fromYesterday && !ps.some((p) => t >= toMin(p.o) - 15 && (!p.c || overnight(p) || t < toMin(p.c)));
 }
 
 /** The calendar's English line, e.g. "Hours: Wed 10:00–16:00". */
@@ -56,6 +60,15 @@ export function hoursLineEn(h: HoursInfo | undefined, date: string): string {
   if (!h.periods.length) return "";
   const ps = periodsOn(h, dowOf(date));
   return ps.length ? `Hours: ${wd} ${ps.map((p) => `${p.o}–${p.c ?? "24:00"}`).join(", ")}` : `Hours: ${wd} closed`;
+}
+
+/**
+ * Whether a viewer may see a stop's hours: never for generic stops; guests get nothing about where
+ * they sleep or about stops only Kai goes to (his work).
+ */
+export function hoursVisible(it: { noHours?: boolean; people?: string[] }, owner: boolean, isStay: boolean): boolean {
+  if (it.noHours) return false;
+  return owner || (!isStay && (!it.people || it.people.includes("aya")));
 }
 
 /** Google's period object → ours. */
