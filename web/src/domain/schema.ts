@@ -120,6 +120,8 @@ export const itemSchema = z.object({
   bookingUrl: z.url({ protocol: /^https$/ }).optional(),
   /** Opening hours from the venue itself (Kai 2026-11-07), shown on the stop; Google hours fill in where this is empty. */
   hours: shortText(160).optional(),
+  /** A generic stop (lunch in a town, a rest stop): Google matched some venue, so its hours are not shown. */
+  noHours: z.boolean().optional(),
   /** The latest sensible day to book. */
   bookBy: dateStr.optional(),
   /** Dinner: when the kitchen closes or last seating, HH:MM; a later plan is flagged. */

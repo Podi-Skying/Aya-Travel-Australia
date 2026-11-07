@@ -16,7 +16,7 @@ export async function hoursForDoc(doc: Doc, owner: boolean, now = new Date()): P
   const out: Record<string, HoursInfo> = {};
   for (const it of [...doc.days.flatMap((d) => d.items), ...doc.attractionPool.flatMap((p) => p.items)]) {
     const ref = refs.get(it.id);
-    if (!ref?.placeId || it.lat == null || it.lng == null || (!owner && isStayItem(it, doc))) continue;
+    if ((it as { noHours?: boolean }).noHours || !ref?.placeId || it.lat == null || it.lng == null || (!owner && isStayItem(it, doc))) continue;
     // Guests see redacted names, so only the position is compared for them.
     if (!sameRef(ref, owner ? it.name : (ref.name ?? ""), it.lat, it.lng)) continue;
     const h = hours.get(ref.placeId);
