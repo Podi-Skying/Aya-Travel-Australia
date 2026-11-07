@@ -46,7 +46,7 @@ function scrub(value: unknown, names: string[], words: string[] = []): unknown {
   if (value && typeof value === "object") {
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(value)) {
-      if (k === "driverConfirmation" || k === "address" || k === "ownerNote") continue;
+      if (k === "driverConfirmation" || k === "address" || k === "ownerNote" || k === "ownerName") continue;
       // A private listing (an Airbnb room) is the owner's; public operators and venues stay.
       if (k === "bookingUrl" && typeof v === "string" && /(^|\.)airbnb\./i.test(new URL(v).hostname)) continue;
       if (k === "needsDriver") {
@@ -190,7 +190,7 @@ export type PublicDoc = ReturnType<typeof toPublicDoc>;
 
 export function assertPublicSafe(out: unknown, source: TripDoc): void {
   const json = JSON.stringify(out);
-  if (/"(address|driverConfirmation|ownerNote)"\s*:/.test(json)) throw new PrivacyGuardError("private key present");
+  if (/"(address|driverConfirmation|ownerNote|ownerName)"\s*:/.test(json)) throw new PrivacyGuardError("private key present");
   const text = norm(json);
   const hasName = (name: string) => new RegExp([...norm(name)].map(escapeRe).join("[-\\s・·]?")).test(text);
   for (const name of Object.keys(source.drivers)) {

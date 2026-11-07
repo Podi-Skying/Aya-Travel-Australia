@@ -190,6 +190,19 @@ describe("owner-only notes and categories", () => {
     const ok = applyOp(d, { op: "editItem", date: d.days[0].date, itemId: d.days[0].items[0].id, fields: { cat: "wildlife" } });
     expect(ok.ok && ok.doc.days[0].items[0].cat).toBe("wildlife");
   });
+
+  it("keeps an owner-only title out of public documents", () => {
+    const d = seedDoc();
+    d.days[0].items[0].name = "拜訪朋友";
+    d.days[0].items[0].ownerName = "Example Hall gathering";
+    expect(parseTripDoc(d).ok).toBe(true);
+    for (const pub of [toPublicDoc(d), toPublicDoc(d, { photos: true })]) {
+      const text = JSON.stringify(pub);
+      expect(text).not.toContain("Example Hall");
+      expect(text).toContain("拜訪朋友");
+    }
+    expect(() => assertPublicSafe({ ownerName: "x" }, d)).toThrow(PrivacyGuardError);
+  });
 });
 
 describe("home base privacy", () => {

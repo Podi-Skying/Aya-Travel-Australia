@@ -133,6 +133,8 @@ export const itemSchema = z.object({
   status: z.enum(["confirmed", "pending"]).optional(),
   /** Owner-only detail (flight numbers, workplace); removed from every public document. */
   ownerNote: shortText(500).optional(),
+  /** Owner-only title shown instead of `name` in the owner's view (`name` stays the public one); removed from every public document. */
+  ownerName: shortText(120).optional(),
   people: peopleSchema.optional(),
   /** People at this stop only without an avatar, shown as +N (a friend who joins for dinner). */
   extraPeople: z.number().int().min(1).max(20).optional(),

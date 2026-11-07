@@ -646,8 +646,9 @@ export function DaysView({ active }: { active: boolean }) {
                 const voted = myVotes.find((v) => v.itemId === i.id && v.dayDate === d.date);
                 const cnt = countOf(i.id);
                 const big = i.major && !isLogistics(i);
-                const name = displayName(i);
-                const fullName = getLang() === "zh" ? i.name : tx(i, "name", i.name);
+                // The owner sees the real title of a private stop (a friend's church); guests get its public name.
+                const name = owner && i.ownerName ? i.ownerName : displayName(i);
+                const fullName = owner && i.ownerName ? i.ownerName : getLang() === "zh" ? i.name : tx(i, "name", i.name);
                 const waiting = i.status === "pending" || tent || nameIsTentative(i);
                 const flag = bookingFlag(i);
                 const bookAt = bookingHref(i);
