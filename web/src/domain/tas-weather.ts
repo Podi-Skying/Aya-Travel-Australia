@@ -71,7 +71,54 @@ export type TasDay = {
   /** Mean cloud 22:00–03:00 Hobart time; null when the window is incomplete (the last forecast date). */
   nightCloud: number | null;
   nightLow: number | null;
+  /** Daylight only (sunrise–sunset): the most severe hourly code, the highest rain chance, the rain sum. */
+  dayCode: number;
+  dayPop: number | null;
+  dayRain: number | null;
+  /** Rain that falls only outside daylight, as runs of consecutive wet Hobart hours ("02–05"); empty when daylight is wet too. */
+  nightRain: string[];
 };
+
+/**
+ * One hour at one point, covering [u, u + 1 h): Hobart civil hour `h` of instant `u` (Unix seconds; two rows share
+ * an `h` when clocks go back). The code, temperature, cloud and `d` (is_day) are the values at `u`; rain chance, rain
+ * and gusts describe the hour that follows, which Open-Meteo reports on the next sample ("preceding hour"). `w` is
+ * `wetHour` on the unrounded rain (`mm` is rounded to 0.1 for display).
+ */
+export type HourRow = { u: number; h: number; code: number; t: number | null; f: number | null; pop: number | null; mm: number | null; cl: number | null; lo: number | null; g: number | null; d: 0 | 1; w: 0 | 1 };
+/** `sr`/`ss`: sunrise and sunset as fractional Hobart hours, for shading the night. */
+export type HourDay = { date: string; sunrise: string | null; sunset: string | null; sr: number | null; ss: number | null; hours: HourRow[] };
+
+/** Days of hourly detail kept per point (the summary still covers all 16). */
+export const HOURLY_DAYS = 10;
+
+/**
+ * Several points' night-rain runs as at most two spans, one before dawn and one in the evening: "rain possible
+ * sometime in 00–05" on a region card, not "00–04 00–05 01–04".
+ */
+export function mergeNightRain(ranges: string[]): string[] {
+  const parts = ranges.map((x) => x.split("–").map(Number)).filter((x) => x.length === 2 && x.every(Number.isFinite));
+  const span2 = (xs: number[][]) => (xs.length ? `${pad2(Math.min(...xs.map((x) => x[0])))}–${pad2(Math.max(...xs.map((x) => x[1])))}` : null);
+  return [span2(parts.filter((x) => x[0] < 12)), span2(parts.filter((x) => x[0] >= 12))].filter((x): x is string => !!x);
+}
+
+/**
+ * How bad a WMO code is, for "the worst hour of the day": intensity first (slight < moderate < heavy), then the
+ * kind (drizzle < rain < freezing < snow) — numeric order alone would rank slight snow showers (85) above violent
+ * rain showers (82). Thunderstorms top everything; fog sits above clouds and below any precipitation.
+ */
+const SEVERITY: Record<number, number> = {
+  45: 10, 48: 11,
+  51: 20, 61: 21, 80: 21, 56: 22, 66: 22, 71: 23, 77: 23, 85: 23,
+  53: 30, 63: 31, 81: 31, 73: 33,
+  55: 40, 65: 41, 82: 41, 57: 42, 67: 42, 75: 43, 86: 43,
+  95: 50, 96: 51, 99: 52,
+};
+export const wxSeverity = (code: number) => SEVERITY[code] ?? code;
+export const worstCode = (codes: number[]) => codes.reduce((a, b) => (wxSeverity(b) > wxSeverity(a) ? b : a));
+
+/** Drizzle, rain, snow, showers and storms are WMO 51 and above; fog (45/48) is not wet. */
+export const wetHour = (x: { code: number; mm: number | null }) => (x.mm ?? 0) >= 0.1 || x.code >= 51;
 
 const HOBART_TZ = "Australia/Hobart";
 const civil = new Intl.DateTimeFormat("en-CA", { timeZone: HOBART_TZ, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
@@ -97,9 +144,36 @@ type Loc = { utc_offset_seconds?: number; daily?: Block; hourly?: Block };
  * hourly instants and sunrise/sunset are converted with the Hobart time zone.
  */
 export function parseTasForecast(body: unknown, points: Pick<TasPoint, "id">[] = TAS_POINTS): Record<string, TasDay[]> {
+  return parseTas(body, points).days;
+}
+
+const pad2 = (n: number) => String(n).padStart(2, "0");
+const frac = (unix: number) => {
+  const c = hobartCivil(unix);
+  return c.hour + Number(c.hm.slice(3)) / 60;
+};
+
+/** Wet hours as runs of consecutive hours, each "HH–HH" (end = the last wet hour + 1); a dry hour splits a run. */
+function runs(rows: { unix: number; hour: number }[]): string[] {
+  const out: string[] = [];
+  let start: (typeof rows)[number] | null = null;
+  rows.forEach((x, k) => {
+    start ??= x;
+    const next = rows[k + 1];
+    if (!next || next.unix !== x.unix + 3600) {
+      out.push(`${pad2(start.hour)}–${pad2(x.hour + 1)}`);
+      start = null;
+    }
+  });
+  return out;
+}
+
+/** Summary rows for every point, plus the first `HOURLY_DAYS` dates of hourly detail. */
+export function parseTas(body: unknown, points: Pick<TasPoint, "id">[] = TAS_POINTS): { days: Record<string, TasDay[]>; hourly: Record<string, HourDay[]> } {
   const list = (Array.isArray(body) ? body : [body]) as Loc[];
   if (list.length !== points.length) throw new Error("tas weather length");
   const out: Record<string, TasDay[]> = {};
+  const hourlyOut: Record<string, HourDay[]> = {};
   list.forEach((loc, k) => {
     const d = loc?.daily;
     const h = loc?.hourly;
@@ -123,7 +197,56 @@ export function parseTasForecast(body: unknown, points: Pick<TasPoint, "id">[] =
         hours.set(night, [...(hours.get(night) ?? []), { cloud, low }]);
       }
     });
+    // Every hour [t, t + 1 h) by Hobart civil date. Open-Meteo reports rain chance, rain and gusts for the hour
+    // before each sample, so the hour starting at t takes those from the next sample (t + 1 h); the weather code,
+    // like temperature and cloud, is the value at t.
+    const byDate = new Map<string, { unix: number; hour: number; raw: number | null; row: HourRow }[]>();
+    const num = (key: string, i: number, k2 = 0) => r(h[key]?.[i], k2);
+    h.time.forEach((t, i) => {
+      const code = h.weather_code?.[i];
+      if (typeof t !== "number" || h.time![i + 1] !== t + 3600 || typeof code !== "number") return;
+      const c = hobartCivil(t);
+      // Classify and sum on the raw amount; only the shown value is rounded (0.06 mm is not a wet hour).
+      const pr = h.precipitation?.[i + 1];
+      const raw = typeof pr === "number" && Number.isFinite(pr) ? pr : null;
+      const row: HourRow = {
+        u: t,
+        h: c.hour,
+        code,
+        t: num("temperature_2m", i, 1),
+        f: num("apparent_temperature", i, 1),
+        pop: num("precipitation_probability", i + 1),
+        mm: num("precipitation", i + 1, 1),
+        cl: num("cloud_cover", i),
+        lo: num("cloud_cover_low", i),
+        g: num("wind_gusts_10m", i + 1),
+        d: h.is_day?.[i] === 0 ? 0 : 1,
+        w: wetHour({ code, mm: raw }) ? 1 : 0,
+      };
+      byDate.set(c.date, [...(byDate.get(c.date) ?? []), { unix: t, hour: c.hour, raw, row }]);
+    });
+    /** Daylight = hours overlapping sunrise–sunset; without sun times or hourly codes, the daily values stand. */
+    const daylight = (date: string, i: number, code: number, sr: number | null, ss: number | null): Pick<TasDay, "dayCode" | "dayPop" | "dayRain" | "nightRain"> => {
+      const all = byDate.get(date) ?? [];
+      // Without daylight hours only the code falls back to the daily one; whole-day rain is not daytime rain.
+      const fallback = { dayCode: code, dayPop: null, dayRain: null, nightRain: [] };
+      if (sr == null || ss == null || !all.length) return fallback;
+      const isDay = (x: { unix: number }) => x.unix + 3600 > sr && x.unix < ss;
+      const lit = all.filter(isDay);
+      if (!lit.length) return fallback;
+      const pops = lit.map((x) => x.row.pop).filter((x): x is number => x != null);
+      const mms = lit.map((x) => x.raw).filter((x): x is number => x != null);
+      const dayWet = lit.some((x) => x.row.w === 1);
+      const wetNight = dayWet ? [] : all.filter((x) => !isDay(x) && x.row.w === 1);
+      return {
+        dayCode: worstCode(lit.map((x) => x.row.code)),
+        dayPop: pops.length ? Math.max(...pops) : null,
+        dayRain: mms.length ? Math.round(mms.reduce((a, b) => a + b, 0) * 10) / 10 : null,
+        nightRain: runs(wetNight),
+      };
+    };
     const days: TasDay[] = [];
+    const hourly: HourDay[] = [];
     d.time.forEach((t, i) => {
       const code = d.weather_code?.[i];
       if (typeof t !== "number" || typeof code !== "number") return;
@@ -146,12 +269,23 @@ export function parseTasForecast(body: unknown, points: Pick<TasPoint, "id">[] =
         sunset: typeof ss === "number" ? hobartCivil(ss).hm : null,
         nightCloud: complete ? mean(night.map((x) => x.cloud)) : null,
         nightLow: complete ? mean(night.map((x) => x.low)) : null,
+        ...daylight(date, i, code, typeof sr === "number" ? sr : null, typeof ss === "number" ? ss : null),
       });
+      if (days.length <= HOURLY_DAYS)
+        hourly.push({
+          date,
+          sunrise: typeof sr === "number" ? hobartCivil(sr).hm : null,
+          sunset: typeof ss === "number" ? hobartCivil(ss).hm : null,
+          sr: typeof sr === "number" ? frac(sr) : null,
+          ss: typeof ss === "number" ? frac(ss) : null,
+          hours: (byDate.get(date) ?? []).map(({ row }) => row),
+        });
     });
     if (!days.length) throw new Error("tas weather empty");
     out[points[k].id] = days;
+    hourlyOut[points[k].id] = hourly;
   });
-  return out;
+  return { days: out, hourly: hourlyOut };
 }
 
 export type Sky = "clear" | "some" | "cloudy";

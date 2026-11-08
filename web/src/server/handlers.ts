@@ -18,7 +18,7 @@ import { todayStr } from "@/domain/format";
 import type { Op } from "@/domain/ops";
 import type { Item, TripDoc } from "@/domain/schema";
 import { isStayItem } from "@/domain/privacy";
-import { tasWeatherResponse } from "./tas-weather";
+import { tasHourlyResponse, tasWeatherResponse } from "./tas-weather";
 import { secondsToHobartMidnight } from "@/domain/tas-weather";
 
 /* Route handler bodies, kept outside app/ so integration tests can call them directly. */
@@ -176,15 +176,32 @@ export async function getSky() {
   }
 }
 
-/** Tasmania-wide forecast (Kai 2026-11-08): public, no trip data; edge copies never outlive the Hobart date. */
+/** Edge copies of the Tasmania forecast never outlive the Hobart date. */
+function tasCacheHeader() {
+  const S = secondsToHobartMidnight();
+  const N = Math.min(1800, S);
+  const M = Math.min(3600, Math.max(0, S - N));
+  return { "cache-control": `public, s-maxage=${N}, stale-while-revalidate=${M}` };
+}
+
+/** Tasmania-wide forecast (Kai 2026-11-08): public, no trip data. */
 export async function getTasWeather() {
   try {
     const r = await tasWeatherResponse();
     if (!r) return fail(503, "天氣暫時無法取得");
-    const S = secondsToHobartMidnight();
-    const N = Math.min(1800, S);
-    const M = Math.min(3600, Math.max(0, S - N));
-    return json(r, 200, { "cache-control": `public, s-maxage=${N}, stale-while-revalidate=${M}` });
+    return json(r, 200, tasCacheHeader());
+  } catch (e) {
+    return errorResponse(e);
+  }
+}
+
+/** One fixed point's hourly forecast, loaded when its sheet opens. */
+export async function getTasHourly(req: Request) {
+  try {
+    const r = await tasHourlyResponse(new URL(req.url).searchParams.get("id") ?? "");
+    if (r && "notFound" in r) return fail(404, "沒有這個地點");
+    if (!r) return fail(503, "逐時預報暫時無法取得");
+    return json(r, 200, tasCacheHeader());
   } catch (e) {
     return errorResponse(e);
   }

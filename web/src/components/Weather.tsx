@@ -26,17 +26,24 @@ const PATHS: Record<ReturnType<typeof wxLabel>["icon"], string> = {
   snow: "M7 14h11a4 4 0 0 0 .4-8 6 6 0 0 0-11.5 1.3A3.4 3.4 0 0 0 7 14zM9 18h.01M12 20h.01M15 18h.01",
 };
 
+/** Night faces for the two sunny icons (hourly view); clouds, rain and the rest look the same by night. */
+const NIGHT: Partial<Record<keyof typeof PATHS, string>> = {
+  sun: "M19 14.5A7.5 7.5 0 1 1 9.5 5a6 6 0 0 0 9.5 9.5z",
+  partly: "M10.5 3.5a3.6 3.6 0 0 0-1 5.6 3.6 3.6 0 0 0 4.4.7 4 4 0 0 1-3.4-6.3zM9 19h9.3a3.7 3.7 0 0 0 .3-7.4 5.2 5.2 0 0 0-9.9 1.1A3.2 3.2 0 0 0 9 19z",
+};
+
 /** The same icon as markup, for Leaflet markers. */
 export function wxIconSvg(code: number, size = 18): string {
   const l = wxLabel(code);
   return `<svg class="wx-icon wx-${l.icon}" viewBox="0 0 24 24" width="${size}" height="${size}" aria-hidden="true"><path d="${PATHS[l.icon]}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 }
 
-export function WxIcon({ code, size = 18 }: { code: number; size?: number }) {
+export function WxIcon({ code, size = 18, night = false }: { code: number; size?: number; night?: boolean }) {
   const l = wxLabel(code);
+  const moon = night ? NIGHT[l.icon] : undefined;
   return (
-    <svg className={`wx-icon wx-${l.icon}`} viewBox="0 0 24 24" width={size} height={size} aria-hidden="true">
-      <path d={PATHS[l.icon]} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    <svg className={`wx-icon wx-${l.icon}${moon ? " wx-night" : ""}`} viewBox="0 0 24 24" width={size} height={size} aria-hidden="true">
+      <path d={moon ?? PATHS[l.icon]} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

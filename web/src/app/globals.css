@@ -1465,13 +1465,6 @@ details.hours-chip { display: inline-block; }
 .tw-mk.night.na .tw-sky { color: var(--ink-muted); }
 .tw-fade .tw-mk { animation: tw-fade 160ms var(--ease); }
 @keyframes tw-fade { from { opacity: .35; } to { opacity: 1; } }
-.tw-popup .leaflet-popup-content-wrapper { border-radius: 14px; background: rgba(250, 247, 240, .94); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); box-shadow: 0 8px 24px -8px rgba(41, 40, 35, .45); }
-.tw-popup .leaflet-popup-content { margin: 10px 12px; }
-.tw-pop { display: grid; gap: 2px; min-width: 150px; font-size: .8125rem; }
-.tw-pop strong { font-size: .9375rem; }
-.tw-pop dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 6px 0 0; }
-.tw-pop dt { color: var(--ink-muted); }
-.tw-pop dd { margin: 0; font-variant-numeric: tabular-nums; text-align: right; }
 
 /* Region cards: one glance per region, five days in a row. */
 .tw-regions { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 10px; }
@@ -1495,6 +1488,8 @@ details.hours-chip { display: inline-block; }
 .tw-mini small { font-size: .6875rem; color: var(--ink-muted); }
 
 /* Region sheet: rises from the bottom, follows the finger, leaves the same way. */
+/* Each sheet host is its own stacking level: a later sheet (and its scrim) paints over an earlier one. */
+.tw-sheet-host { position: relative; z-index: 940; }
 .tw-scrim { position: fixed; inset: 0; z-index: 940; background: rgba(41, 40, 35, .32); opacity: 0; }
 .tw-sheet { position: fixed; z-index: 950; left: 0; right: 0; bottom: 0; max-height: 78vh; display: grid; grid-template-rows: auto auto 1fr; padding: 6px 16px calc(16px + env(safe-area-inset-bottom)); border-radius: 20px 20px 0 0; background: rgba(250, 247, 240, .94); -webkit-backdrop-filter: blur(24px) saturate(170%); backdrop-filter: blur(24px) saturate(170%); box-shadow: 0 -10px 40px -12px rgba(41, 40, 35, .45); will-change: transform; outline: none; }
 .tw-sheet, .tw-grab, .tw-sheet-head { touch-action: none; cursor: grab; }
@@ -1505,7 +1500,10 @@ details.hours-chip { display: inline-block; }
 .tw-sheet-head strong { font-size: 1.25rem; letter-spacing: -.015em; }
 .tw-sheet-head .btn { margin-left: auto; }
 .tw-sheet-list { list-style: none; margin: 8px 0 0; padding: 0; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; }
-.tw-sheet-list li { display: grid; grid-template-columns: 1fr auto auto; grid-template-areas: "nm ic t" "f f f"; align-items: center; gap: 4px 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.tw-sheet-list li { border-bottom: 1px solid var(--line); }
+.tw-row { width: 100%; display: grid; grid-template-columns: 1fr auto auto 12px; grid-template-areas: "nm ic t ch" "f f f ch"; align-items: center; gap: 4px 10px; padding: 10px 0; border: 0; border-radius: 12px; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: transform var(--t-press) ease-out, background-color var(--t-ui) var(--ease); }
+.tw-row:active { transform: scale(.98); background: var(--surface-2); }
+.tw-row .chev { grid-area: ch; color: var(--ink-muted); font-size: 1.25rem; line-height: 1; }
 .tw-sheet-list li.here .nm { color: var(--vermilion); }
 .tw-sheet-list .nm { grid-area: nm; display: flex; gap: 6px; align-items: center; font-weight: 500; }
 .tw-sheet-list .wx-icon { grid-area: ic; }
@@ -1515,16 +1513,64 @@ details.hours-chip { display: inline-block; }
 .tw-sheet-list .facts .warn { color: var(--vermilion); font-weight: 600; }
 .tw-sheet-list .facts .sky { color: var(--sky, var(--ink-2)); }
 
+.tw-nr { display: inline-flex; align-items: center; gap: 3px; color: var(--ink-2); font-size: .75rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tw-mk .tw-warn.nr { top: auto; right: auto; bottom: -15px; left: 50%; transform: translateX(-50%); background: var(--ink-2); }
+
+/* Hourly sheet: a strip of hours, night shaded, numbers over words. */
+.tw-sheet.tw-hourly { max-height: 88vh; grid-template-rows: auto auto auto 1fr; }
+.tw-hsum { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 6px 0 2px; color: var(--ink-2); font-size: .8125rem; font-variant-numeric: tabular-nums; }
+.tw-hsum .tw-card-t { color: var(--ink); }
+.tw-hsum .sky { color: var(--sky, var(--ink-2)); }
+.tw-hbody { min-height: 0; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; cursor: auto; }
+.tw-strip.in-sheet { position: static; margin: 4px -16px 6px; padding: 4px 16px; background: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+.tw-hskel { height: 248px; margin-top: 6px; border-radius: 14px; background: linear-gradient(90deg, var(--surface-2) 0%, var(--bg) 50%, var(--surface-2) 100%); background-size: 200% 100%; animation: tw-skel 1.2s linear infinite; }
+@keyframes tw-skel { to { background-position: -200% 0; } }
+.tw-herr { padding: 18px 0; }
+.tw-hfoot { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 8px 0 0; }
+.tw-hours { display: grid; grid-template-columns: 24px 1fr; margin: 0 -16px 0 -8px; }
+/* Past the hourly horizon the chart keeps its layout and scroll position, just unseen. */
+.tw-hours.is-hidden { visibility: hidden; height: 0; overflow: hidden; }
+.tw-hlegend { display: grid; grid-template-rows: 44px 102px 58px 18px 22px; justify-items: center; align-items: center; color: var(--ink-muted); }
+.tw-hlegend .r-temp { align-self: center; }
+.tw-hscroll { overflow-x: auto; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; scrollbar-width: none; touch-action: pan-x; cursor: grab; user-select: none; -webkit-user-select: none; outline: none; padding-right: 16px; }
+.tw-hscroll::-webkit-scrollbar { display: none; }
+.tw-hscroll:focus-visible { box-shadow: inset 0 0 0 2px var(--ink); border-radius: 10px; }
+.tw-hgrid { position: relative; display: flex; }
+.tw-night { position: absolute; top: 0; bottom: 0; background: rgba(41, 40, 35, .07); pointer-events: none; }
+.tw-curve { position: absolute; top: 44px; left: 0; pointer-events: none; overflow: visible; }
+.tw-curve path { stroke: var(--ink); stroke-width: 2; stroke-linecap: round; }
+.tw-curve circle { fill: var(--ink); }
+.tw-curve circle.hi { fill: var(--vermilion); }
+.tw-curve circle.lo { fill: var(--tasmania-label); }
+.tw-curve text { font-size: 11px; fill: var(--ink-2); font-variant-numeric: tabular-nums; }
+.tw-curve text.mark { font-weight: 700; fill: var(--ink); }
+.tw-hcol { position: relative; flex: 0 0 48px; display: grid; grid-template-rows: 18px 26px 102px 58px 18px 22px; justify-items: center; align-items: center; scroll-snap-align: start; font-variant-numeric: tabular-nums; }
+.tw-hcol .hh { font-size: .75rem; font-weight: 600; color: var(--ink); }
+.tw-hcol.night .hh, .tw-hcol.night .wx-icon { color: var(--ink-muted); }
+.tw-hcol.now .hh { color: var(--vermilion); }
+.tw-hcol .rain { display: grid; grid-template-rows: 14px 30px 14px; justify-items: center; align-items: end; }
+.tw-hcol .rain small { font-size: .6875rem; color: var(--ink-2); line-height: 1; }
+.tw-hcol .rain .mm { align-self: start; padding-top: 2px; color: var(--vermilion); font-weight: 600; }
+.tw-hcol .bar { width: 10px; min-height: 1px; border-radius: 3px 3px 0 0; background: rgba(41, 40, 35, .22); }
+.tw-hcol .bar.wet { background: var(--vermilion); }
+.tw-hcol .gust { font-size: .75rem; color: var(--ink-2); }
+.tw-hcol .gust.warn { color: var(--vermilion); font-weight: 700; }
+.tw-hcol .cloud { position: relative; width: 14px; height: 18px; border-radius: 3px; background: rgba(41, 40, 35, .05); overflow: hidden; }
+.tw-hcol .cloud span { position: absolute; left: 0; right: 0; bottom: 0; }
+.tw-hcol .cloud .all { background: rgba(98, 94, 85, .3); }
+.tw-hcol .cloud .low { background: rgba(98, 94, 85, .75); }
+
 .tw-foot { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; padding-top: 4px; }
 
 @media (prefers-reduced-motion: reduce) {
-  .tw-chip, .tw-seg button, .tw-mk, .tw-card { transition: none; }
-  .tw-chip:active, .tw-seg button:active, .tw-pin:active .tw-mk, .tw-card:active { transform: none; }
+  .tw-chip, .tw-seg button, .tw-mk, .tw-card, .tw-row { transition: none; }
+  .tw-chip:active, .tw-seg button:active, .tw-pin:active .tw-mk, .tw-card:active, .tw-row:active { transform: none; }
+  .tw-hskel { animation: none; }
   .tw-fade .tw-mk { animation: none; }
   .tw-sheet, .tw-scrim { transition: opacity 160ms linear; }
 }
 @media (prefers-reduced-transparency: reduce) {
-  .tw-strip, .tw-seg, .tw-legend, .tw-sheet, .tw-popup .leaflet-popup-content-wrapper { background: var(--bg); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .tw-strip, .tw-seg, .tw-legend, .tw-sheet { background: var(--bg); -webkit-backdrop-filter: none; backdrop-filter: none; }
   .tw-kp { background: var(--ink); -webkit-backdrop-filter: none; backdrop-filter: none; }
   .tw-mk { background: var(--bg); }
 }
