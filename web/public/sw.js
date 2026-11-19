@@ -60,7 +60,8 @@ self.addEventListener("message", (event) => {
   const same = urls.filter((u) => {
     try {
       const url = new URL(u, self.location.origin);
-      return url.origin === self.location.origin && !url.pathname.startsWith("/api/auth");
+      // Kai's private photos (/api/my-photos) are never kept in the offline cache.
+      return url.origin === self.location.origin && !url.pathname.startsWith("/api/auth") && !url.pathname.startsWith("/api/my-photos");
     } catch {
       return false;
     }

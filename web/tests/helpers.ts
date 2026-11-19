@@ -14,7 +14,12 @@ export const ORIGIN = "http://localhost:3000";
 
 export const session = { githubId: null as string | null };
 
-vi.mock("@/server/session", () => ({ getSessionGithubId: async () => session.githubId }));
+export const identity = { email: null as string | null };
+
+vi.mock("@/server/session", () => ({
+  getSessionGithubId: async () => session.githubId,
+  getSessionIdentity: async () => ({ githubId: session.githubId, email: identity.email }),
+}));
 
 export async function freshDb(): Promise<AppDb> {
   const db = drizzle({ client: new PGlite(), schema });

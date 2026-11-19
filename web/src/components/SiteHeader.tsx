@@ -10,19 +10,22 @@ import { LangSwitch } from "@/i18n";
  * tabs as `children`; they replace the 散步/行程 links and the logo leads back to the walk.
  */
 export const SITE_NAME = "2026澳洲旅程with Aya";
-export type Section = "walk" | "plan";
+export type Section = "walk" | "plan" | "photos";
 
 export function SiteHeader({
   base = "",
   current,
   account,
   variant = "paper",
+  photos = false,
   children,
 }: {
   base?: string;
   current?: Section;
   account: "signin" | "signout" | null;
   variant?: "paper" | "dark";
+  /** Kai and the people he allows also get 照片 (docs/PHOTOS-PLAN.md); never set for guests. */
+  photos?: boolean;
   children?: ReactNode;
 }) {
   const links: { key: Section; label: string; href: string }[] = [
@@ -48,6 +51,11 @@ export function SiteHeader({
             {l.label}
           </a>
         ))}
+        {photos && !base && (
+          <a href="/photos" aria-current={current === "photos" ? "page" : undefined}>
+            照片
+          </a>
+        )}
         {account && (
           <button
             type="button"

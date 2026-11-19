@@ -120,3 +120,62 @@ export const googleUsage = pgTable(
   },
   (t) => [primaryKey({ columns: [t.day, t.api] })],
 );
+
+/* Kai's own photos (docs/PHOTOS-PLAN.md). Bytes live in a private Vercel Blob store; these rows hold paths and sorting only. */
+export const tripPhotos = pgTable(
+  "trip_photos",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tripId: uuid("trip_id")
+      .notNull()
+      .references(() => trips.id, { onDelete: "cascade" }),
+    displayPath: text("display_path").notNull(),
+    thumbPath: text("thumb_path").notNull(),
+    bytes: integer("bytes").notNull(),
+    width: integer("width").notNull(),
+    height: integer("height").notNull(),
+    sha256: text("sha256").notNull(),
+    takenAt: timestamp("taken_at", { withTimezone: true }),
+    takenLocal: text("taken_local"),
+    timeSource: text("time_source").notNull(),
+    dayDate: text("day_date"),
+    itemId: text("item_id"),
+    manual: boolean("manual").notNull().default(false),
+    lat: doublePrecision("lat"),
+    lng: doublePrecision("lng"),
+    caption: text("caption"),
+    fileName: text("file_name").notNull(),
+    uploadedBy: text("uploaded_by").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [unique("trip_photos_sha").on(t.tripId, t.sha256), index("trip_photos_day").on(t.tripId, t.dayDate, t.takenLocal)],
+);
+
+/* Accounts allowed to see the photos: a GitHub numeric id or a lower-cased email. */
+export const photoViewers = pgTable(
+  "photo_viewers",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tripId: uuid("trip_id")
+      .notNull()
+      .references(() => trips.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    value: text("value").notNull(),
+    label: text("label").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [unique("photo_viewers_entry").on(t.tripId, t.kind, t.value)],
+);
+
+/* Revocable viewer links; only the token's sha256 is stored. */
+export const photoLinks = pgTable("photo_links", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tripId: uuid("trip_id")
+    .notNull()
+    .references(() => trips.id, { onDelete: "cascade" }),
+  tokenHash: text("token_hash").notNull().unique(),
+  label: text("label").notNull().default(""),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+});

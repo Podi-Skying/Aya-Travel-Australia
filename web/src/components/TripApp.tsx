@@ -6,6 +6,7 @@ import type { Op } from "@/domain/ops";
 import { alertStatus } from "@/domain/rules";
 import { dayDiff, fmtMD, fmtTs } from "@/domain/format";
 import { withMediaToken } from "@/domain/media";
+import { useMyPhotos, type MyPhoto, type PhotoAccessKind } from "@/client/my-photos";
 import { api, registerServiceWorker } from "@/client/api";
 import { keyFor, loadSnapshot, saveSnapshot, mergeVersions, type VersionMeta } from "@/client/offline";
 import { SiteHeader } from "./SiteHeader";
@@ -58,6 +59,8 @@ type Ctx = {
   alerts: Alerts;
   lastSyncAt: string;
   offlineCopy: boolean;
+  /** Kai's own photos (docs/PHOTOS-PLAN.md): null for guests, who never fetch them. */
+  myPhotos: MyPhoto[] | null;
 };
 
 const TripCtx = createContext<Ctx | null>(null);
@@ -97,8 +100,11 @@ function voterKey(): string {
   return memoryVoterKey;
 }
 
-export function TripApp(props: { mode: Mode; token?: string; home?: boolean; initial: { doc: TripDoc; versionNo: number; syncedAt: string } }) {
+export function TripApp(props: { mode: Mode; token?: string; home?: boolean; photoAccess?: PhotoAccessKind | null; initial: { doc: TripDoc; versionNo: number; syncedAt: string } }) {
   const { mode, token } = props;
+  // Share links never carry private photos, whoever opens them.
+  const photoAccess = token ? null : (props.photoAccess ?? null);
+  const myPhotos = useMyPhotos(photoAccess).data?.photos ?? null;
   // 繁中 / EN / 日本語 (Kai 2026-10-27): the tree below is keyed by the language, so a switch re-renders it all.
   const lang = useRootLang();
   // Public home (PUBLIC_HOME=1): read-only like a share link, but without voting (votes belong to a share link).
@@ -379,6 +385,7 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
     alerts,
     lastSyncAt,
     offlineCopy: !online || fromCache,
+    myPhotos,
   };
 
   const visibleTabs = TABS;
@@ -409,7 +416,7 @@ export function TripApp(props: { mode: Mode; token?: string; home?: boolean; ini
         {tt("跳到主要內容")}
       </a>
       {/* The planner's tabs live in the top bar; the logo leads back to the walk (2026-10-26). */}
-      <SiteHeader base={base} current="plan" account={mode === "owner" ? "signout" : home ? "signin" : null}>
+      <SiteHeader base={base} current="plan" account={mode === "owner" ? "signout" : home ? "signin" : null} photos={!!photoAccess}>
         <nav className="tabs" aria-label={tt("行程分頁")}>
           <div className="tabs-inner" role="tablist" ref={tabsRef} onKeyDown={onTabKey}>
             {visibleTabs.map((t) => (

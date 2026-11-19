@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { loadOwnerPage } from "@/server/pages";
+import { loadOwnerPage, pagePhotoAccess } from "@/server/pages";
 import { TripApp } from "@/components/TripApp";
 import { ConfigNotice, Notice } from "@/components/Notice";
 
@@ -10,7 +10,7 @@ export const metadata = { title: "行程｜2026澳洲旅程with Aya" };
 export default async function Planner() {
   const p = await loadOwnerPage();
   if (p.kind === "config") return <ConfigNotice missing={p.missing} />;
-  if (p.kind === "public") return <TripApp mode="public" home initial={{ doc: p.trip.doc as never, versionNo: p.trip.versionNo, syncedAt: new Date().toISOString() }} />;
+  if (p.kind === "public") return <TripApp mode="public" home photoAccess={await pagePhotoAccess()} initial={{ doc: p.trip.doc as never, versionNo: p.trip.versionNo, syncedAt: new Date().toISOString() }} />;
   if (p.kind === "signin") redirect("/api/auth/signin?callbackUrl=%2Fplan");
   if (p.kind === "forbidden")
     return (
@@ -28,5 +28,5 @@ export default async function Planner() {
         <p className="muted">資料庫裡還沒有行程。請依 docs/DEPLOY.md 執行一次 npm run db:seed。</p>
       </Notice>
     );
-  return <TripApp mode="owner" initial={{ doc: p.trip.doc, versionNo: p.trip.versionNo, syncedAt: new Date().toISOString() }} />;
+  return <TripApp mode="owner" photoAccess="owner" initial={{ doc: p.trip.doc, versionNo: p.trip.versionNo, syncedAt: new Date().toISOString() }} />;
 }
