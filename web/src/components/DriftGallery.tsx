@@ -9,8 +9,10 @@ import { useOnceHint, useReducedMotion } from "./ui";
 import { Icon } from "./Icon";
 import { commonsFor } from "@/client/photos";
 import { fmtDay } from "@/domain/format";
+import { CATEGORIES } from "@/domain/photo-sort";
 import { isLogistics } from "@/domain/day-title";
 import type { Item, Photo } from "@/domain/schema";
+import { fullUrl, thumbUrl, type MyPhoto } from "@/client/my-photos";
 
 /*
  * 畫廊 (Kai 2026-10-26): an endless field of the trip's place photos drifting past in 3D. Our own build in the
@@ -21,7 +23,7 @@ import type { Item, Photo } from "@/domain/schema";
  * on screen ever changes at once (Kai 2026-10-31: on phones photos changed in an instant).
  */
 
-export type Shot = { key: string; src: string; name: string; date?: string; dayIndex?: number; credit: string };
+export type Shot = { key: string; src: string; name: string; date?: string; dayIndex?: number; credit: string; /** Larger copy for the detail sheet (Kai's own photos). */ full?: string };
 
 const MAX_PLANES = 24; // each plane is a composited layer: more made phones stutter
 const GAP = 260; // depth between planes (px)
@@ -122,7 +124,11 @@ const rand = (n: number) => {
 };
 
 export function DriftGallery({ active }: { active: boolean }) {
-  const { doc, token, mode, gotoDay } = useTrip();
+  const { doc, token, mode, gotoDay, myPhotos } = useTrip();
+  // 景點照片 / 我的照片 (docs/PHOTOS-PLAN.md): the switch exists only for Kai and the people he allows.
+  const [mine, setMine] = useState(false);
+  const [mineDay, setMineDay] = useState<string | null>(null);
+  const [mineCat, setMineCat] = useState<string | null>(null);
   const reduce = useReducedMotion();
   const [commons, setCommons] = useState<Record<string, Photo[]>>({});
   const [loading, setLoading] = useState(true);
@@ -150,11 +156,54 @@ export function DriftGallery({ active }: { active: boolean }) {
   }, [active, places, mode, token]);
 
   const [hint, doneHint] = useOnceHint("aya-hint-gallery");
-  const shots = useMemo(() => tripShots(doc.days, doc.attractionPool, commons), [doc, commons]);
+  const placeShots = useMemo(() => tripShots(doc.days, doc.attractionPool, commons), [doc, commons]);
+  const myDays = useMemo(() => doc.days.filter((d) => myPhotos?.some((p) => p.dayDate === d.date)), [doc.days, myPhotos]);
+  const myCats = useMemo(() => CATEGORIES.filter((c) => myPhotos?.some((p) => p.dayDate && p.category === c)), [myPhotos]);
+  const myShots = useMemo(() => (myPhotos ? myPhotoShots(doc, myPhotos, mineDay, mineCat) : []), [doc, myPhotos, mineDay, mineCat]);
+  const showMine = mine && !!myPhotos?.length;
+  const shots = showMine ? myShots : placeShots;
 
   return (
     <div className="drift" onPointerDown={hint ? doneHint : undefined} onWheel={hint ? doneHint : undefined} onKeyDown={hint ? doneHint : undefined}>
       <h2 className="sr-only">畫廊</h2>
+      {!!myPhotos?.length && (
+        <div className="drift-mine">
+          <div className="seg-switch" role="group" aria-label="照片來源">
+            <button type="button" aria-pressed={!mine} onClick={() => setMine(false)}>
+              景點照片
+            </button>
+            <button type="button" aria-pressed={mine} onClick={() => setMine(true)}>
+              我的照片
+            </button>
+          </div>
+          {mine && (
+            <div className="my-chips" role="group" aria-label="選擇日子">
+              <button type="button" aria-pressed={!mineDay} onClick={() => setMineDay(null)}>
+                全部
+              </button>
+              {myDays.map((d) => (
+                <button key={d.date} type="button" aria-pressed={mineDay === d.date} onClick={() => setMineDay(d.date)}>
+                  {fmtDay(d.date)}
+                </button>
+              ))}
+            </div>
+          )}
+          {mine && (
+            <a className="drift-mine-all" href={mineDay ? `/photos?day=${mineDay}` : "/photos"}>
+              整理與下載 ›
+            </a>
+          )}
+          {mine && myCats.length > 1 && (
+            <div className="my-chips" role="group" aria-label="選擇分類">
+              {myCats.map((c) => (
+                <button key={c} type="button" aria-pressed={mineCat === c} onClick={() => setMineCat(mineCat === c ? null : c)}>
+                  {c}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       {!loading && shots.length > 0 && (
         <span className="drift-count" role="img" aria-label={`共 ${shots.length} 張`}>
           <Icon name="image" size={14} /> {shots.length}
@@ -165,9 +214,9 @@ export function DriftGallery({ active }: { active: boolean }) {
           左右滑換照片・雙指縮放・點照片看是哪裡
         </p>
       )}
-      {shots.length === 0 ? (
+      {shots.length === 0 && !showMine ? (
         <p className="section muted">{loading ? "照片載入中…" : "還沒有照片。景點加上照片之後會出現在這裡。"}</p>
-      ) : !reduce && loading && shots.length < MAX_PLANES ? (
+      ) : !reduce && !showMine && loading && shots.length < MAX_PLANES ? (
         // The field's depth depends on how many planes it has: it starts once that number is settled.
         <div className="drift-wait">
           <LoadingTile />
@@ -184,7 +233,7 @@ export function DriftGallery({ active }: { active: boolean }) {
           ))}
         </ul>
       ) : (
-        <Field shots={shots} active={active} paused={!!picked} onPick={(shot, from) => setPicked({ shot, from })} />
+        <Field key={showMine ? `mine-${mineDay ?? "all"}-${mineCat ?? "all"}` : "places"} shots={shots} active={active} paused={!!picked} onPick={(shot, from) => setPicked({ shot, from })} />
       )}
       {picked && (
         <DetailSheet
@@ -198,6 +247,17 @@ export function DriftGallery({ active }: { active: boolean }) {
       )}
     </div>
   );
+}
+
+/** Kai's own photos as gallery shots: thumbnails drift, the detail sheet shows the larger copy. */
+function myPhotoShots(doc: { days: { date: string; items: { id: string; name: string }[] }[] }, photos: MyPhoto[], day: string | null, category: string | null = null): Shot[] {
+  return photos
+    .filter((p) => p.dayDate && (!day || p.dayDate === day) && (!category || p.category === category))
+    .map((p) => {
+      const dayIndex = doc.days.findIndex((d) => d.date === p.dayDate);
+      const name = doc.days[dayIndex]?.items.find((i) => i.id === p.itemId)?.name ?? fmtDay(p.dayDate!);
+      return { key: `my-${p.id}`, src: thumbUrl(p.id), full: fullUrl(p.id), name, date: p.dayDate!, dayIndex: dayIndex >= 0 ? dayIndex : undefined, credit: p.caption ?? "" };
+    });
 }
 
 /**
@@ -319,7 +379,7 @@ function DetailSheet({ shot, from, reduce, onClose, onGoto }: { shot: Shot; from
       <div ref={sheet} className="drift-sheet" role="dialog" aria-modal="true" aria-label={shot.name} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}>
         <div ref={bg} className="drift-sheet-bg" />
         {/* eslint-disable-next-line @next/next/no-img-element -- photos from several hosts */}
-        <img ref={photo} className="drift-info-img" src={shot.src} alt="" referrerPolicy="no-referrer" draggable={false} />
+        <img ref={photo} className="drift-info-img" src={shot.full ?? shot.src} alt="" referrerPolicy="no-referrer" draggable={false} />
         <div ref={body} className="drift-sheet-body">
           <strong>{shot.name}</strong>
           <span className="small muted">{shot.date ? fmtDay(shot.date) : "還沒排進行程"}</span>

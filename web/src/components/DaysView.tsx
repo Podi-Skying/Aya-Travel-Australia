@@ -15,6 +15,7 @@ import { RainPlan, WxLine, wxChips, wxFor } from "./Weather";
 import { isWet, weatherNote } from "@/domain/weather";
 import { CATEGORY_META, distanceLabel, nearbyPlaces, type NearbyPlace } from "./Places";
 import { PhotoViewer, mapsPhotoLink, type DayPhoto } from "./Photos";
+import { itemName, photosOfDay, thumbUrl, viewerPhotos } from "@/client/my-photos";
 import { DayMap } from "./MapViews";
 import { effectiveDay, isTentative } from "@/domain/effective-day";
 import { checks, feasibility, longestDrive, MAX_DRIVE_MIN } from "@/domain/rules";
@@ -938,6 +939,7 @@ export function DaysView({ active }: { active: boolean }) {
                 </button>
               </p>
             ))}
+          <MyDayPhotos date={d.date} />
           <SharedCosts />
         </article>
         {viewer !== null && dayPhotos[viewer] && (
@@ -1042,5 +1044,39 @@ function SharedCosts() {
       ))}
       <p className="muted small">規則：油資、停車、渡輪等車輛費用只由該段車程的參與者分攤。</p>
     </div>
+  );
+}
+
+/** 我的照片 for this day (docs/PHOTOS-PLAN.md): only Kai and the people he allows; nothing for guests. */
+function MyDayPhotos({ date }: { date: string }) {
+  const { doc, myPhotos } = useTrip();
+  const [open, setOpen] = useState<number | null>(null);
+  const list = myPhotos ? photosOfDay(myPhotos, date) : [];
+  if (!list.length) return null;
+  const shown = list.slice(0, 12);
+  return (
+    <section className="my-day-strip" aria-label="我的照片">
+      <h3>
+        我的照片 <span className="muted small">{list.length}</span>
+      </h3>
+      <ul>
+        {shown.map((p, k) => (
+          <li key={p.id}>
+            <button type="button" data-photo-id={`my-${p.id}`} onClick={() => setOpen(k)} aria-label={p.caption ?? "照片"}>
+              {/* eslint-disable-next-line @next/next/no-img-element -- private, auth-checked bytes */}
+              <img src={thumbUrl(p.id)} alt="" loading="lazy" decoding="async" onError={(e) => (e.currentTarget.style.visibility = "hidden")} />
+            </button>
+          </li>
+        ))}
+        {list.length > shown.length && (
+          <li>
+            <a className="my-more" href={`/photos?day=${date}`}>
+              全部
+            </a>
+          </li>
+        )}
+      </ul>
+      {open !== null && <PhotoViewer key={date} photos={viewerPhotos(list, (p) => itemName(doc, p))} start={open} onClose={() => setOpen(null)} />}
+    </section>
   );
 }

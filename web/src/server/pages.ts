@@ -26,3 +26,18 @@ export async function loadOwnerPage(): Promise<OwnerPage> {
   const trip = await getCurrentTrip(c.owner);
   return trip ? { kind: "ok", trip } : { kind: "none" };
 }
+
+/** "owner" / "viewer" when this visitor may see Kai's own photos (docs/PHOTOS-PLAN.md), else null. */
+export async function pagePhotoAccess(): Promise<"owner" | "viewer" | null> {
+  const { cookies } = await import("next/headers");
+  const { photoAccess, VIEWER_COOKIE } = await import("./photo-access");
+  // Outside a request (tests, prerender) there is no cookie to read.
+  let cookie: string | null = null;
+  try {
+    cookie = (await cookies()).get(VIEWER_COOKIE)?.value ?? null;
+  } catch {
+    /* no request scope */
+  }
+  const a = await photoAccess(null, cookie).catch(() => null);
+  return a?.kind ?? null;
+}

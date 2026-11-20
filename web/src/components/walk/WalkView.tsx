@@ -21,6 +21,7 @@ export function WalkView({
   syncedAt,
   base = "",
   account,
+  photos = false,
 }: {
   doc: TripDoc;
   dataUrl: string;
@@ -28,6 +29,8 @@ export function WalkView({
   /** "" for the site, "/s/{token}" for a share link. */
   base?: string;
   account: "signin" | "owner" | null;
+  /** Kai and the people he allows get a 照片 link (docs/PHOTOS-PLAN.md). */
+  photos?: boolean;
 }) {
   const planHref = `${base}/plan`;
   const root = useRef<HTMLDivElement>(null);
@@ -88,7 +91,7 @@ export function WalkView({
       )}
 
       <DomTranslator key={lang} content={content} />
-      <SiteHeader base={base} current="walk" account={account === "owner" ? "signout" : account} />
+      <SiteHeader base={base} current="walk" account={account === "owner" ? "signout" : account} photos={photos} />
 
       <main id="rw-days" />
 

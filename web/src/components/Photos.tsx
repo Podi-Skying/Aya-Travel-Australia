@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Pointer
 import { createPortal } from "react-dom";
 import { Icon } from "./Icon";
 import { useReducedMotion } from "./ui";
-import { project, rubber, spring } from "./motion";
+import { project, rubber, spring, swipeStep } from "./motion";
 import type { Photo } from "@/domain/schema";
 
 /*
@@ -191,8 +191,7 @@ export function PhotoViewer({ photos, start, onClose }: { photos: DayPhoto[]; st
       return;
     }
     const w = width();
-    const projected = st.current.x + project(vx);
-    const step = projected < -w / 2 ? 1 : projected > w / 2 ? -1 : 0;
+    const step = swipeStep(st.current.x, vx, w, idx.current, photos.length);
     if (step) go(idx.current + step, vx);
     else run("x", 0, vx, 0.3);
   }
