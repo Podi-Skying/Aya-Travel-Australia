@@ -1,16 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import type { MyPhoto } from "@/client/my-photos";
-import { contactSheets, download, exportCsv, exportName, exportZip } from "@/client/photo-export";
+import { useState } from "react";
+import { thumbUrl, type MyPhoto } from "@/client/my-photos";
+import { canSaveToFolder, contactSheets, download, exportCsv, exportName, exportToFolder, exportZip } from "@/client/photo-export";
 import { fmtDay } from "@/domain/format";
-import { CATEGORIES, classificationPrompt, parseClassification, sheetPages } from "@/domain/photo-sort";
+import { classificationPrompt, OTHER, parseClassification, sheetPages, type Category } from "@/domain/photo-sort";
 import type { TripDoc } from "@/domain/schema";
 
 /*
- * Owner tools under 我的照片 (docs/PHOTOS-PLAN.md): sorting photos into content categories through a Claude
- * chat Kai already uses (numbered contact sheets out, a JSON reply back in, no API key), and downloading
- * the photos as a ZIP with a folder per day plus a CSV list.
+ * Owner tools in the sorter's 設定 panel (docs/PHOTOS-PLAN.md): content categories through a Claude chat Kai
+ * already uses (numbered contact sheets out, the JSON reply back in, no API key), and downloads.
  */
 
 const SHEET_KEY = "aya-photo-sheet";
@@ -23,36 +22,35 @@ function loadOrder(): string[] {
     return [];
   }
 }
-function saveOrder(ids: string[]) {
+function saveOrder(keys: string[]) {
   try {
-    sessionStorage.setItem(SHEET_KEY, JSON.stringify(ids));
+    sessionStorage.setItem(SHEET_KEY, JSON.stringify(keys));
   } catch {}
 }
 
-export function ClassifyPanel({ photos, onSaved }: { photos: MyPhoto[]; onSaved: () => void }) {
-  const todo = photos.filter((p) => !p.category);
-  /* The numbers on the sheet must stay the ones Claude saw, also after a reload. */
-  const [order, setOrder] = useState<string[]>(() => loadOrder().filter((id) => photos.some((p) => p.id === id)));
+export type ClassifyItem = { key: string; src: string | null };
+
+/**
+ * The three numbered steps. `items` are the photos still without a category; the numbers on the sheet are
+ * kept (also across a reload) so a reply always maps back to the photos Claude saw.
+ */
+export function ClassifySteps({ items, onApply, onSkip, say }: { items: ClassifyItem[]; onApply: (got: Map<string, Category>) => Promise<number>; onSkip: () => Promise<void> | void; say: (t: string) => void }) {
+  const [order, setOrder] = useState<string[]>(() => loadOrder().filter((k) => items.some((i) => i.key === k)));
   const [busy, setBusy] = useState(false);
   const [reply, setReply] = useState("");
-  const [msg, setMsg] = useState<string | null>(null);
   const [copyText, setCopyText] = useState<string | null>(null);
   const ready = order.length > 0;
 
-  if (!todo.length && !ready) return null;
-
-  const makeSheets = async () => {
+  const sheets = async () => {
     setBusy(true);
-    setMsg(null);
     try {
-      const ids = todo.map((p) => p.id);
-      const pages = sheetPages(todo);
-      const { blob, name } = await contactSheets(pages);
+      const keys = items.map((i) => i.key);
+      const { blob, name } = await contactSheets(sheetPages(items).map((pg) => pg.map((i) => i.src)));
       download(blob, name);
-      saveOrder(ids);
-      setOrder(ids);
+      saveOrder(keys);
+      setOrder(keys);
     } catch {
-      setMsg("總表做不出來，請再試一次。");
+      say("總表做不出來，請再試一次。");
     } finally {
       setBusy(false);
     }
@@ -61,178 +59,131 @@ export function ClassifyPanel({ photos, onSaved }: { photos: MyPhoto[]; onSaved:
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(prompt());
-      setMsg("已複製，貼到 Claude 對話，再附上總表圖片。");
+      say("提示詞已複製");
     } catch {
       setCopyText(prompt());
     }
   };
   const apply = async () => {
     const got = parseClassification(reply, order.length);
-    if (!got.size) return setMsg("讀不到分類結果。請貼上 Claude 回覆的整段 JSON。");
-    const items = [...got].map(([n, category]) => ({ id: order[n - 1], category })).filter((x) => x.id);
+    if (!got.size) return say("讀不到分類結果，請貼上 Claude 回覆的整段文字。");
+    const map = new Map<string, Category>();
+    for (const [n, c] of got) if (order[n - 1]) map.set(order[n - 1], c);
     setBusy(true);
     try {
-      for (let i = 0; i < items.length; i += 500) {
-        const r = await fetch("/api/my-photos/categories", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ items: items.slice(i, i + 500) }) });
-        if (!r.ok) throw new Error(String(r.status));
-      }
-      const left = order.filter((id) => !items.some((x) => x.id === id) && photos.find((p) => p.id === id && !p.category)).length;
-      setMsg(`已套用 ${items.length} 張，還有 ${left} 張未分類。`);
+      const n = await onApply(map);
+      const left = items.filter((i) => !map.has(i.key)).length;
+      say(`已套用 ${n} 張，還有 ${left} 張未分類`);
       setReply("");
       if (!left) {
         saveOrder([]);
         setOrder([]);
       }
-      onSaved();
     } catch {
-      setMsg("存不進去，請再試一次。");
-    } finally {
-      setBusy(false);
-    }
-  };
-  const skip = async () => {
-    const items = todo.map((p) => ({ id: p.id, category: "其他" }));
-    setBusy(true);
-    try {
-      for (let i = 0; i < items.length; i += 500)
-        await fetch("/api/my-photos/categories", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ items: items.slice(i, i + 500) }) });
-      saveOrder([]);
-      setOrder([]);
-      onSaved();
+      say("存不進去，請再試一次。");
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <section className="my-classify">
-      <h2>用 Claude 分類</h2>
-      <p className="small muted">{todo.length} 張還沒有分類（{CATEGORIES.join("、")}）。</p>
-      <ol className="my-steps">
+    <>
+      <ol className="srt-steps">
         <li>
           <b>下載分類總表</b>
-          <button type="button" className="btn small" disabled={busy || !todo.length} onClick={() => void makeSheets()}>
-            下載
+          <p>把要分類的 {items.length} 張排成有編號的總表圖片</p>
+          <button type="button" className="srt-btn gold" disabled={busy || !items.length} onClick={() => void sheets()}>
+            下載分類總表
           </button>
         </li>
         <li>
-          <b>複製提示詞</b>，和總表圖片一起貼到 Claude 對話
-          <button type="button" className="btn small" disabled={!ready} onClick={() => void copy()}>
-            複製
+          <b>複製提示詞</b>
+          <p>開一個 Claude 對話，貼上提示詞，再附上總表圖片</p>
+          <button type="button" className="srt-btn" disabled={!ready} onClick={() => void copy()}>
+            複製提示詞
           </button>
           {copyText && <textarea readOnly value={copyText} rows={4} onFocus={(e) => e.target.select()} aria-label="提示詞" />}
         </li>
         <li>
           <b>貼回 Claude 的回覆</b>
-          <textarea value={reply} onChange={(e) => setReply(e.target.value)} rows={3} placeholder='{"1":"風景","2":"美食"}' aria-label="Claude 的回覆" disabled={!ready} />
-          <button type="button" className="btn small" disabled={!ready || busy || !reply.trim()} onClick={() => void apply()}>
+          <p>把回覆整段貼進來，按套用</p>
+          <textarea value={reply} onChange={(e) => setReply(e.target.value)} rows={4} placeholder='{"1":"風景","2":"美食"}' aria-label="Claude 的回覆" disabled={!ready} />
+          <button type="button" className="srt-btn gold" disabled={!ready || busy || !reply.trim()} onClick={() => void apply()}>
             套用分類結果
           </button>
         </li>
       </ol>
-      <button type="button" className="linkish small" disabled={busy || !todo.length} onClick={() => void skip()}>
-        略過，全部放「其他」
+      <button type="button" className="srt-link" disabled={busy} onClick={() => void onSkip()}>
+        略過分類，直接整理
       </button>
-      {msg && <p className="small" role="status">{msg}</p>}
-    </section>
+    </>
   );
 }
 
-export function ExportPanel({ doc, photos }: { doc: TripDoc; photos: MyPhoto[] }) {
+/** Classifying photos already uploaded: results go straight to the server. */
+export function LibraryClassify({ photos, onSaved, say }: { photos: MyPhoto[]; onSaved: () => void; say: (t: string) => void }) {
+  const todo = photos.filter((p) => !p.category);
+  const post = async (items: { id: string; category: string }[]) => {
+    for (let i = 0; i < items.length; i += 500) {
+      const r = await fetch("/api/my-photos/categories", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ items: items.slice(i, i + 500) }) });
+      if (!r.ok) throw new Error(String(r.status));
+    }
+    onSaved();
+  };
+  if (!todo.length) return <p className="srt-note">{photos.length ? "已上傳的照片都分類好了。" : "加入照片之後就能分類。"}</p>;
+  return (
+    <ClassifySteps
+      items={todo.map((p) => ({ key: p.id, src: thumbUrl(p.id) }))}
+      say={say}
+      onApply={async (map) => {
+        await post([...map].map(([id, category]) => ({ id, category })));
+        return map.size;
+      }}
+      onSkip={() => post(todo.map((p) => ({ id: p.id, category: OTHER })))}
+    />
+  );
+}
+
+export function ExportPanel({ doc, photos, say }: { doc: TripDoc; photos: MyPhoto[]; say: (t: string) => void }) {
   const [day, setDay] = useState("");
   const [progress, setProgress] = useState<number | null>(null);
-  const [err, setErr] = useState<string | null>(null);
   const days = doc.days.filter((d) => photos.some((p) => p.dayDate === d.date));
   const list = day ? photos.filter((p) => p.dayDate === day) : photos;
-  if (!photos.length) return null;
-  const zip = async () => {
-    setErr(null);
+  if (!photos.length) return <p className="srt-note">上傳照片之後就能下載。</p>;
+  const run = async (what: "zip" | "folder") => {
     setProgress(0);
     try {
-      const blob = await exportZip(doc, list, setProgress);
-      download(blob, `${exportName(day || "全部")}.zip`);
-    } catch {
-      setErr("下載中斷，請再試一次。");
+      if (what === "zip") download(await exportZip(doc, list, setProgress), `${exportName(day || "全部")}.zip`);
+      else say(`已存到「${await exportToFolder(doc, list, setProgress)}」`);
+    } catch (e) {
+      if ((e as Error).name !== "AbortError") say("下載中斷，請再試一次。");
     } finally {
       setProgress(null);
     }
   };
+  const busy = progress != null;
   return (
-    <section className="my-export">
-      <h2>下載</h2>
-      <div className="my-export-row">
-        <select value={day} onChange={(e) => setDay(e.target.value)} aria-label="哪一天">
-          <option value="">全部（{photos.length} 張）</option>
-          {days.map((d) => (
-            <option key={d.date} value={d.date}>
-              {fmtDay(d.date)}（{photos.filter((p) => p.dayDate === d.date).length} 張）
-            </option>
-          ))}
-        </select>
-        <button type="button" className="btn small" disabled={progress != null} onClick={() => void zip()}>
-          {progress != null ? `${Math.round(progress * 100)}%` : "ZIP"}
+    <div className="srt-export">
+      <select value={day} onChange={(e) => setDay(e.target.value)} aria-label="哪一天">
+        <option value="">全部（{photos.length} 張）</option>
+        {days.map((d) => (
+          <option key={d.date} value={d.date}>
+            {fmtDay(d.date)}（{photos.filter((p) => p.dayDate === d.date).length} 張）
+          </option>
+        ))}
+      </select>
+      <div className="srt-row">
+        <button type="button" className="srt-btn gold" disabled={busy || !canSaveToFolder()} onClick={() => void run("folder")}>
+          存到資料夾
         </button>
-        <button type="button" className="btn ghost small" onClick={() => download(exportCsv(doc, list), `${exportName(day || "全部")}.csv`)}>
+        <button type="button" className="srt-btn" disabled={busy} onClick={() => void run("zip")}>
+          {busy ? `${Math.round(progress! * 100)}%` : "下載 ZIP"}
+        </button>
+        <button type="button" className="srt-btn" onClick={() => download(exportCsv(doc, list), `${exportName(day || "全部")}.csv`)}>
           清單 CSV
         </button>
       </div>
-      {err && <p className="small error">{err}</p>}
-    </section>
-  );
-}
-
-/**
- * A bottom sheet on a translucent material. It rises from the bottom edge and leaves the same way. `modal`
- * dims the page behind it (the classify steps are a task of their own); otherwise the page stays visible.
- */
-function Sheet({ label, modal, onClose, children }: { label: string; modal?: boolean; onClose: () => void; children: ReactNode }) {
-  const [leaving, setLeaving] = useState(false);
-  const box = useRef<HTMLDivElement>(null);
-  const close = () => setLeaving(true);
-  useEffect(() => {
-    const key = (e: KeyboardEvent) => e.key === "Escape" && setLeaving(true);
-    window.addEventListener("keydown", key);
-    box.current?.focus();
-    return () => window.removeEventListener("keydown", key);
-  }, []);
-  return (
-    <div className={`tool-sheet-backdrop${modal ? " modal" : ""}${leaving ? " leaving" : ""}`} onClick={close} onAnimationEnd={(e) => leaving && e.target === e.currentTarget && onClose()}>
-      <div ref={box} tabIndex={-1} className="tool-sheet" role="dialog" aria-modal={modal ? "true" : undefined} aria-label={label} onClick={(e) => e.stopPropagation()}>
-        <span className="tool-sheet-grip" aria-hidden />
-        {children}
-        <button type="button" className="btn ghost small tool-sheet-close" onClick={close}>
-          完成
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/** 分類 and 下載 as two buttons; each opens its sheet. */
-export function PhotoToolbar({ doc, photos, configured, onSaved }: { doc: TripDoc; photos: MyPhoto[]; configured: boolean; onSaved: () => void }) {
-  const [open, setOpen] = useState<"classify" | "export" | null>(null);
-  const todo = photos.filter((p) => !p.category).length;
-  if (!photos.length) return null;
-  return (
-    <div className="my-toolbar">
-      {configured && (
-        <button type="button" className="btn small" onClick={() => setOpen("classify")}>
-          分類{todo ? <span className="n">{todo}</span> : null}
-        </button>
-      )}
-      <button type="button" className="btn ghost small" onClick={() => setOpen("export")}>
-        下載
-      </button>
-      {open === "classify" && (
-        <Sheet label="用 Claude 分類" modal onClose={() => setOpen(null)}>
-          {todo ? <ClassifyPanel photos={photos} onSaved={onSaved} /> : <p className="muted">全部都分類好了。</p>}
-        </Sheet>
-      )}
-      {open === "export" && (
-        <Sheet label="下載照片" onClose={() => setOpen(null)}>
-          <ExportPanel doc={doc} photos={photos} />
-        </Sheet>
-      )}
+      {!canSaveToFolder() && <p className="srt-note">「存到資料夾」要用 Chrome 或 Edge。</p>}
     </div>
   );
 }

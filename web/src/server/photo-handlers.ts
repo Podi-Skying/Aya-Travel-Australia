@@ -8,6 +8,7 @@ import {
   checkBody,
   deletePhoto,
   knownFingerprints,
+  labelsFor,
   listPhotos,
   MAX_DISPLAY,
   MAX_THUMB,
@@ -113,7 +114,7 @@ export async function postCheck(req: Request) {
     if (a.kind !== "owner") return denied();
     const b = checkBody.safeParse(await readJson(req, 200_000));
     if (!b.success) throw new HttpError(400, "格式錯誤");
-    return json({ known: await knownFingerprints(a.tripId, b.data.fingerprints) });
+    return json({ known: await knownFingerprints(a.tripId, b.data.fingerprints), labels: await labelsFor(a.tripId, b.data.fingerprints) });
   });
 }
 

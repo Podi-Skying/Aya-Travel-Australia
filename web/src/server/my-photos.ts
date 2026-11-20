@@ -8,13 +8,13 @@ import type { PhotoAccess } from "./photo-access";
 import { getCurrentTrip } from "./trips";
 import { blobConfigured, deleteBlobs, putJpeg, readJpeg } from "./photo-blob";
 import { dayFor, exifLocal, fileNameLocal, itemFor, type TimeSource } from "@/domain/photo-day";
-import { CATEGORIES, FINGERPRINT, isScreenshotName, SCREENSHOT } from "@/domain/photo-sort";
+import { CATEGORIES, FINGERPRINT, isCategory, isScreenshotName, SCREENSHOT } from "@/domain/photo-sort";
 import type { TripDoc } from "@/domain/schema";
 import { toPublicDoc } from "@/domain/privacy";
 
 /* Kai's own photos (docs/PHOTOS-PLAN.md): rows in Neon, bytes in the private Blob store. */
 
-const { tripPhotos } = schema;
+const { tripPhotos, photoLabels } = schema;
 
 export const MAX_DISPLAY = 3_000_000;
 export const MAX_THUMB = 300_000;
@@ -26,6 +26,7 @@ export type MyPhoto = { id: string; w: number; h: number; dayDate: string | null
 export const uploadMeta = z.object({
   sha256: z.string().regex(/^[0-9a-f]{64}$/),
   fingerprint: z.string().regex(FINGERPRINT).nullish(),
+  category: z.enum(CATEGORIES).nullish(),
   fileName: z.string().min(1).max(200),
   exifTime: z.string().max(40).nullish(),
   exifOffset: z.string().max(10).nullish(),
@@ -54,7 +55,7 @@ const isJpeg = (b: Uint8Array) => b.length > 3 && b[0] === 0xff && b[1] === 0xd8
  * Where a photo goes, decided on the server from its time and the current trip. Screenshots keep their
  * time but wait in 未分類 (a screenshot of a booking is rarely a photo of that day).
  */
-export function placePhoto(meta: Pick<UploadMeta, "exifTime" | "exifOffset" | "fileName" | "lat" | "lng">, doc: Pick<TripDoc, "days">) {
+export function placePhoto(meta: Pick<UploadMeta, "exifTime" | "exifOffset" | "fileName" | "lat" | "lng"> & { category?: UploadMeta["category"] }, doc: Pick<TripDoc, "days">) {
   const ex = exifLocal(meta.exifTime, meta.exifOffset);
   const fn = ex ? null : fileNameLocal(meta.fileName);
   const local = ex?.local ?? fn?.local ?? null;
@@ -64,7 +65,7 @@ export function placePhoto(meta: Pick<UploadMeta, "exifTime" | "exifOffset" | "f
   const day = dayDate ? doc.days.find((d) => d.date === dayDate) : undefined;
   const pos = meta.lat != null && meta.lng != null ? { lat: meta.lat, lng: meta.lng } : null;
   const itemId = day ? itemFor(local, day.items, pos) : null;
-  return { takenLocal: local, takenAt: ex?.at ? new Date(ex.at) : null, timeSource, dayDate, itemId, category: screenshot ? SCREENSHOT : null };
+  return { takenLocal: local, takenAt: ex?.at ? new Date(ex.at) : null, timeSource, dayDate, itemId, category: screenshot ? SCREENSHOT : (meta.category ?? null) };
 }
 
 function view(r: typeof tripPhotos.$inferSelect, owner: boolean): MyPhoto {
@@ -96,7 +97,18 @@ export async function uploadPhoto(owner: Owner, tripId: string, display: Uint8Ar
   if (dup) return { photo: view(dup, true), duplicate: true };
   if ((await usedBytes(tripId)) + display.length + thumb.length > QUOTA_BYTES) throw new HttpError(507, "照片空間快滿了（1 GB 上限）");
   const trip = await getCurrentTrip(owner);
-  const place = placePhoto(meta, trip?.doc ?? { days: [] });
+  const doc = trip?.doc ?? { days: [] };
+  const place = placePhoto(meta, doc);
+  /* a label from Claude on Kai's Mac fills in what the upload did not say */
+  const label = meta.fingerprint ? (await db.select().from(photoLabels).where(and(eq(photoLabels.tripId, tripId), eq(photoLabels.fingerprint, meta.fingerprint))).limit(1))[0] : undefined;
+  if (label) {
+    if (!place.category && isCategory(label.category)) place.category = label.category;
+    const day = label.dayDate ? doc.days.find((d) => d.date === label.dayDate) : undefined;
+    if (day && place.category !== SCREENSHOT) {
+      place.dayDate = day.date;
+      place.itemId = itemFor(place.takenLocal, day.items, meta.lat != null && meta.lng != null ? { lat: meta.lat, lng: meta.lng } : null);
+    }
+  }
   const id = randomUUID();
   const paths: string[] = [];
   try {
@@ -152,6 +164,45 @@ export async function knownFingerprints(tripId: string, prints: string[]): Promi
     .from(tripPhotos)
     .where(and(eq(tripPhotos.tripId, tripId), inArray(tripPhotos.fingerprint, [...new Set(prints)])));
   return r.map((x) => x.f!).filter(Boolean);
+}
+
+/** Labels Claude made on Kai's Mac, by fingerprint, for the sorting stage to show before upload. */
+export async function labelsFor(tripId: string, prints: string[]): Promise<Record<string, string>> {
+  if (!prints.length) return {};
+  const db = await getDb();
+  const r = await db
+    .select({ f: photoLabels.fingerprint, c: photoLabels.category })
+    .from(photoLabels)
+    .where(and(eq(photoLabels.tripId, tripId), inArray(photoLabels.fingerprint, [...new Set(prints)])));
+  return Object.fromEntries(r.map((x) => [x.f, x.c]));
+}
+
+export const labelInput = z.array(z.object({ fingerprint: z.string().regex(FINGERPRINT), category: z.enum(CATEGORIES), dayDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish() }).strict()).max(5000);
+
+/**
+ * Stores labels from the local classify script and back-fills photos already uploaded with the same
+ * fingerprint (category always when empty; the day only for photos never moved by hand).
+ */
+export async function saveLabels(tripId: string, days: { date: string }[], labels: z.infer<typeof labelInput>): Promise<{ saved: number; backfilled: number }> {
+  const db = await getDb();
+  let backfilled = 0;
+  for (const l of labels) {
+    const dayDate = l.dayDate && days.some((d) => d.date === l.dayDate) ? l.dayDate : null;
+    await db
+      .insert(photoLabels)
+      .values({ tripId, fingerprint: l.fingerprint, category: l.category, dayDate })
+      .onConflictDoUpdate({ target: [photoLabels.tripId, photoLabels.fingerprint], set: { category: l.category, dayDate, createdAt: new Date() } });
+    const rows = await db.select().from(tripPhotos).where(and(eq(tripPhotos.tripId, tripId), eq(tripPhotos.fingerprint, l.fingerprint)));
+    for (const r of rows) {
+      const set: Partial<typeof tripPhotos.$inferInsert> = {};
+      if (!r.category) set.category = l.category;
+      if (dayDate && !r.manual && r.dayDate !== dayDate && !isScreenshotName(r.fileName)) Object.assign(set, { dayDate, itemId: null });
+      if (!Object.keys(set).length) continue;
+      await db.update(tripPhotos).set(set).where(eq(tripPhotos.id, r.id));
+      backfilled++;
+    }
+  }
+  return { saved: labels.length, backfilled };
 }
 
 /** Categories from a classified contact sheet, many photos at once. Unknown ids are skipped. */

@@ -155,6 +155,23 @@ export const tripPhotos = pgTable(
   (t) => [unique("trip_photos_sha").on(t.tripId, t.sha256), unique("trip_photos_print").on(t.tripId, t.fingerprint), index("trip_photos_day").on(t.tripId, t.dayDate, t.takenLocal)],
 );
 
+/* Categories (and an optional day) that Claude on Kai's Mac gave a photo, keyed by its fingerprint; applied on upload. */
+export const photoLabels = pgTable(
+  "photo_labels",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tripId: uuid("trip_id")
+      .notNull()
+      .references(() => trips.id, { onDelete: "cascade" }),
+    fingerprint: text("fingerprint").notNull(),
+    category: text("category").notNull(),
+    dayDate: text("day_date"),
+    source: text("source").notNull().default("local-claude"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [unique("photo_labels_print").on(t.tripId, t.fingerprint)],
+);
+
 /* Accounts allowed to see the photos: a GitHub numeric id or a lower-cased email. */
 export const photoViewers = pgTable(
   "photo_viewers",

@@ -5,8 +5,7 @@ import { SiteHeader } from "./SiteHeader";
 import { PhotoViewer } from "./Photos";
 import { itemName, photosOfDay, thumbUrl, useMyPhotos, viewerPhotos, type MyPhoto, type MyPhotosData, type PhotoAccessKind } from "@/client/my-photos";
 import { CATEGORIES, isCategory } from "@/domain/photo-sort";
-import { PhotoToolbar } from "./PhotoTools";
-import { SortStage } from "./SortStage";
+import { Sorter, UNSORTED } from "./Sorter";
 import { fmtDay } from "@/domain/format";
 import type { Item, TripDoc } from "@/domain/schema";
 
@@ -15,7 +14,6 @@ import type { Item, TripDoc } from "@/domain/schema";
  * allows. Photo-first (Aya prefers pictures to text). The owner uploads, moves, captions and deletes here.
  */
 
-const UNSORTED = "unsorted";
 
 /** Thumbnails in a grid; `data-photo-id` lets the viewer open from and return to the tapped one. */
 export function PhotoGrid({ photos, onOpen, onEdit }: { photos: MyPhoto[]; onOpen: (p: MyPhoto) => void; onEdit?: (p: MyPhoto) => void }) {
@@ -223,7 +221,47 @@ function NotConfigured() {
   );
 }
 
-const mb = (n: number) => `${(n / 1_000_000).toFixed(0)} MB`;
+
+/** One folder's photos (a day, or 未分類) over the sorter, with the viewer and the edit sheet. */
+function DaySheet({ target, doc, photos, onClose, onOpen, onEdit }: { target: string; doc: TripDoc; photos: MyPhoto[]; onClose: () => void; onOpen: (list: MyPhoto[], p: MyPhoto) => void; onEdit: (p: MyPhoto) => void }) {
+  const day = doc.days.find((d) => d.date === target);
+  const list = target === UNSORTED ? photos.filter((p) => !p.dayDate) : photosOfDay(photos, target);
+  const [cat, setCat] = useState<string | null>(null);
+  const cats = CATEGORIES.filter((c) => list.some((p) => p.category === c));
+  const shown = cat ? list.filter((p) => p.category === cat) : list;
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", k);
+    return () => window.removeEventListener("keydown", k);
+  }, [onClose]);
+  return (
+    <div className="srt-sheet-backdrop" onClick={onClose}>
+      <section className="srt-sheet" role="dialog" aria-modal="true" aria-label={day ? fmtDay(day.date) : "未分類"} onClick={(e) => e.stopPropagation()}>
+        <header>
+          <h2>
+            {day ? fmtDay(day.date) : "未分類"} <small>{day?.title ?? "找不到拍攝日期，或是截圖"}</small>
+          </h2>
+          <button type="button" className="srt-close" onClick={onClose} aria-label="關閉">
+            ×
+          </button>
+        </header>
+        {cats.length > 1 && (
+          <nav className="my-chips" aria-label="選擇分類">
+            <button type="button" aria-pressed={!cat} onClick={() => setCat(null)}>
+              全部
+            </button>
+            {cats.map((c) => (
+              <button key={c} type="button" aria-pressed={cat === c} onClick={() => setCat(cat === c ? null : c)}>
+                {c}
+              </button>
+            ))}
+          </nav>
+        )}
+        <PhotoGrid photos={shown} onOpen={(p) => onOpen(shown, p)} onEdit={onEdit} />
+      </section>
+    </div>
+  );
+}
 
 export function MyPhotosPage({ access, doc, initialDay }: { access: PhotoAccessKind; doc: TripDoc; initialDay?: string | null }) {
   const owner = access === "owner";
@@ -235,27 +273,48 @@ export function MyPhotosPage({ access, doc, initialDay }: { access: PhotoAccessK
   const all = useMemo(() => data?.photos ?? [], [data]);
   const cats = CATEGORIES.filter((c) => all.some((p) => p.category === c));
   const photos = useMemo(() => (cat ? all.filter((p) => p.category === cat) : all), [all, cat]);
-  const unsorted = photos.filter((p) => !p.dayDate);
   const days = doc.days.filter((d) => photos.some((p) => p.dayDate === d.date));
-  const shown = pick === UNSORTED ? [] : pick ? days.filter((d) => d.date === pick) : days;
+  const shown = pick ? days.filter((d) => d.date === pick) : days;
 
   const openAt = (list: MyPhoto[], p: MyPhoto) => setOpen({ list, start: Math.max(0, list.findIndex((x) => x.id === p.id)) });
+  const overlays = (
+    <>
+      {open && <PhotoViewer photos={viewerPhotos(open.list, (p) => itemName(doc, p))} start={open.start} onClose={() => setOpen(null)} />}
+      {edit && <EditSheet p={edit} doc={doc} onClose={() => setEdit(null)} onSaved={() => void reload()} />}
+    </>
+  );
+
+  if (owner)
+    return (
+      <>
+        <SiteHeader account="signout" current="photos" photos />
+        <main id="main" className="my-photos srt-page">
+          {error && <p className="srt-error">讀取失敗，請重新整理。</p>}
+          <Sorter
+            doc={doc}
+            photos={all}
+            configured={data?.configured ?? true}
+            usedBytes={data?.usedBytes}
+            onUploaded={() => void reload()}
+            onOpenDay={setPick}
+            who={<WhoCanSee />}
+            setup={<NotConfigured />}
+          />
+          {pick && <DaySheet target={pick} doc={doc} photos={all} onClose={() => setPick(null)} onOpen={openAt} onEdit={setEdit} />}
+        </main>
+        {overlays}
+      </>
+    );
 
   return (
     <>
-      <SiteHeader account={owner ? "signout" : null} current="photos" photos />
+      <SiteHeader account={null} current="photos" photos />
       <main id="main" className="my-photos">
         <header className="my-head">
           <h1>我的照片</h1>
-          {owner && data && data.usedBytes != null && data.quotaBytes != null && (
-            <p className="small muted my-meter">
-              <meter min={0} max={data.quotaBytes} value={data.usedBytes} /> {mb(data.usedBytes)} / 1 GB
-            </p>
-          )}
         </header>
         {error && <p className="small error">讀取失敗，請重新整理。</p>}
         {!data && !error && <p className="muted my-empty">照片載入中…</p>}
-        {data && !data.configured && owner && <NotConfigured />}
         {data && (
           <nav className="my-chips" aria-label="選擇日子">
             <button type="button" aria-pressed={!pick} onClick={() => setPick(null)}>
@@ -266,14 +325,8 @@ export function MyPhotosPage({ access, doc, initialDay }: { access: PhotoAccessK
                 {fmtDay(d.date)} <span className="n">{photos.filter((p) => p.dayDate === d.date).length}</span>
               </button>
             ))}
-            {owner && unsorted.length > 0 && (
-              <button type="button" aria-pressed={pick === UNSORTED} onClick={() => setPick(UNSORTED)}>
-                未分類 <span className="n">{unsorted.length}</span>
-              </button>
-            )}
           </nav>
         )}
-        {owner && data && <PhotoToolbar doc={doc} photos={all} configured={data.configured} onSaved={() => void reload()} />}
         {data && cats.length > 1 && (
           <nav className="my-chips my-cats" aria-label="選擇分類">
             <button type="button" aria-pressed={!cat} onClick={() => setCat(null)}>
@@ -285,14 +338,6 @@ export function MyPhotosPage({ access, doc, initialDay }: { access: PhotoAccessK
               </button>
             ))}
           </nav>
-        )}
-        {owner && data?.configured && <SortStage doc={doc} onUploaded={() => void reload()} />}
-        {owner && (pick === UNSORTED || (!pick && unsorted.length > 0)) && (
-          <section className="my-day">
-            <h2>未分類</h2>
-            <p className="small muted">找不到拍攝日期，或不在旅程日子裡。點 ⋯ 選哪一天。</p>
-            <PhotoGrid photos={unsorted} onOpen={(p) => openAt(unsorted, p)} onEdit={setEdit} />
-          </section>
         )}
         {shown.map((d) => {
           const list = photosOfDay(photos, d.date);
@@ -306,32 +351,15 @@ export function MyPhotosPage({ access, doc, initialDay }: { access: PhotoAccessK
               {[...groups].map(([itemId, ps]) => (
                 <div key={itemId || "day"} className="my-group">
                   {itemId && <h3>{d.items.find((i) => i.id === itemId)?.name ?? ""}</h3>}
-                  <PhotoGrid photos={ps} onOpen={(p) => openAt(list, p)} onEdit={owner ? setEdit : undefined} />
+                  <PhotoGrid photos={ps} onOpen={(p) => openAt(list, p)} />
                 </div>
               ))}
             </section>
           );
         })}
         {data && !photos.length && <p className="muted my-empty">還沒有照片。</p>}
-
-        {owner && (
-          <div className="my-tools">
-            <button
-              type="button"
-              className="btn ghost small"
-              onClick={async () => {
-                const r = await fetch("/api/my-photos/resort", { method: "POST" });
-                if (r.ok) void reload();
-              }}
-            >
-              重新依時間分類
-            </button>
-          </div>
-        )}
-        {owner && <WhoCanSee />}
       </main>
-      {open && <PhotoViewer photos={viewerPhotos(open.list, (p) => itemName(doc, p))} start={open.start} onClose={() => setOpen(null)} />}
-      {edit && <EditSheet p={edit} doc={doc} onClose={() => setEdit(null)} onSaved={() => void reload()} />}
+      {overlays}
     </>
   );
 }

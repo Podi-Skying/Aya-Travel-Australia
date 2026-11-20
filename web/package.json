@@ -11,7 +11,9 @@
     "test": "vitest run",
     "db:migrate": "tsx --env-file-if-exists=.env.local scripts/migrate.ts",
     "db:seed": "tsx --env-file-if-exists=.env.local scripts/seed.ts",
-    "cache": "tsx --env-file-if-exists=.env.local scripts/cache.ts"
+    "cache": "tsx --env-file-if-exists=.env.local scripts/cache.ts",
+    "photos:scan": "tsx --env-file-if-exists=.env.local scripts/classify-local.ts scan",
+    "photos:apply": "tsx --env-file-if-exists=.env.local scripts/classify-local.ts apply"
   },
   "dependencies": {
     "@neon/config": "^1.9.3",

@@ -1,6 +1,6 @@
 "use client";
 
-import { fullUrl, itemName, thumbUrl, type MyPhoto } from "./my-photos";
+import { fullUrl, itemName, type MyPhoto } from "./my-photos";
 import { fmtDay } from "@/domain/format";
 import { safeName, SHEET_CELL, SHEET_COLS, toCsv, uniqueName } from "@/domain/photo-sort";
 import type { TripDoc } from "@/domain/schema";
@@ -73,10 +73,10 @@ export const dayLabel = (date: string) => fmtDay(date);
 
 /**
  * One numbered contact sheet: 7 columns of 224 px, each photo centre-cropped with a 6 px margin, '#n' in
- * the top-left corner. `first` is the number of the first photo on this sheet.
+ * the top-left corner. `first` is the number of the first photo on this sheet. `srcs` are image URLs.
  */
-export async function contactSheet(photos: MyPhoto[], first: number): Promise<Blob> {
-  const rows = Math.ceil(photos.length / SHEET_COLS);
+export async function contactSheet(srcs: (string | null)[], first: number): Promise<Blob> {
+  const rows = Math.ceil(srcs.length / SHEET_COLS);
   const c = document.createElement("canvas");
   c.width = SHEET_COLS * SHEET_CELL;
   c.height = rows * SHEET_CELL;
@@ -85,11 +85,12 @@ export async function contactSheet(photos: MyPhoto[], first: number): Promise<Bl
   g.fillRect(0, 0, c.width, c.height);
   const inner = SHEET_CELL - 12;
   await Promise.all(
-    photos.map(async (p, i) => {
+    srcs.map(async (src, i) => {
       const x = (i % SHEET_COLS) * SHEET_CELL + 6;
       const y = Math.floor(i / SHEET_COLS) * SHEET_CELL + 6;
       try {
-        const r = await fetch(thumbUrl(p.id));
+        if (!src) throw new Error("none");
+        const r = await fetch(src);
         const img = await createImageBitmap(await r.blob());
         const s = inner / Math.min(img.width, img.height);
         g.save();
@@ -116,7 +117,7 @@ export async function contactSheet(photos: MyPhoto[], first: number): Promise<Bl
 }
 
 /** All sheets: one JPEG, or a ZIP of them when there is more than one. */
-export async function contactSheets(pages: MyPhoto[][]): Promise<{ blob: Blob; name: string }> {
+export async function contactSheets(pages: (string | null)[][]): Promise<{ blob: Blob; name: string }> {
   const sheets: Blob[] = [];
   let n = 1;
   for (const page of pages) {
@@ -128,3 +129,28 @@ export async function contactSheets(pages: MyPhoto[][]): Promise<{ blob: Blob; n
   for (const [i, s] of sheets.entries()) zip.add(`分類總表-${i + 1}.jpg`, s, crc32(new Uint8Array(await s.arrayBuffer())), s.size);
   return { blob: new Blob(zip.finish(), { type: "application/zip" }), name: "分類總表.zip" };
 }
+
+/** Copies the photos into a folder Kai picks (Chrome and Edge), one sub-folder per day. Returns the folder name. */
+export async function exportToFolder(doc: Pick<TripDoc, "days">, photos: MyPhoto[], onProgress: (f: number) => void): Promise<string> {
+  const pick = (window as unknown as { showDirectoryPicker?: (o: { mode: string }) => Promise<FileSystemDirectoryHandle> }).showDirectoryPicker;
+  if (!pick) throw new Error("unsupported");
+  const root = await pick({ mode: "readwrite" });
+  const name = exportName("整理好的照片");
+  const top = await root.getDirectoryHandle(name, { create: true });
+  const taken = new Map<string, Set<string>>();
+  let i = 0;
+  for (const p of photos) {
+    const folder = folderOf(doc, p);
+    const dir = await top.getDirectoryHandle(folder, { create: true });
+    const names = taken.get(folder) ?? new Set<string>();
+    taken.set(folder, names);
+    const r = await fetch(fullUrl(p.id));
+    if (!r.ok || !r.body) throw new Error(`photo ${r.status}`);
+    const fh = await dir.getFileHandle(uniqueName(fileOf(p), names), { create: true });
+    await r.body.pipeTo(await fh.createWritable());
+    onProgress(++i / photos.length);
+  }
+  return name;
+}
+
+export const canSaveToFolder = () => typeof window !== "undefined" && "showDirectoryPicker" in window;

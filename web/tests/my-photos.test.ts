@@ -419,3 +419,55 @@ describe("viewer swipe physics", () => {
     expect(rubber(400, 375) - rubber(300, 375)).toBeLessThan(rubber(100, 375));
   });
 });
+
+describe("labels from Claude on Kai's Mac", () => {
+  it("the local script and the browser give the same fingerprint for the same file", async () => {
+    const { mkdtempSync, writeFileSync } = await import("node:fs");
+    const os = await import("node:os");
+    const path = await import("node:path");
+    const { fileFingerprint } = await import("../scripts/classify-local");
+    const { fingerprint } = await import("@/client/photo-upload");
+    const dir = mkdtempSync(path.join(os.tmpdir(), "aya-print-"));
+    for (const size of [1000, 300_000]) {
+      const bytes = new Uint8Array(size).map((_, i) => (i * 31 + size) % 251);
+      const f = path.join(dir, `p${size}.jpg`);
+      writeFileSync(f, bytes);
+      const node = await fileFingerprint(f);
+      expect(node).toMatch(/^\d+:[0-9a-f]{64}$/);
+      expect(await fingerprint(new Blob([bytes]))).toBe(node);
+    }
+  });
+
+  it("applies a label on upload, back-fills stored photos, and tells the sorting stage", async () => {
+    const { saveLabels } = await import("@/server/my-photos");
+    const { getCurrentTrip } = await import("@/server/trips");
+    const trip = (await getCurrentTrip({ githubId: "32431832" } as never))!;
+    const other = trip.doc.days[3].date;
+    // Already uploaded, no category yet.
+    const before = (await json(await P.postMyPhoto(upload({ sha256: sha("L1"), fingerprint: print("L1"), fileName: "IMG_3500.jpg" })))).photo as { id: string };
+    const res = await saveLabels(trip.tripId, trip.doc.days, [
+      { fingerprint: print("L1"), category: "美食", dayDate: other },
+      { fingerprint: print("L2"), category: "動物", dayDate: null },
+    ]);
+    expect(res).toEqual({ saved: 2, backfilled: 1 });
+    let list = (await json(await P.getMyPhotos(req("GET", "/api/my-photos")))).photos as { id: string; category: string | null; dayDate: string | null }[];
+    expect(list.find((p) => p.id === before.id)).toMatchObject({ category: "美食", dayDate: other });
+    // Uploaded after labelling: the label fills the category.
+    const after = (await json(await P.postMyPhoto(upload({ sha256: sha("L2"), fingerprint: print("L2"), fileName: "IMG_3501.jpg" })))).photo as { id: string; category: string };
+    expect(after.category).toBe("動物");
+    // The upload's own category wins over a label.
+    await saveLabels(trip.tripId, trip.doc.days, [{ fingerprint: print("L3"), category: "交通", dayDate: null }]);
+    const own = (await json(await P.postMyPhoto(upload({ sha256: sha("L3"), fingerprint: print("L3"), category: "風景", fileName: "IMG_3502.jpg" })))).photo as { category: string };
+    expect(own.category).toBe("風景");
+    const check = await json(await P.postCheck(req("POST", "/api/my-photos/check", { fingerprints: [print("L2"), print("L9")] })));
+    expect(check.labels).toEqual({ [print("L2")]: "動物" });
+    // A day moved by hand is not overwritten.
+    await P.patchMyPhoto(req("PATCH", `/api/my-photos/${before.id}`, { dayDate: trip.doc.days[5].date }), idCtx(before.id));
+    await saveLabels(trip.tripId, trip.doc.days, [{ fingerprint: print("L1"), category: "美食", dayDate: other }]);
+    list = (await json(await P.getMyPhotos(req("GET", "/api/my-photos")))).photos as typeof list;
+    expect(list.find((p) => p.id === before.id)?.dayDate).toBe(trip.doc.days[5].date);
+    // Guests learn nothing about labels.
+    signedOut();
+    expect((await P.postCheck(req("POST", "/api/my-photos/check", { fingerprints: [print("L2")] }))).status).toBe(401);
+  });
+});
