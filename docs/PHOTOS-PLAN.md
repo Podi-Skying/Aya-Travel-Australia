@@ -184,6 +184,44 @@ Kai asked to apply a third-party guide for a local photo sorter (an HTML page th
 - **How labels are used:** `POST /api/my-photos/check` returns the labels for the fingerprints it is asked about, so the sorter shows the category before upload. On upload the server applies the label's category, and the label's day when the photo is not a screenshot. `saveLabels` also back-fills photos already uploaded: the category only where it is empty, the day only when it was not set by hand.
 - **Checks:** `tsc` clean; `vitest` 263/263, including fingerprint parity between the script and the browser; `next build` passes. Codex review still unavailable until 2026-11-25.
 
+## Videos (2026-11-21, fourth pass)
+
+Kai asked for videos as well as photos (「影片也要，不能只有照片」).
+
+- **Storage limit:** Vercel Blob Hobby includes 1 GB of storage and 10 GB of transfer a month. Going over is not billed, but it blocks the store for 30 days. One setting, `STORAGE_LIMIT_BYTES` in `src/domain/video.ts`, holds the limit. Uploads stop at 90 % (900 MB) and a warning shows from 75 % (750 MB). The server checks the limit before it issues a video token, and again when it finishes a video. The 設定 panel shows a meter: 已用 x MB / 1 GB, with the stop line marked. Raise the setting after moving to Pro.
+- **Which files:** mp4, mov, m4v and webm (including DJI files) are accepted from pick, folder or drag. Other video formats are counted and skipped. Videos fly into the day cards like photos, with ▶ on the tile. The stat bar reads 總檔案 / 影片 / 照片 / 天數 / 重複.
+- **Day:**
+  - First choice is the time in the file header: `com.apple.quicktime.creationdate` with its zone, or the UTC creation time (read as +00:00).
+  - Second choice is a date in the file name. `DJI_YYYYMMDDHHMMSS` is now read as well.
+  - Otherwise the video goes to 未分類.
+  - Duplicates are caught with the same fingerprint as photos.
+- **Poster frame:** taken at min(1 s, 15 %). It becomes the display JPEG and thumbnail, and it stands for the video on the contact sheets (marked ▶) and for the Mac classifier.
+- **Compression in the browser (`src/client/video-upload.ts`):**
+  - Videos are converted with Mediabunny (WebCodecs; it loads only when a video is picked) to MP4 H.264, long edge 1280, about 1.8 Mbps, with AAC 128 kbps. That is about 15 MB a minute.
+  - A small MP4 with H.264 (1280 or less, 2.5 Mbps or less) is only re-packed, not re-encoded.
+  - If the browser cannot encode, a video of 50 MB or less is re-packed. Anything bigger shows 「請放進 Mac 的照片待分類，我幫你壓縮」.
+  - Only the creation time is kept from the original's tags, so stored videos carry no GPS, like the photos.
+- **Upload:**
+  - The video goes straight from the browser into the private store with a one-video token from `POST /api/my-photos/video/token`.
+  - That route is owner only. It checks the path pattern, the declared size (500 MB at most) and the room left, and caps the token at the room left. It handles only token requests; there is no completion callback.
+  - Files over 100 MB go up in parts.
+  - `POST /api/my-photos/video` then sends the poster, the thumbnail and the details. The server confirms the file is in the store and is a video, checks duplicates and the limit, and deletes the stored file on any refusal.
+  - Photos upload three at a time first, then videos one at a time.
+- **Playback:** `/api/my-photos/<id>/video` checks access exactly like a photo, then redirects to a signed link that is valid for 30 minutes. The store serves byte ranges, so seeking works. The viewer plays the video with controls, `playsInline` and no autoplay, and pauses it when you swipe away. Downloads (ZIP or 存到資料夾) stream the stored file through `/api/my-photos/<id>/download`. The CSV gains 類型 and 長度 columns.
+- **Mac route:**
+  - `npm run photos:scan` also handles videos in 照片待分類. It reads the time with ffprobe (Spotlight's date when ffprobe is missing).
+  - It writes a 720p copy into `照片待分類/已壓縮/<name>.mp4`, using ffmpeg when installed and macOS avconvert (Preset1280x720) otherwise. Only the creation time is carried over.
+  - It takes the poster for the contact sheet.
+  - `photos:apply` stores the label under the original's fingerprint and under the copy's fingerprint.
+  - When a folder holds both an original and its copy in 已壓縮, the sorter keeps only the copy.
+- **Data:** migration `0006_photo_videos.sql` is additive. It adds `media_type` (default 'photo'), `video_path` and `duration_ms`. `bytes` now includes the video.
+- **Privacy:** every new route gives guests and strangers the same 401, and the leak test covers them. Guests never get a redirect or a store path. Viewers reach only videos that are sorted into a day, as with photos.
+- **Checks:**
+  - `tsc` clean; `eslint` shows only the 5 problems already on `main`; `vitest` 268/268 (31 photo and video tests); `next build` passes.
+  - The Mac scan was run on generated test-pattern videos (a MOV with a zone and GPS tag, and a DJI-named MP4). Its copies came out H.264 1280×720 at about 1.8 Mbps with no location tag.
+  - The sorter was run locally at 1440 px and 375 px with generated test media. Browser compression ran to 100 %. Real uploads cannot be tested locally because there is no store.
+  - Codex review is still unavailable until 2026-11-25.
+
 ## Review status (2026-11-20)
 
 - Built on branch `feat/my-photos` from `f28aef0`.

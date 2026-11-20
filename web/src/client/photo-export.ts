@@ -1,9 +1,10 @@
 "use client";
 
-import { fullUrl, itemName, type MyPhoto } from "./my-photos";
+import { fullUrl, itemName, videoFileUrl, type MyPhoto } from "./my-photos";
 import { fmtDay } from "@/domain/format";
 import { safeName, SHEET_CELL, SHEET_COLS, toCsv, uniqueName } from "@/domain/photo-sort";
 import type { TripDoc } from "@/domain/schema";
+import { clock } from "@/domain/video";
 import { crc32, ZipWriter } from "@/domain/zip";
 
 /*
@@ -29,11 +30,15 @@ function folderOf(doc: Pick<TripDoc, "days">, p: MyPhoto) {
   return safeName(`${p.dayDate} 第${dayNo(doc, p.dayDate)}天`);
 }
 
-function fileOf(p: MyPhoto) {
+function fileOf(p: MyPhoto, type = "") {
   const time = p.takenLocal && p.takenLocal.length >= 16 ? p.takenLocal.slice(11, 16).replace(":", "") + " " : "";
   const base = safeName((p.fileName ?? p.id).replace(/\.[^.]*$/, ""));
-  return `${time}${base}.jpg`;
+  const ext = !p.video ? "jpg" : /webm/.test(type) ? "webm" : /quicktime/.test(type) ? "mov" : "mp4";
+  return `${time}${base}.${ext}`;
 }
+
+/** The stored file: the display JPEG for a photo, the compressed video for a video. */
+const sourceOf = (p: MyPhoto) => (p.video ? videoFileUrl(p.id) : fullUrl(p.id));
 
 /** One ZIP of the photos (display copies), a folder per day. `onProgress` gets 0–1. */
 export async function exportZip(doc: Pick<TripDoc, "days">, photos: MyPhoto[], onProgress: (f: number) => void): Promise<Blob> {
@@ -41,7 +46,7 @@ export async function exportZip(doc: Pick<TripDoc, "days">, photos: MyPhoto[], o
   const taken = new Map<string, Set<string>>();
   let i = 0;
   for (const p of photos) {
-    const r = await fetch(fullUrl(p.id));
+    const r = await fetch(sourceOf(p));
     if (!r.ok) throw new Error(`photo ${r.status}`);
     const blob = await r.blob();
     const crc = crc32(new Uint8Array(await blob.arrayBuffer()));
@@ -49,7 +54,7 @@ export async function exportZip(doc: Pick<TripDoc, "days">, photos: MyPhoto[], o
     const names = taken.get(folder) ?? new Set<string>();
     taken.set(folder, names);
     const when = p.takenLocal ? new Date(`${p.takenLocal.length >= 16 ? p.takenLocal : p.takenLocal + "T12:00"}:00`) : new Date();
-    zip.add(`${folder}/${uniqueName(fileOf(p), names)}`, blob, crc, blob.size, isNaN(when.getTime()) ? new Date() : when);
+    zip.add(`${folder}/${uniqueName(fileOf(p, blob.type), names)}`, blob, crc, blob.size, isNaN(when.getTime()) ? new Date() : when);
     onProgress(++i / photos.length);
   }
   return new Blob(zip.finish(), { type: "application/zip" });
@@ -57,9 +62,9 @@ export async function exportZip(doc: Pick<TripDoc, "days">, photos: MyPhoto[], o
 
 /** 檔名, 日期, 天數, 分類, 活動 — one row per photo, UTF-8 with BOM for Excel. */
 export function exportCsv(doc: TripDoc, photos: MyPhoto[]): Blob {
-  const rows: (string | number | null)[][] = [["檔名", "日期", "天數", "分類", "活動", "時間", "說明"]];
+  const rows: (string | number | null)[][] = [["檔名", "類型", "日期", "天數", "分類", "活動", "時間", "長度", "說明"]];
   for (const p of photos)
-    rows.push([p.fileName ?? "", p.dayDate ?? "未分類", p.dayDate ? dayNo(doc, p.dayDate) : "", p.category ?? "", p.itemId ? itemName(doc, p) : "", p.takenLocal?.slice(11, 16) ?? "", p.caption ?? ""]);
+    rows.push([p.fileName ?? "", p.video ? "影片" : "照片", p.dayDate ?? "未分類", p.dayDate ? dayNo(doc, p.dayDate) : "", p.category ?? "", p.itemId ? itemName(doc, p) : "", p.takenLocal?.slice(11, 16) ?? "", p.video ? clock(p.durationMs) : "", p.caption ?? ""]);
   return new Blob([toCsv(rows)], { type: "text/csv;charset=utf-8" });
 }
 
@@ -75,7 +80,8 @@ export const dayLabel = (date: string) => fmtDay(date);
  * One numbered contact sheet: 7 columns of 224 px, each photo centre-cropped with a 6 px margin, '#n' in
  * the top-left corner. `first` is the number of the first photo on this sheet. `srcs` are image URLs.
  */
-export async function contactSheet(srcs: (string | null)[], first: number): Promise<Blob> {
+export async function contactSheet(cells: { src: string | null; video?: boolean }[], first: number): Promise<Blob> {
+  const srcs = cells.map((c) => c.src);
   const rows = Math.ceil(srcs.length / SHEET_COLS);
   const c = document.createElement("canvas");
   c.width = SHEET_COLS * SHEET_CELL;
@@ -104,6 +110,17 @@ export async function contactSheet(srcs: (string | null)[], first: number): Prom
         g.fillStyle = "#d9d3c4";
         g.fillRect(x, y, inner, inner);
       }
+      if (cells[i].video) {
+        // a play mark in the bottom-left corner, so Claude knows it is a video's first frame
+        g.fillStyle = "rgba(0,0,0,.6)";
+        g.fillRect(x, y + inner - 30, 34, 30);
+        g.fillStyle = "#fff";
+        g.beginPath();
+        g.moveTo(x + 11, y + inner - 24);
+        g.lineTo(x + 26, y + inner - 15);
+        g.lineTo(x + 11, y + inner - 6);
+        g.fill();
+      }
       const label = `#${first + i}`;
       g.font = "bold 22px system-ui, sans-serif";
       const w = g.measureText(label).width + 12;
@@ -117,7 +134,7 @@ export async function contactSheet(srcs: (string | null)[], first: number): Prom
 }
 
 /** All sheets: one JPEG, or a ZIP of them when there is more than one. */
-export async function contactSheets(pages: (string | null)[][]): Promise<{ blob: Blob; name: string }> {
+export async function contactSheets(pages: { src: string | null; video?: boolean }[][]): Promise<{ blob: Blob; name: string }> {
   const sheets: Blob[] = [];
   let n = 1;
   for (const page of pages) {
@@ -144,9 +161,9 @@ export async function exportToFolder(doc: Pick<TripDoc, "days">, photos: MyPhoto
     const dir = await top.getDirectoryHandle(folder, { create: true });
     const names = taken.get(folder) ?? new Set<string>();
     taken.set(folder, names);
-    const r = await fetch(fullUrl(p.id));
+    const r = await fetch(sourceOf(p));
     if (!r.ok || !r.body) throw new Error(`photo ${r.status}`);
-    const fh = await dir.getFileHandle(uniqueName(fileOf(p), names), { create: true });
+    const fh = await dir.getFileHandle(uniqueName(fileOf(p, r.headers.get("content-type") ?? ""), names), { create: true });
     await r.body.pipeTo(await fh.createWritable());
     onProgress(++i / photos.length);
   }

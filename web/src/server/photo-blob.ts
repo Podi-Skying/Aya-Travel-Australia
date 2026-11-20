@@ -28,3 +28,49 @@ export async function deleteBlobs(pathnames: string[]): Promise<void> {
   const { del } = await import("@vercel/blob");
   await del(pathnames);
 }
+
+/** Size and type of a stored file, or null when it is not there. */
+export async function blobInfo(pathname: string): Promise<{ size: number; contentType: string } | null> {
+  const { head } = await import("@vercel/blob");
+  try {
+    const r = await head(pathname);
+    return { size: r.size, contentType: r.contentType };
+  } catch {
+    return null;
+  }
+}
+
+/** A read-only URL for one private file that stops working after `seconds`; the CDN serves ranges for seeking. */
+export async function signedReadUrl(pathname: string, seconds: number): Promise<string> {
+  const { issueSignedToken, presignUrl } = await import("@vercel/blob");
+  const validUntil = Date.now() + seconds * 1000;
+  const token = await issueSignedToken({ pathname, operations: ["get"], validUntil });
+  const r = await presignUrl(token, { operation: "get", pathname, validUntil, access: "private" });
+  return r.presignedUrl;
+}
+
+/** A readable stream of any stored file (videos for download), or null when it is gone. */
+export async function readBlob(pathname: string): Promise<{ stream: ReadableStream<Uint8Array>; contentType: string; size: number | null } | null> {
+  const { get } = await import("@vercel/blob");
+  const r = await get(pathname, { access: "private" });
+  if (!r || r.statusCode !== 200) return null;
+  return { stream: r.stream, contentType: r.blob.contentType, size: r.blob.size ?? null };
+}
+
+/**
+ * Answers the browser's request for a one-hour token to put one video straight into the store. `check`
+ * runs first (owner, path, room left) and returns the largest size allowed; nothing is stored here.
+ */
+export async function videoUploadToken(request: Request, body: unknown, check: (pathname: string, clientPayload: string | null) => Promise<number>): Promise<unknown> {
+  const { handleUpload } = await import("@vercel/blob/client");
+  return handleUpload({
+    request,
+    body: body as Parameters<typeof handleUpload>[0]["body"],
+    onBeforeGenerateToken: async (pathname, clientPayload) => ({
+      maximumSizeInBytes: await check(pathname, clientPayload),
+      allowedContentTypes: ["video/mp4", "video/quicktime", "video/webm"],
+      addRandomSuffix: true,
+      validUntil: Date.now() + 3600_000,
+    }),
+  });
+}

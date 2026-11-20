@@ -12,12 +12,16 @@ import type { Photo, TripDoc } from "@/domain/schema";
 
 export type PhotoAccessKind = "owner" | "viewer";
 
-export type MyPhoto = { id: string; w: number; h: number; dayDate: string | null; itemId: string | null; takenLocal: string | null; caption: string | null; category: string | null; lat?: number | null; lng?: number | null; fileName?: string; manual?: boolean };
+export type MyPhoto = { id: string; w: number; h: number; dayDate: string | null; itemId: string | null; takenLocal: string | null; caption: string | null; category: string | null; video?: true; durationMs?: number | null; lat?: number | null; lng?: number | null; fileName?: string; manual?: boolean };
 
-export type MyPhotosData = { configured: boolean; photos: MyPhoto[]; usedBytes?: number; quotaBytes?: number; viewersEnabled?: boolean };
+export type MyPhotosData = { configured: boolean; photos: MyPhoto[]; usedBytes?: number; quotaBytes?: number; limitBytes?: number; viewersEnabled?: boolean };
 
 export const thumbUrl = (id: string) => `/api/my-photos/${id}/thumb`;
 export const fullUrl = (id: string) => `/api/my-photos/${id}/full`;
+/** Redirects to a 30-minute link in the store, for the player. */
+export const videoUrl = (id: string) => `/api/my-photos/${id}/video`;
+/** The video file through the site, for downloads. */
+export const videoFileUrl = (id: string) => `/api/my-photos/${id}/download`;
 
 export function useMyPhotos(access: PhotoAccessKind | null | undefined) {
   const [data, setData] = useState<MyPhotosData | null>(null);
@@ -45,7 +49,7 @@ export function photosOfDay(photos: MyPhoto[], date: string): MyPhoto[] {
 
 /** The shape the shared viewer expects; the caption takes the credit line's place. */
 export function viewerPhotos(list: MyPhoto[], nameOf: (p: MyPhoto) => string): DayPhoto[] {
-  return list.map((p) => ({ id: `my-${p.id}`, name: nameOf(p), photo: { url: fullUrl(p.id), page: fullUrl(p.id), w: p.w, h: p.h, site: p.caption ?? "", kind: "custom" } as Photo }));
+  return list.map((p) => ({ id: `my-${p.id}`, name: nameOf(p), photo: { url: fullUrl(p.id), page: fullUrl(p.id), w: p.w, h: p.h, site: p.caption ?? "", kind: "custom" } as Photo, ...(p.video ? { video: videoUrl(p.id) } : {}) }));
 }
 
 export function itemName(doc: Pick<TripDoc, "days">, p: MyPhoto): string {

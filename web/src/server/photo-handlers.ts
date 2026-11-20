@@ -19,7 +19,13 @@ import {
   updatePhoto,
   uploadMeta,
   uploadPhoto,
+  uploadVideo,
+  videoFile,
+  videoLink,
+  videoMeta,
+  videoRoom,
 } from "./my-photos";
+import { videoUploadToken } from "./photo-blob";
 import { routeQuota } from "./sharing";
 
 /* Route bodies for /api/my-photos/* and /p/<token> (docs/PHOTOS-PLAN.md), kept outside app/ for tests. */
@@ -71,6 +77,50 @@ export async function postMyPhoto(req: Request) {
     const meta = uploadMeta.safeParse(parsed);
     if (!meta.success) throw new HttpError(400, "照片資料格式錯誤");
     const r = await uploadPhoto(a.owner, a.tripId, new Uint8Array(await display.arrayBuffer()), new Uint8Array(await thumb.arrayBuffer()), meta.data);
+    return json(r, r.duplicate ? 200 : 201);
+  });
+}
+
+/**
+ * The browser asks here for a token to put one video straight into the private store (videos are far over
+ * the 4.5 MB function body limit). Owner only; the path, size and room left are checked before any token.
+ */
+export async function postVideoToken(req: Request) {
+  return run(async () => {
+    const a = await guard(req, true);
+    if (a instanceof Response) return a;
+    if (a.kind !== "owner") return denied();
+    if (!(await routeQuota(`video-token:${a.owner.githubId}`, 200, false))) throw new HttpError(429, "上傳太頻繁，請稍後再試");
+    const body = (await readJson(req, 4_000)) as { type?: unknown } | null;
+    // Only token requests: no completion callback is ever registered, so nothing else may come here.
+    if (body?.type !== "blob.generate-client-token") throw new HttpError(400, "格式錯誤");
+    const tripId = a.tripId;
+    return json(await videoUploadToken(req, body, (pathname, payload) => videoRoom(tripId, pathname, payload)));
+  });
+}
+
+/** After the video is in the store: its poster frame, thumbnail and details make the row (owner). */
+export async function postVideo(req: Request) {
+  return run(async () => {
+    const a = await guard(req, true);
+    if (a instanceof Response) return a;
+    if (a.kind !== "owner") return denied();
+    if (Number(req.headers.get("content-length") ?? "0") > MAX_UPLOAD) throw new HttpError(413, "封面太大");
+    if (!(await routeQuota(`photo-upload:${a.owner.githubId}`, 600, false))) throw new HttpError(429, "上傳太頻繁，請稍後再試");
+    const form = await req.formData().catch(() => null);
+    const display = form?.get("display");
+    const thumb = form?.get("thumb");
+    const metaRaw = form?.get("meta");
+    if (!(display instanceof Blob) || !(thumb instanceof Blob) || typeof metaRaw !== "string") throw new HttpError(400, "缺少影片封面");
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(metaRaw);
+    } catch {
+      throw new HttpError(400, "JSON 格式錯誤");
+    }
+    const meta = videoMeta.safeParse(parsed);
+    if (!meta.success) throw new HttpError(400, "影片資料格式錯誤");
+    const r = await uploadVideo(a.owner, a.tripId, new Uint8Array(await display.arrayBuffer()), new Uint8Array(await thumb.arrayBuffer()), meta.data);
     return json(r, r.duplicate ? 200 : 201);
   });
 }
@@ -135,6 +185,19 @@ export async function getMyPhotoFile(req: Request, ctx: Ctx<{ id: string; size: 
     const a = await guard(req, false);
     if (a instanceof Response) return a;
     const { id, size } = await ctx.params;
+    if (size === "video") {
+      // A 30-minute link straight to the store, issued only after the check above.
+      const url = await videoLink(a, id);
+      if (!url) return fail(404, "找不到");
+      return new Response(null, { status: 302, headers: { location: url, "cache-control": "no-store", "referrer-policy": "no-referrer", "x-robots-tag": "noindex" } });
+    }
+    if (size === "download") {
+      const f = await videoFile(a, id);
+      if (!f) return fail(404, "找不到");
+      return new Response(f.stream, {
+        headers: { "content-type": f.contentType, ...(f.size != null ? { "content-length": String(f.size) } : {}), "x-content-type-options": "nosniff", "cache-control": "private, no-store", "x-robots-tag": "noindex" },
+      });
+    }
     if (size !== "thumb" && size !== "full") return fail(404, "找不到");
     const stream = await photoStream(a, id, size);
     if (!stream) return fail(404, "找不到");

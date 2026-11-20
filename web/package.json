@@ -25,6 +25,7 @@
     "heic2any": "^0.0.4",
     "idb-keyval": "^6.3.0",
     "leaflet": "^1.9.4",
+    "mediabunny": "1.65.2",
     "next": "16.4.2",
     "next-auth": "^4.24.15",
     "pg": "^8.23.1",

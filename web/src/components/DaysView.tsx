@@ -1062,9 +1062,14 @@ function MyDayPhotos({ date }: { date: string }) {
       <ul>
         {shown.map((p, k) => (
           <li key={p.id}>
-            <button type="button" data-photo-id={`my-${p.id}`} onClick={() => setOpen(k)} aria-label={p.caption ?? "照片"}>
+            <button type="button" data-photo-id={`my-${p.id}`} onClick={() => setOpen(k)} aria-label={p.caption ?? (p.video ? "影片" : "照片")}>
               {/* eslint-disable-next-line @next/next/no-img-element -- private, auth-checked bytes */}
               <img src={thumbUrl(p.id)} alt="" loading="lazy" decoding="async" onError={(e) => (e.currentTarget.style.visibility = "hidden")} />
+              {p.video && (
+                <span className="my-play" aria-hidden>
+                  ▶
+                </span>
+              )}
             </button>
           </li>
         ))}

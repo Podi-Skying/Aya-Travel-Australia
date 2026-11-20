@@ -28,7 +28,7 @@ function saveOrder(keys: string[]) {
   } catch {}
 }
 
-export type ClassifyItem = { key: string; src: string | null };
+export type ClassifyItem = { key: string; src: string | null; video?: boolean };
 
 /**
  * The three numbered steps. `items` are the photos still without a category; the numbers on the sheet are
@@ -45,7 +45,7 @@ export function ClassifySteps({ items, onApply, onSkip, say }: { items: Classify
     setBusy(true);
     try {
       const keys = items.map((i) => i.key);
-      const { blob, name } = await contactSheets(sheetPages(items).map((pg) => pg.map((i) => i.src)));
+      const { blob, name } = await contactSheets(sheetPages(items).map((pg) => pg.map((i) => ({ src: i.src, video: !!i.video }))));
       download(blob, name);
       saveOrder(keys);
       setOrder(keys);
@@ -73,7 +73,7 @@ export function ClassifySteps({ items, onApply, onSkip, say }: { items: Classify
     try {
       const n = await onApply(map);
       const left = items.filter((i) => !map.has(i.key)).length;
-      say(`已套用 ${n} 張，還有 ${left} 張未分類`);
+      say(`已套用 ${n} 個，還有 ${left} 個未分類`);
       setReply("");
       if (!left) {
         saveOrder([]);
@@ -91,7 +91,7 @@ export function ClassifySteps({ items, onApply, onSkip, say }: { items: Classify
       <ol className="srt-steps">
         <li>
           <b>下載分類總表</b>
-          <p>把要分類的 {items.length} 張排成有編號的總表圖片</p>
+          <p>把要分類的 {items.length} 個排成有編號的總表圖片（影片用封面，標 ▶）</p>
           <button type="button" className="srt-btn gold" disabled={busy || !items.length} onClick={() => void sheets()}>
             下載分類總表
           </button>
@@ -130,10 +130,10 @@ export function LibraryClassify({ photos, onSaved, say }: { photos: MyPhoto[]; o
     }
     onSaved();
   };
-  if (!todo.length) return <p className="srt-note">{photos.length ? "已上傳的照片都分類好了。" : "加入照片之後就能分類。"}</p>;
+  if (!todo.length) return <p className="srt-note">{photos.length ? "已上傳的照片和影片都分類好了。" : "加入照片或影片之後就能分類。"}</p>;
   return (
     <ClassifySteps
-      items={todo.map((p) => ({ key: p.id, src: thumbUrl(p.id) }))}
+      items={todo.map((p) => ({ key: p.id, src: thumbUrl(p.id), video: !!p.video }))}
       say={say}
       onApply={async (map) => {
         await post([...map].map(([id, category]) => ({ id, category })));
@@ -149,7 +149,7 @@ export function ExportPanel({ doc, photos, say }: { doc: TripDoc; photos: MyPhot
   const [progress, setProgress] = useState<number | null>(null);
   const days = doc.days.filter((d) => photos.some((p) => p.dayDate === d.date));
   const list = day ? photos.filter((p) => p.dayDate === day) : photos;
-  if (!photos.length) return <p className="srt-note">上傳照片之後就能下載。</p>;
+  if (!photos.length) return <p className="srt-note">上傳之後就能下載（影片是壓縮後的 720p 版本）。</p>;
   const run = async (what: "zip" | "folder") => {
     setProgress(0);
     try {
@@ -165,10 +165,10 @@ export function ExportPanel({ doc, photos, say }: { doc: TripDoc; photos: MyPhot
   return (
     <div className="srt-export">
       <select value={day} onChange={(e) => setDay(e.target.value)} aria-label="哪一天">
-        <option value="">全部（{photos.length} 張）</option>
+        <option value="">全部（{photos.length} 個）</option>
         {days.map((d) => (
           <option key={d.date} value={d.date}>
-            {fmtDay(d.date)}（{photos.filter((p) => p.dayDate === d.date).length} 張）
+            {fmtDay(d.date)}（{photos.filter((p) => p.dayDate === d.date).length} 個）
           </option>
         ))}
       </select>
