@@ -214,6 +214,8 @@ export function SortStage({ doc, onUploaded }: { doc: TripDoc; onUploaded: () =>
       if (card && now - (lastGlow.current.get(e.target) ?? 0) > 250) {
         lastGlow.current.set(e.target, now);
         card.animate([{ backgroundColor: "var(--sort-glow)", borderColor: "var(--vermilion)" }, {}], { duration: 420, easing: "ease-out" });
+        /* the thrown photo carries momentum, so the card gives a little and settles (a light, under-damped bounce) */
+        card.animate([{ transform: "scale(1)" }, { transform: "scale(1.06)", offset: 0.25 }, { transform: "scale(0.985)", offset: 0.6 }, { transform: "scale(1)" }], { duration: 380, easing: "cubic-bezier(.2,.8,.2,1)" });
       }
       if (!frame.current) frame.current = requestAnimationFrame(flush);
     },
