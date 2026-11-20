@@ -168,9 +168,18 @@ Kai asked to apply a third-party guide for a local photo sorter (an HTML page th
 - **Not in this version:** videos (Blob Hobby storage is about 1 GB). If a video is picked, the stage says how many were skipped.
 - **Privacy:** unchanged. The new endpoints are owner-only and give guests and strangers the same 401. Viewers see the category of sorted photos only.
 
+## Apple-design pass (2026-11-20, before launch)
+
+- Press feedback on pointer-down for chips, the source switch, day strips, edit buttons and cards (`scale(.97)`, 100 ms). Buttons already had this.
+- The sorting stage can be interrupted. A tap on the stage or 「略過動畫」 lands everything still in the air and starts the uploads. 「重來」 cancels the flights through the run token and returns every photo to the pile. A card gives a small under-damped bounce when a photo lands; the bounce comes from the throw's momentum.
+- Viewer: it already opens from the tapped thumbnail and closes back into it. Its swipe already tracks the finger 1:1 from the grab offset, projects the release velocity, and rubber-bands at the ends. Swipe-down closes it, with the scrim dimming as you drag. The page decision now lives in `swipeStep` in `motion.ts` and is unit-tested.
+- 分類 and 下載 open as bottom sheets on a translucent material that rises from the bottom edge and leaves the same way. The classify task dims the page; the download sheet does not. Reduced transparency makes the sheet solid; reduced motion turns the slide into fades.
+- Wayfinding: the gallery's 我的照片 mode links to /photos (「整理與下載 ›」); the header links back to 行程 and 散步.
+
 ## Review status (2026-11-20)
 
 - Built on branch `feat/my-photos` from `f28aef0`.
 - Independent Codex plan review and code inspection did not run: the first attempt timed out, the second stopped on Codex's usage limit (resets 2026-11-25). Neither the plan nor the code has independent approval yet.
 - Host checks: `tsc` clean; `eslint` shows only the 5 problems already on `main`; `vitest` 253/253; `next build` passes; owner UI checked locally at phone width with the store not configured.
 - Second pass (sorting stage, categories, export) built on the same branch. Codex review again not possible before the quota reset on 2026-11-25. Host checks: `tsc` clean; `eslint` only the 5 problems already on `main`; `vitest` 260/260 (18 photo tests); `next build` passes; ZIP output checked with `unzip -t`. The sorting stage was run locally at 375 px with 84 placeholder images (gradients, no people, including 3 duplicates, 4 screenshots and 5 undated files); uploads were stubbed in the browser so nothing left the machine.
+- Launched on Kai's go (「上線讓我在網站測試」, 2026-11-20) without the Codex review, which stays unavailable until 2026-11-25. Rerun it then.

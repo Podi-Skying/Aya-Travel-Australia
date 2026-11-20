@@ -5,7 +5,7 @@ import { SiteHeader } from "./SiteHeader";
 import { PhotoViewer } from "./Photos";
 import { itemName, photosOfDay, thumbUrl, useMyPhotos, viewerPhotos, type MyPhoto, type MyPhotosData, type PhotoAccessKind } from "@/client/my-photos";
 import { CATEGORIES, isCategory } from "@/domain/photo-sort";
-import { ClassifyPanel, ExportPanel } from "./PhotoTools";
+import { PhotoToolbar } from "./PhotoTools";
 import { SortStage } from "./SortStage";
 import { fmtDay } from "@/domain/format";
 import type { Item, TripDoc } from "@/domain/schema";
@@ -273,6 +273,7 @@ export function MyPhotosPage({ access, doc, initialDay }: { access: PhotoAccessK
             )}
           </nav>
         )}
+        {owner && data && <PhotoToolbar doc={doc} photos={all} configured={data.configured} onSaved={() => void reload()} />}
         {data && cats.length > 1 && (
           <nav className="my-chips my-cats" aria-label="選擇分類">
             <button type="button" aria-pressed={!cat} onClick={() => setCat(null)}>
@@ -312,8 +313,7 @@ export function MyPhotosPage({ access, doc, initialDay }: { access: PhotoAccessK
           );
         })}
         {data && !photos.length && <p className="muted my-empty">還沒有照片。</p>}
-        {owner && data?.configured && <ClassifyPanel photos={all} onSaved={() => void reload()} />}
-        {owner && <ExportPanel doc={doc} photos={all} />}
+
         {owner && (
           <div className="my-tools">
             <button

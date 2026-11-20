@@ -70,6 +70,30 @@ main#main.my-photos { max-width: 1100px; margin: 0 auto; padding: calc(56px + en
 .my-sheet-img { width: 96px; height: 96px; object-fit: cover; border-radius: 8px; }
 .my-sheet-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .my-cats { padding-top: 0; }
+/* Feedback on press, not on release (Apple-design pass). */
+.my-chips button:active, .seg-switch button:active, .my-day-strip button:active, .my-edit:active, .sort-card:active, .linkish:active { transform: scale(.97); transition: transform 100ms var(--ease); }
+.my-toolbar { display: flex; gap: 8px; margin: 4px 0 8px; }
+.my-toolbar .n { margin-left: 6px; font-size: .8em; opacity: .7; font-variant-numeric: tabular-nums; }
+.drift-mine-all { font-size: .85rem; color: var(--ink); text-decoration: none; padding: 4px 12px; border-radius: 999px; background: rgba(250, 247, 240, .82); backdrop-filter: blur(12px); }
+.drift-mine-all:active { transform: scale(.97); }
+/* Tool sheets: a translucent material rising from the bottom edge; the classify task also dims the page. */
+.tool-sheet-backdrop { position: fixed; inset: 0; z-index: 60; display: flex; align-items: flex-end; justify-content: center; animation: sheet-scrim-in 260ms var(--ease) both; }
+.tool-sheet-backdrop.modal { background: rgba(20, 19, 16, .32); }
+.tool-sheet-backdrop.leaving { animation: sheet-scrim-out 220ms var(--ease) both; }
+.tool-sheet { position: relative; width: min(560px, 100%); max-height: 86vh; overflow: auto; padding: 22px 16px calc(16px + env(safe-area-inset-bottom)); border-radius: 18px 18px 0 0; background: color-mix(in srgb, var(--surface) 78%, transparent); backdrop-filter: blur(22px) saturate(160%); -webkit-backdrop-filter: blur(22px) saturate(160%); border-top: 1px solid rgba(255, 255, 255, .5); box-shadow: 0 -8px 30px rgba(41, 40, 35, .16); animation: sheet-in 320ms cubic-bezier(.2, .8, .2, 1) both; outline: none; }
+.tool-sheet-backdrop.leaving .tool-sheet { animation: sheet-out 220ms cubic-bezier(.4, 0, 1, 1) both; }
+.tool-sheet h2 { margin-top: 0; font-size: 1.1rem; }
+.tool-sheet-grip { position: absolute; top: 8px; left: 50%; width: 36px; height: 4px; margin-left: -18px; border-radius: 2px; background: color-mix(in srgb, var(--ink) 22%, transparent); }
+.tool-sheet-close { display: block; margin: 14px auto 0; }
+@keyframes sheet-in { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes sheet-out { from { transform: none; } to { transform: translateY(100%); } }
+@keyframes sheet-scrim-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sheet-scrim-out { from { opacity: 1; } to { opacity: 0; } }
+@media (prefers-reduced-transparency: reduce) { .tool-sheet { background: var(--surface); backdrop-filter: none; -webkit-backdrop-filter: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .tool-sheet, .tool-sheet-backdrop.leaving .tool-sheet { animation-name: sheet-scrim-in; animation-duration: 200ms; }
+  .tool-sheet-backdrop.leaving .tool-sheet { animation-name: sheet-scrim-out; }
+}
 .my-classify, .my-export { margin-top: 20px; }
 .my-steps { margin: 8px 0; padding-left: 20px; display: grid; gap: 10px; }
 .my-steps li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; font-size: .92rem; }

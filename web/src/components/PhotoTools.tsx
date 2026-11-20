@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { MyPhoto } from "@/client/my-photos";
 import { contactSheets, download, exportCsv, exportName, exportZip } from "@/client/photo-export";
 import { fmtDay } from "@/domain/format";
@@ -105,7 +105,7 @@ export function ClassifyPanel({ photos, onSaved }: { photos: MyPhoto[]; onSaved:
   };
 
   return (
-    <section className="card my-classify">
+    <section className="my-classify">
       <h2>用 Claude 分類</h2>
       <p className="small muted">{todo.length} 張還沒有分類（{CATEGORIES.join("、")}）。</p>
       <ol className="my-steps">
@@ -158,7 +158,7 @@ export function ExportPanel({ doc, photos }: { doc: TripDoc; photos: MyPhoto[] }
     }
   };
   return (
-    <section className="card my-export">
+    <section className="my-export">
       <h2>下載</h2>
       <div className="my-export-row">
         <select value={day} onChange={(e) => setDay(e.target.value)} aria-label="哪一天">
@@ -178,5 +178,61 @@ export function ExportPanel({ doc, photos }: { doc: TripDoc; photos: MyPhoto[] }
       </div>
       {err && <p className="small error">{err}</p>}
     </section>
+  );
+}
+
+/**
+ * A bottom sheet on a translucent material. It rises from the bottom edge and leaves the same way. `modal`
+ * dims the page behind it (the classify steps are a task of their own); otherwise the page stays visible.
+ */
+function Sheet({ label, modal, onClose, children }: { label: string; modal?: boolean; onClose: () => void; children: ReactNode }) {
+  const [leaving, setLeaving] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  const close = () => setLeaving(true);
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => e.key === "Escape" && setLeaving(true);
+    window.addEventListener("keydown", key);
+    box.current?.focus();
+    return () => window.removeEventListener("keydown", key);
+  }, []);
+  return (
+    <div className={`tool-sheet-backdrop${modal ? " modal" : ""}${leaving ? " leaving" : ""}`} onClick={close} onAnimationEnd={(e) => leaving && e.target === e.currentTarget && onClose()}>
+      <div ref={box} tabIndex={-1} className="tool-sheet" role="dialog" aria-modal={modal ? "true" : undefined} aria-label={label} onClick={(e) => e.stopPropagation()}>
+        <span className="tool-sheet-grip" aria-hidden />
+        {children}
+        <button type="button" className="btn ghost small tool-sheet-close" onClick={close}>
+          完成
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** 分類 and 下載 as two buttons; each opens its sheet. */
+export function PhotoToolbar({ doc, photos, configured, onSaved }: { doc: TripDoc; photos: MyPhoto[]; configured: boolean; onSaved: () => void }) {
+  const [open, setOpen] = useState<"classify" | "export" | null>(null);
+  const todo = photos.filter((p) => !p.category).length;
+  if (!photos.length) return null;
+  return (
+    <div className="my-toolbar">
+      {configured && (
+        <button type="button" className="btn small" onClick={() => setOpen("classify")}>
+          分類{todo ? <span className="n">{todo}</span> : null}
+        </button>
+      )}
+      <button type="button" className="btn ghost small" onClick={() => setOpen("export")}>
+        下載
+      </button>
+      {open === "classify" && (
+        <Sheet label="用 Claude 分類" modal onClose={() => setOpen(null)}>
+          {todo ? <ClassifyPanel photos={photos} onSaved={onSaved} /> : <p className="muted">全部都分類好了。</p>}
+        </Sheet>
+      )}
+      {open === "export" && (
+        <Sheet label="下載照片" onClose={() => setOpen(null)}>
+          <ExportPanel doc={doc} photos={photos} />
+        </Sheet>
+      )}
+    </div>
   );
 }

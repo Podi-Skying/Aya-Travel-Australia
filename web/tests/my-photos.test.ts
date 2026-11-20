@@ -400,3 +400,22 @@ describe("duplicates and categories (owner)", () => {
     expect(Object.fromEntries(list.map((p) => [p.id, p.category]))).toEqual({ [ids[0]]: "美食", [ids[1]]: "風景", [shot.id]: "截圖" });
   });
 });
+
+describe("viewer swipe physics", () => {
+  it("projects the release velocity and moves one photo at most, never past the ends", async () => {
+    const { project, swipeStep, rubber } = await import("@/components/motion");
+    expect(project(1000)).toBeCloseTo(499, 0);
+    // A short drag with a quick flick still turns the page; a slow half-drag does not.
+    expect(swipeStep(-40, -800, 375, 2, 5)).toBe(1);
+    expect(swipeStep(-100, 0, 375, 2, 5)).toBe(0);
+    expect(swipeStep(60, 900, 375, 2, 5)).toBe(-1);
+    // A huge flick is still one page.
+    expect(swipeStep(-50, -20000, 375, 2, 5)).toBe(1);
+    // Ends: nothing beyond the first or last photo.
+    expect(swipeStep(80, 2000, 375, 0, 5)).toBe(0);
+    expect(swipeStep(-80, -2000, 375, 4, 5)).toBe(0);
+    // Rubber-band: past the edge the photo follows less and less.
+    expect(rubber(100, 375)).toBeLessThan(100);
+    expect(rubber(400, 375) - rubber(300, 375)).toBeLessThan(rubber(100, 375));
+  });
+});

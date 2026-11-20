@@ -2,6 +2,16 @@
 
 /** Apple's scroll-deceleration projection (Designing Fluid Interfaces). */
 export const project = (v: number, rate = 0.998) => ((v / 1000) * rate) / (1 - rate);
+
+/**
+ * Which page a horizontal swipe ends on: the release offset plus the projected travel of its velocity,
+ * one page at most, never past the first or last.
+ */
+export function swipeStep(offset: number, velocity: number, width: number, index: number, count: number): -1 | 0 | 1 {
+  const projected = offset + project(velocity);
+  const step = projected < -width / 2 ? 1 : projected > width / 2 ? -1 : 0;
+  return index + step < 0 || index + step >= count ? 0 : step;
+}
 export function rubber(over: number, dim: number, c = 0.55) {
   return (over * dim * c) / (dim + c * Math.abs(over));
 }

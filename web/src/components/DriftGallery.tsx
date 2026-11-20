@@ -188,6 +188,11 @@ export function DriftGallery({ active }: { active: boolean }) {
               ))}
             </div>
           )}
+          {mine && (
+            <a className="drift-mine-all" href={mineDay ? `/photos?day=${mineDay}` : "/photos"}>
+              整理與下載 ›
+            </a>
+          )}
           {mine && myCats.length > 1 && (
             <div className="my-chips" role="group" aria-label="選擇分類">
               {myCats.map((c) => (

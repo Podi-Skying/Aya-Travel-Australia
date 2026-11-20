@@ -222,12 +222,49 @@ export function SortStage({ doc, onUploaded }: { doc: TripDoc; onUploaded: () =>
     [flush],
   );
 
+  /* flights in the air and photos not yet landed, so a tap can finish them all or 重來 can take them back */
+  const flights = useRef(new Set<Animation>());
+  const pending = useRef(new Map<string, Entry>());
+
+  const resetCounts = () => {
+    counts.current = new Map();
+    covers.current = new Map();
+    flush();
+  };
+  const stopFlights = () => {
+    for (const a of flights.current) a.cancel();
+    flights.current.clear();
+    layer.current?.replaceChildren();
+  };
+
+  /** Everything still in the air lands at once; the uploads start right away. */
+  const finishNow = () => {
+    if (phase !== "fly") return;
+    const my = ++token.current;
+    stopFlights();
+    for (const e of pending.current.values()) land(e);
+    pending.current.clear();
+    setPhase("upload");
+    void upload(entries, my);
+  };
+
+  /** Back to the pile, so the throw can be watched again. */
+  const again = () => {
+    if (phase !== "fly") return;
+    token.current++;
+    stopFlights();
+    pending.current.clear();
+    for (const el of pileImgs.current.values()) el.style.visibility = "";
+    resetCounts();
+    setPhase("ready");
+  };
+
   const start = () => {
     if (phase !== "ready") return;
     const my = ++token.current;
-    counts.current = new Map();
-    covers.current = new Map();
+    resetCounts();
     const list = entries;
+    pending.current = new Map(list.map((e) => [e.key, e]));
     if (reducedMotion() || !stage.current || !pile.current || !layer.current) {
       for (const e of list) land(e);
       setPhase("upload");
@@ -280,9 +317,12 @@ export function SortStage({ doc, onUploaded }: { doc: TripDoc; onUploaded: () =>
           frames.push({ transform: `translate(${pt.x - size / 2}px, ${pt.y - size / 2}px) rotate(${rot0 * (1 - t)}deg) scale(${grow})`, opacity: t > 0.92 ? 0.4 : 1, offset: t });
         }
         const a = el.animate(frames, { duration: 900 + Math.random() * 400, easing: "cubic-bezier(.45,.05,.25,1)", fill: "forwards" });
+        flights.current.add(a);
         a.onfinish = () => {
           el.remove();
+          flights.current.delete(a);
           if (token.current !== my) return;
+          pending.current.delete(e.key);
           land(e);
           if (++landed === order.length) {
             setPhase("upload");
@@ -350,6 +390,7 @@ export function SortStage({ doc, onUploaded }: { doc: TripDoc; onUploaded: () =>
       onDragOver={(e) => (e.preventDefault(), setDragging(true))}
       onDragLeave={() => setDragging(false)}
       onDrop={(e) => void onDrop(e)}
+      onPointerDown={(e) => phase === "fly" && !(e.target as HTMLElement).closest("button") && finishNow()}
       aria-label="整理照片"
     >
       <input ref={fileInput} type="file" accept="image/*,.heic,.heif" multiple hidden onChange={(e) => (void add([...(e.target.files ?? [])]), (e.target.value = ""))} />
@@ -430,7 +471,16 @@ export function SortStage({ doc, onUploaded }: { doc: TripDoc; onUploaded: () =>
             開始整理 {entries.length} 張
           </button>
         )}
-        {phase === "fly" && <p className="small muted">整理中…</p>}
+        {phase === "fly" && (
+          <>
+            <button type="button" className="btn sort-go" onClick={finishNow}>
+              略過動畫
+            </button>
+            <button type="button" className="btn ghost small" onClick={again}>
+              重來
+            </button>
+          </>
+        )}
         {phase === "upload" && (
           <p className="small muted">
             上傳中 {sent} / {toSend}（可以繼續看照片，別關掉頁面）
