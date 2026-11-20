@@ -9,6 +9,7 @@ import { useOnceHint, useReducedMotion } from "./ui";
 import { Icon } from "./Icon";
 import { commonsFor } from "@/client/photos";
 import { fmtDay } from "@/domain/format";
+import { CATEGORIES } from "@/domain/photo-sort";
 import { isLogistics } from "@/domain/day-title";
 import type { Item, Photo } from "@/domain/schema";
 import { fullUrl, thumbUrl, type MyPhoto } from "@/client/my-photos";
@@ -127,6 +128,7 @@ export function DriftGallery({ active }: { active: boolean }) {
   // 景點照片 / 我的照片 (docs/PHOTOS-PLAN.md): the switch exists only for Kai and the people he allows.
   const [mine, setMine] = useState(false);
   const [mineDay, setMineDay] = useState<string | null>(null);
+  const [mineCat, setMineCat] = useState<string | null>(null);
   const reduce = useReducedMotion();
   const [commons, setCommons] = useState<Record<string, Photo[]>>({});
   const [loading, setLoading] = useState(true);
@@ -156,7 +158,8 @@ export function DriftGallery({ active }: { active: boolean }) {
   const [hint, doneHint] = useOnceHint("aya-hint-gallery");
   const placeShots = useMemo(() => tripShots(doc.days, doc.attractionPool, commons), [doc, commons]);
   const myDays = useMemo(() => doc.days.filter((d) => myPhotos?.some((p) => p.dayDate === d.date)), [doc.days, myPhotos]);
-  const myShots = useMemo(() => (myPhotos ? myPhotoShots(doc, myPhotos, mineDay) : []), [doc, myPhotos, mineDay]);
+  const myCats = useMemo(() => CATEGORIES.filter((c) => myPhotos?.some((p) => p.dayDate && p.category === c)), [myPhotos]);
+  const myShots = useMemo(() => (myPhotos ? myPhotoShots(doc, myPhotos, mineDay, mineCat) : []), [doc, myPhotos, mineDay, mineCat]);
   const showMine = mine && !!myPhotos?.length;
   const shots = showMine ? myShots : placeShots;
 
@@ -181,6 +184,15 @@ export function DriftGallery({ active }: { active: boolean }) {
               {myDays.map((d) => (
                 <button key={d.date} type="button" aria-pressed={mineDay === d.date} onClick={() => setMineDay(d.date)}>
                   {fmtDay(d.date)}
+                </button>
+              ))}
+            </div>
+          )}
+          {mine && myCats.length > 1 && (
+            <div className="my-chips" role="group" aria-label="選擇分類">
+              {myCats.map((c) => (
+                <button key={c} type="button" aria-pressed={mineCat === c} onClick={() => setMineCat(mineCat === c ? null : c)}>
+                  {c}
                 </button>
               ))}
             </div>
@@ -216,7 +228,7 @@ export function DriftGallery({ active }: { active: boolean }) {
           ))}
         </ul>
       ) : (
-        <Field key={showMine ? `mine-${mineDay ?? "all"}` : "places"} shots={shots} active={active} paused={!!picked} onPick={(shot, from) => setPicked({ shot, from })} />
+        <Field key={showMine ? `mine-${mineDay ?? "all"}-${mineCat ?? "all"}` : "places"} shots={shots} active={active} paused={!!picked} onPick={(shot, from) => setPicked({ shot, from })} />
       )}
       {picked && (
         <DetailSheet
@@ -233,9 +245,9 @@ export function DriftGallery({ active }: { active: boolean }) {
 }
 
 /** Kai's own photos as gallery shots: thumbnails drift, the detail sheet shows the larger copy. */
-function myPhotoShots(doc: { days: { date: string; items: { id: string; name: string }[] }[] }, photos: MyPhoto[], day: string | null): Shot[] {
+function myPhotoShots(doc: { days: { date: string; items: { id: string; name: string }[] }[] }, photos: MyPhoto[], day: string | null, category: string | null = null): Shot[] {
   return photos
-    .filter((p) => p.dayDate && (!day || p.dayDate === day))
+    .filter((p) => p.dayDate && (!day || p.dayDate === day) && (!category || p.category === category))
     .map((p) => {
       const dayIndex = doc.days.findIndex((d) => d.date === p.dayDate);
       const name = doc.days[dayIndex]?.items.find((i) => i.id === p.itemId)?.name ?? fmtDay(p.dayDate!);

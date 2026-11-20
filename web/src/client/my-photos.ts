@@ -12,7 +12,7 @@ import type { Photo, TripDoc } from "@/domain/schema";
 
 export type PhotoAccessKind = "owner" | "viewer";
 
-export type MyPhoto = { id: string; w: number; h: number; dayDate: string | null; itemId: string | null; takenLocal: string | null; caption: string | null; lat?: number | null; lng?: number | null; fileName?: string; manual?: boolean };
+export type MyPhoto = { id: string; w: number; h: number; dayDate: string | null; itemId: string | null; takenLocal: string | null; caption: string | null; category: string | null; lat?: number | null; lng?: number | null; fileName?: string; manual?: boolean };
 
 export type MyPhotosData = { configured: boolean; photos: MyPhoto[]; usedBytes?: number; quotaBytes?: number; viewersEnabled?: boolean };
 

@@ -144,8 +144,33 @@ Manual (dev server, owner session, Blob not configured): `/photos` shows the not
 - next-auth v4 sign-in change is the only touch to existing auth; it is behind `PHOTO_VIEWERS`.
 - `heic2any` (0.0.4) is old and large; it is lazy-loaded only on HEIC decode failure.
 
+## Sorting stage, categories and export (2026-11-20, second pass)
+
+Kai asked to apply a third-party guide for a local photo sorter (an HTML page that piles photos up, flies them into folders, classifies through a Claude chat and exports). Its ideas are applied to this feature; its text, branding and colours are not copied. The site's own paper, ink and vermilion style is kept.
+
+- **Sorting stage** (`src/components/SortStage.tsx`, owner only, on `/photos`): pick photos, pick a folder (`webkitdirectory`), or drop files and folders anywhere on the stage (folders are read with `webkitGetAsEntry`, calling `readEntries` until it returns nothing). Each photo is read four at a time: fingerprint, EXIF and a 96 px preview. The photos form a sunflower-spiral pile that turns once every 120 s. 「開始整理」 throws each one along a quadratic Bézier into its card: one card per trip day (11/3–11/27), plus 未分類 and 重複. Counters show photos, days and duplicates. Uploads then run in the background, three at a time, with a progress bar on each card.
+- **Motion rules:** layout is measured once at the start. Start points come from the pile's rotation angle (its Animation's `currentTime`). Flights are 12-step Web Animations on `transform` and `opacity`, lasting 900–1300 ms with `cubic-bezier(.45,.05,.25,1)`. Launch times follow `D × (i/N)^0.6`, where `D = clamp(4 s, N × 25 ms, 20 s)`. Counters are written once per animation frame, and a card glows at most once every 250 ms. A token cancels a run that was reset. With reduced motion there is no spin and no flights: counts appear directly and the stage uses 200 ms fades. Messages are inline or toasts, never `alert`.
+- **Day preview:** the stage uses the same pure functions as the server (`exifLocal`, `fileNameLocal`, `dayFor`). The server still decides the day on upload.
+- **Duplicates:** the client fingerprint is `size:sha256` over the first, middle and last 64 KB. It is stored in `trip_photos.fingerprint`, unique per trip (migration `0004_photo_sorting.sql`). A duplicate is caught three ways:
+  - earlier in the same batch;
+  - already uploaded, checked through `POST /api/my-photos/check` (owner);
+  - on the server, which compares the full-file sha256 or the fingerprint.
+- **Screenshots:** a file name like Screenshot, Screen Shot, 螢幕截圖, 截圖, スクリーンショット or screen recording gets the category 截圖 and waits in 未分類, even when its date is known. 「重新依時間分類」 leaves screenshots alone.
+- **Categories** (`trip_photos.category`): 風景、美食、合照、動物、住宿、交通、截圖、其他.
+  - **Classify panel:** 「用 Claude 分類」 (owner). Step 1 downloads numbered contact sheets: 7 × 224 px columns, at most 49 photos per sheet, `#n` in the top-left corner; one sheet downloads as a JPEG, several as a ZIP. Step 2 copies a prompt for a Claude chat Kai already uses. Step 3 reads the pasted reply.
+  - **Reply parser** (`parseClassification`): it reads `{"1":"美食"}`, `{"results":[{id,category}]}`, a bare array, and lines such as `#1：美食`, `1. 美食` or `1 - 美食`. It matches names exactly first, then by containment, and falls back to 其他. Batches add up, and the numbering survives a reload in `sessionStorage`.
+  - **Skip:** 「略過」 puts every unclassified photo in 其他.
+  - **Saving:** `POST /api/my-photos/categories` (owner, up to 500 per call) saves the batch. The edit sheet also has a category field. No API key and no paid model call is involved.
+  - **Filters:** category chips filter 我的照片 and the gallery's 我的照片 mode.
+- **Export** (owner, `src/client/photo-export.ts`, `src/domain/zip.ts`):
+  - **ZIP:** one day or all, built from the display copies. It is an uncompressed (STORE) ZIP with UTF-8 names. Each file's CRC is computed and the file is then added as a Blob, with no big in-memory copy. There is one folder per day (`2026-11-15 第13天/1320 IMG_….jpg`, plus `未分類/`), and repeated names get ` (2)`.
+  - **CSV:** 檔名, 日期, 天數, 分類, 活動, 時間, 說明, with a UTF-8 BOM. Cells that start with `= + - @` are quoted so spreadsheets do not run them.
+- **Not in this version:** videos (Blob Hobby storage is about 1 GB). If a video is picked, the stage says how many were skipped.
+- **Privacy:** unchanged. The new endpoints are owner-only and give guests and strangers the same 401. Viewers see the category of sorted photos only.
+
 ## Review status (2026-11-20)
 
 - Built on branch `feat/my-photos` from `f28aef0`.
 - Independent Codex plan review and code inspection did not run: the first attempt timed out, the second stopped on Codex's usage limit (resets 2026-11-25). Neither the plan nor the code has independent approval yet.
 - Host checks: `tsc` clean; `eslint` shows only the 5 problems already on `main`; `vitest` 253/253; `next build` passes; owner UI checked locally at phone width with the store not configured.
+- Second pass (sorting stage, categories, export) built on the same branch. Codex review again not possible before the quota reset on 2026-11-25. Host checks: `tsc` clean; `eslint` only the 5 problems already on `main`; `vitest` 260/260 (18 photo tests); `next build` passes; ZIP output checked with `unzip -t`. The sorting stage was run locally at 375 px with 84 placeholder images (gradients, no people, including 3 duplicates, 4 screenshots and 5 undated files); uploads were stubbed in the browser so nothing left the machine.

@@ -5,7 +5,9 @@
  * so the stored images carry no GPS.
  */
 
-export type Prepared = { display: Blob; thumb: Blob; meta: { sha256: string; fileName: string; exifTime: string | null; exifOffset: string | null; lat: number | null; lng: number | null; width: number; height: number } };
+import { printRanges } from "@/domain/photo-sort";
+
+export type Prepared = { display: Blob; thumb: Blob; meta: { sha256: string; fingerprint: string | null; fileName: string; exifTime: string | null; exifOffset: string | null; lat: number | null; lng: number | null; width: number; height: number } };
 
 const DISPLAY = 2048;
 const THUMB = 480;
@@ -24,7 +26,17 @@ function wall(v: unknown): string | null {
   return null;
 }
 
-async function readExif(file: File) {
+const hex = (d: ArrayBuffer) => [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, "0")).join("");
+
+/** 'size:sha256' of the first, middle and last 64 KB: finds duplicates without reading big files whole. */
+export async function fingerprint(file: Blob): Promise<string> {
+  const parts = await Promise.all(printRanges(file.size).map(([a, b]) => file.slice(a, b).arrayBuffer()));
+  return `${file.size}:${hex(await crypto.subtle.digest("SHA-256", await new Blob(parts).arrayBuffer()))}`;
+}
+
+export type Exif = { exifTime: string | null; exifOffset: string | null; lat: number | null; lng: number | null };
+
+export async function readExif(file: File): Promise<Exif> {
   try {
     const exifr = (await import("exifr")).default;
     const t = (await exifr.parse(file, { pick: ["DateTimeOriginal", "CreateDate", "OffsetTimeOriginal", "OffsetTime"], gps: false, reviveValues: false })) as Record<string, unknown> | undefined;
@@ -67,13 +79,32 @@ function resize(img: ImageBitmap, long: number, quality: number): Promise<{ blob
   return new Promise((ok, bad) => c.toBlob((b) => (b ? ok({ blob: b, w, h }) : bad(new Error("encode"))), "image/jpeg", quality));
 }
 
-export async function preparePhoto(file: File): Promise<Prepared> {
-  const [hash, exif] = await Promise.all([sha256(file), readExif(file)]);
+/** A small square-ish preview for the sorting stage; null when the browser cannot decode the file (HEIC off Safari). */
+export async function tinyThumb(file: File, size = 96): Promise<string | null> {
+  try {
+    const img = await createImageBitmap(file, { imageOrientation: "from-image" });
+    try {
+      const s = size / Math.min(img.width, img.height);
+      const c = document.createElement("canvas");
+      c.width = c.height = size;
+      c.getContext("2d")!.drawImage(img, (size - img.width * s) / 2, (size - img.height * s) / 2, img.width * s, img.height * s);
+      const b = await new Promise<Blob | null>((ok) => c.toBlob(ok, "image/jpeg", 0.7));
+      return b ? URL.createObjectURL(b) : null;
+    } finally {
+      img.close();
+    }
+  } catch {
+    return null;
+  }
+}
+
+export async function preparePhoto(file: File, known?: { fingerprint?: string; exif?: Exif }): Promise<Prepared> {
+  const [hash, exif, print] = await Promise.all([sha256(file), known?.exif ?? readExif(file), known?.fingerprint ?? fingerprint(file)]);
   const img = await decode(file);
   try {
     const d = await resize(img, DISPLAY, 0.85);
     const t = await resize(img, THUMB, 0.78);
-    return { display: d.blob, thumb: t.blob, meta: { sha256: hash, fileName: file.name.slice(0, 200), ...exif, width: d.w, height: d.h } };
+    return { display: d.blob, thumb: t.blob, meta: { sha256: hash, fingerprint: print, fileName: file.name.slice(0, 200), ...exif, width: d.w, height: d.h } };
   } finally {
     img.close();
   }

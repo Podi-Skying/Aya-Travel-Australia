@@ -135,6 +135,8 @@ export const tripPhotos = pgTable(
     width: integer("width").notNull(),
     height: integer("height").notNull(),
     sha256: text("sha256").notNull(),
+    /** 'size:sha256' of the first, middle and last 64 KB of the original file (src/domain/photo-sort.ts). */
+    fingerprint: text("fingerprint"),
     takenAt: timestamp("taken_at", { withTimezone: true }),
     takenLocal: text("taken_local"),
     timeSource: text("time_source").notNull(),
@@ -144,11 +146,13 @@ export const tripPhotos = pgTable(
     lat: doublePrecision("lat"),
     lng: doublePrecision("lng"),
     caption: text("caption"),
+    /** One of CATEGORIES in src/domain/photo-sort.ts, or null until classified. */
+    category: text("category"),
     fileName: text("file_name").notNull(),
     uploadedBy: text("uploaded_by").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [unique("trip_photos_sha").on(t.tripId, t.sha256), index("trip_photos_day").on(t.tripId, t.dayDate, t.takenLocal)],
+  (t) => [unique("trip_photos_sha").on(t.tripId, t.sha256), unique("trip_photos_print").on(t.tripId, t.fingerprint), index("trip_photos_day").on(t.tripId, t.dayDate, t.takenLocal)],
 );
 
 /* Accounts allowed to see the photos: a GitHub numeric id or a lower-cased email. */

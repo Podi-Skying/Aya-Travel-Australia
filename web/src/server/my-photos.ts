@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getDb, schema } from "./db/client";
 import { HttpError } from "./http";
@@ -8,6 +8,7 @@ import type { PhotoAccess } from "./photo-access";
 import { getCurrentTrip } from "./trips";
 import { blobConfigured, deleteBlobs, putJpeg, readJpeg } from "./photo-blob";
 import { dayFor, exifLocal, fileNameLocal, itemFor, type TimeSource } from "@/domain/photo-day";
+import { CATEGORIES, FINGERPRINT, isScreenshotName, SCREENSHOT } from "@/domain/photo-sort";
 import type { TripDoc } from "@/domain/schema";
 import { toPublicDoc } from "@/domain/privacy";
 
@@ -20,10 +21,11 @@ export const MAX_THUMB = 300_000;
 /** Vercel Blob Hobby stores 1 GB; stop well before it so Blob is never locked for 30 days. */
 export const QUOTA_BYTES = 950_000_000;
 
-export type MyPhoto = { id: string; w: number; h: number; dayDate: string | null; itemId: string | null; takenLocal: string | null; caption: string | null; lat?: number | null; lng?: number | null; fileName?: string; manual?: boolean };
+export type MyPhoto = { id: string; w: number; h: number; dayDate: string | null; itemId: string | null; takenLocal: string | null; caption: string | null; category: string | null; lat?: number | null; lng?: number | null; fileName?: string; manual?: boolean };
 
 export const uploadMeta = z.object({
   sha256: z.string().regex(/^[0-9a-f]{64}$/),
+  fingerprint: z.string().regex(FINGERPRINT).nullish(),
   fileName: z.string().min(1).max(200),
   exifTime: z.string().max(40).nullish(),
   exifOffset: z.string().max(10).nullish(),
@@ -35,26 +37,38 @@ export const uploadMeta = z.object({
 export type UploadMeta = z.infer<typeof uploadMeta>;
 
 export const patchBody = z
-  .object({ dayDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(), itemId: z.string().max(80).nullable().optional(), caption: z.string().max(200).optional() })
+  .object({
+    dayDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+    itemId: z.string().max(80).nullable().optional(),
+    caption: z.string().max(200).optional(),
+    category: z.enum(CATEGORIES).nullable().optional(),
+  })
   .strict();
+
+export const categoriesBody = z.object({ items: z.array(z.object({ id: z.string().uuid(), category: z.enum(CATEGORIES) }).strict()).min(1).max(500) }).strict();
+export const checkBody = z.object({ fingerprints: z.array(z.string().regex(FINGERPRINT)).max(2000) }).strict();
 
 const isJpeg = (b: Uint8Array) => b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff;
 
-/** Where a photo goes, decided on the server from its time and the current trip. */
+/**
+ * Where a photo goes, decided on the server from its time and the current trip. Screenshots keep their
+ * time but wait in 未分類 (a screenshot of a booking is rarely a photo of that day).
+ */
 export function placePhoto(meta: Pick<UploadMeta, "exifTime" | "exifOffset" | "fileName" | "lat" | "lng">, doc: Pick<TripDoc, "days">) {
   const ex = exifLocal(meta.exifTime, meta.exifOffset);
   const fn = ex ? null : fileNameLocal(meta.fileName);
   const local = ex?.local ?? fn?.local ?? null;
   const timeSource: TimeSource = ex ? "exif" : fn ? "filename" : "none";
-  const dayDate = dayFor(local, doc.days);
+  const screenshot = isScreenshotName(meta.fileName);
+  const dayDate = screenshot ? null : dayFor(local, doc.days);
   const day = dayDate ? doc.days.find((d) => d.date === dayDate) : undefined;
   const pos = meta.lat != null && meta.lng != null ? { lat: meta.lat, lng: meta.lng } : null;
   const itemId = day ? itemFor(local, day.items, pos) : null;
-  return { takenLocal: local, takenAt: ex?.at ? new Date(ex.at) : null, timeSource, dayDate, itemId };
+  return { takenLocal: local, takenAt: ex?.at ? new Date(ex.at) : null, timeSource, dayDate, itemId, category: screenshot ? SCREENSHOT : null };
 }
 
 function view(r: typeof tripPhotos.$inferSelect, owner: boolean): MyPhoto {
-  const base = { id: r.id, w: r.width, h: r.height, dayDate: r.dayDate, itemId: r.itemId, takenLocal: r.takenLocal, caption: r.caption };
+  const base = { id: r.id, w: r.width, h: r.height, dayDate: r.dayDate, itemId: r.itemId, takenLocal: r.takenLocal, caption: r.caption, category: r.category };
   return owner ? { ...base, lat: r.lat, lng: r.lng, fileName: r.fileName, manual: r.manual } : base;
 }
 
@@ -78,8 +92,8 @@ export async function uploadPhoto(owner: Owner, tripId: string, display: Uint8Ar
   if (!isJpeg(display) || !isJpeg(thumb)) throw new HttpError(415, "只接受 JPEG");
   if (display.length > MAX_DISPLAY || thumb.length > MAX_THUMB) throw new HttpError(413, "照片太大");
   const db = await getDb();
-  const dup = await db.select().from(tripPhotos).where(and(eq(tripPhotos.tripId, tripId), eq(tripPhotos.sha256, meta.sha256))).limit(1);
-  if (dup[0]) return { photo: view(dup[0], true), duplicate: true };
+  const dup = await findDuplicate(tripId, meta);
+  if (dup) return { photo: view(dup, true), duplicate: true };
   if ((await usedBytes(tripId)) + display.length + thumb.length > QUOTA_BYTES) throw new HttpError(507, "照片空間快滿了（1 GB 上限）");
   const trip = await getCurrentTrip(owner);
   const place = placePhoto(meta, trip?.doc ?? { days: [] });
@@ -99,23 +113,56 @@ export async function uploadPhoto(owner: Owner, tripId: string, display: Uint8Ar
         width: meta.width,
         height: meta.height,
         sha256: meta.sha256,
+        fingerprint: meta.fingerprint ?? null,
         ...place,
         lat: meta.lat ?? null,
         lng: meta.lng ?? null,
         fileName: meta.fileName,
         uploadedBy: owner.githubId,
       })
-      .onConflictDoNothing({ target: [tripPhotos.tripId, tripPhotos.sha256] })
+      .onConflictDoNothing()
       .returning();
     if (r[0]) return { photo: view(r[0], true), duplicate: false };
     // The same photo finished in a parallel request: keep that one.
     await deleteBlobs(paths).catch(() => {});
-    const again = await db.select().from(tripPhotos).where(and(eq(tripPhotos.tripId, tripId), eq(tripPhotos.sha256, meta.sha256))).limit(1);
-    return { photo: view(again[0], true), duplicate: true };
+    const again = await findDuplicate(tripId, meta);
+    if (!again) throw new HttpError(409, "請再試一次");
+    return { photo: view(again, true), duplicate: true };
   } catch (e) {
     await deleteBlobs(paths).catch(() => {});
     throw e;
   }
+}
+
+/** The same photo already stored: equal full-file hash, or equal fingerprint when the client sent one. */
+async function findDuplicate(tripId: string, meta: Pick<UploadMeta, "sha256" | "fingerprint">) {
+  const db = await getDb();
+  const bySha = await db.select().from(tripPhotos).where(and(eq(tripPhotos.tripId, tripId), eq(tripPhotos.sha256, meta.sha256))).limit(1);
+  if (bySha[0] || !meta.fingerprint) return bySha[0];
+  const byPrint = await db.select().from(tripPhotos).where(and(eq(tripPhotos.tripId, tripId), eq(tripPhotos.fingerprint, meta.fingerprint))).limit(1);
+  return byPrint[0];
+}
+
+/** Which of these fingerprints are already stored, so the sorting stage marks them 重複 before uploading. */
+export async function knownFingerprints(tripId: string, prints: string[]): Promise<string[]> {
+  if (!prints.length) return [];
+  const db = await getDb();
+  const r = await db
+    .select({ f: tripPhotos.fingerprint })
+    .from(tripPhotos)
+    .where(and(eq(tripPhotos.tripId, tripId), inArray(tripPhotos.fingerprint, [...new Set(prints)])));
+  return r.map((x) => x.f!).filter(Boolean);
+}
+
+/** Categories from a classified contact sheet, many photos at once. Unknown ids are skipped. */
+export async function setCategories(tripId: string, items: { id: string; category: string }[]): Promise<number> {
+  const db = await getDb();
+  let n = 0;
+  for (const it of items) {
+    const r = await db.update(tripPhotos).set({ category: it.category }).where(and(eq(tripPhotos.tripId, tripId), eq(tripPhotos.id, it.id))).returning({ id: tripPhotos.id });
+    n += r.length;
+  }
+  return n;
 }
 
 async function ownRow(tripId: string, id: string) {
@@ -140,6 +187,7 @@ export async function updatePhoto(owner: Owner, tripId: string, id: string, body
     Object.assign(set, { dayDate, itemId, manual: true });
   }
   if (body.caption !== undefined) set.caption = body.caption.trim() || null;
+  if (body.category !== undefined) set.category = body.category;
   if (!Object.keys(set).length) return view(row, true);
   const db = await getDb();
   const r = await db.update(tripPhotos).set(set).where(eq(tripPhotos.id, row.id)).returning();
@@ -161,7 +209,7 @@ export async function resortPhotos(owner: Owner, tripId: string): Promise<number
   const rows = await db.select().from(tripPhotos).where(and(eq(tripPhotos.tripId, tripId), eq(tripPhotos.manual, false)));
   let changed = 0;
   for (const r of rows) {
-    if (!r.takenLocal) continue;
+    if (!r.takenLocal || isScreenshotName(r.fileName)) continue;
     const dayDate = dayFor(r.takenLocal, trip.doc.days);
     const day = dayDate ? trip.doc.days.find((d) => d.date === dayDate) : undefined;
     const pos = r.lat != null && r.lng != null ? { lat: r.lat, lng: r.lng } : null;

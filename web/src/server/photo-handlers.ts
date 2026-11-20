@@ -3,7 +3,22 @@ import { errorResponse, fail, HttpError, json, readJson, sameOrigin } from "./ht
 import { missingConfig } from "./config";
 import { photoViewersEnabled } from "./auth";
 import { addViewer, createLink, linkTrip, listViewers, photoAccess, removeViewer, revokeLink, VIEWER_COOKIE, type PhotoAccess } from "./photo-access";
-import { deletePhoto, listPhotos, MAX_DISPLAY, MAX_THUMB, patchBody, photoStream, resortPhotos, updatePhoto, uploadMeta, uploadPhoto } from "./my-photos";
+import {
+  categoriesBody,
+  checkBody,
+  deletePhoto,
+  knownFingerprints,
+  listPhotos,
+  MAX_DISPLAY,
+  MAX_THUMB,
+  patchBody,
+  photoStream,
+  resortPhotos,
+  setCategories,
+  updatePhoto,
+  uploadMeta,
+  uploadPhoto,
+} from "./my-photos";
 import { routeQuota } from "./sharing";
 
 /* Route bodies for /api/my-photos/* and /p/<token> (docs/PHOTOS-PLAN.md), kept outside app/ for tests. */
@@ -87,6 +102,30 @@ export async function postResort(req: Request) {
     if (a instanceof Response) return a;
     if (a.kind !== "owner") return denied();
     return json({ changed: await resortPhotos(a.owner, a.tripId) });
+  });
+}
+
+/** Which fingerprints of a batch about to be sorted are already stored (owner). */
+export async function postCheck(req: Request) {
+  return run(async () => {
+    const a = await guard(req, true);
+    if (a instanceof Response) return a;
+    if (a.kind !== "owner") return denied();
+    const b = checkBody.safeParse(await readJson(req, 200_000));
+    if (!b.success) throw new HttpError(400, "格式錯誤");
+    return json({ known: await knownFingerprints(a.tripId, b.data.fingerprints) });
+  });
+}
+
+/** Categories read from a classified contact sheet (owner). */
+export async function postCategories(req: Request) {
+  return run(async () => {
+    const a = await guard(req, true);
+    if (a instanceof Response) return a;
+    if (a.kind !== "owner") return denied();
+    const b = categoriesBody.safeParse(await readJson(req, 60_000));
+    if (!b.success) throw new HttpError(400, "格式錯誤");
+    return json({ updated: await setCategories(a.tripId, b.data.items) });
   });
 }
 

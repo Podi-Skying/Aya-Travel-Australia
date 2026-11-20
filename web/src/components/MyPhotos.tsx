@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { SiteHeader } from "./SiteHeader";
 import { PhotoViewer } from "./Photos";
 import { itemName, photosOfDay, thumbUrl, useMyPhotos, viewerPhotos, type MyPhoto, type MyPhotosData, type PhotoAccessKind } from "@/client/my-photos";
-import { preparePhoto, sendPhoto } from "@/client/photo-upload";
+import { CATEGORIES, isCategory } from "@/domain/photo-sort";
+import { ClassifyPanel, ExportPanel } from "./PhotoTools";
+import { SortStage } from "./SortStage";
 import { fmtDay } from "@/domain/format";
 import type { Item, TripDoc } from "@/domain/schema";
 
@@ -36,101 +38,11 @@ export function PhotoGrid({ photos, onOpen, onEdit }: { photos: MyPhoto[]; onOpe
   );
 }
 
-type Job = { key: string; file: File; name: string; state: "wait" | "prep" | "send" | "done" | "dup" | "fail"; progress: number; error?: string };
-
-function Uploader({ onDone }: { onDone: () => void }) {
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const input = useRef<HTMLInputElement>(null);
-  const running = useRef(0);
-  const seq = useRef(0);
-  const queue = useRef<Job[]>([]);
-  const set = (key: string, patch: Partial<Job>) => setJobs((js) => js.map((j) => (j.key === key ? { ...j, ...patch } : j)));
-
-  const busy = jobs.some((j) => j.state === "wait" || j.state === "prep" || j.state === "send");
-  useEffect(() => {
-    if (!busy) return;
-    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
-    window.addEventListener("beforeunload", warn);
-    return () => window.removeEventListener("beforeunload", warn);
-  }, [busy]);
-
-  const pump = () => {
-    while (running.current < 3 && queue.current.length) {
-      const j = queue.current.shift()!;
-      running.current++;
-      void (async () => {
-        try {
-          set(j.key, { state: "prep", progress: 0, error: undefined });
-          const p = await preparePhoto(j.file);
-          set(j.key, { state: "send" });
-          const r = await sendPhoto(p, (f) => set(j.key, { progress: f }));
-          if (r.status === 200 || r.status === 201) set(j.key, { state: r.status === 200 ? "dup" : "done", progress: 1 });
-          else set(j.key, { state: "fail", error: (r.body as { error?: string } | null)?.error ?? `錯誤 ${r.status}` });
-        } catch {
-          set(j.key, { state: "fail", error: "這張讀不出來或網路中斷" });
-        } finally {
-          running.current--;
-          if (!queue.current.length && running.current === 0) onDone();
-          pump();
-        }
-      })();
-    }
-  };
-
-  const add = (files: FileList | null) => {
-    if (!files?.length) return;
-    const js: Job[] = [...files].map((file) => ({ key: `j${++seq.current}`, file, name: file.name, state: "wait", progress: 0 }));
-    setJobs((old) => [...old.filter((j) => j.state !== "done" && j.state !== "dup"), ...js]);
-    queue.current.push(...js);
-    pump();
-  };
-  const retry = (j: Job) => {
-    set(j.key, { state: "wait", error: undefined });
-    queue.current.push(j);
-    pump();
-  };
-
-  const done = jobs.filter((j) => j.state === "done" || j.state === "dup").length;
-  return (
-    <div className="my-upload">
-      <input ref={input} type="file" accept="image/*,.heic,.heif" multiple hidden onChange={(e) => (add(e.target.files), (e.target.value = ""))} />
-      <button type="button" className="btn my-upload-btn" onClick={() => input.current?.click()}>
-        上傳照片
-      </button>
-      {jobs.length > 0 && (
-        <div className="my-jobs" aria-live="polite">
-          <p className="small muted">
-            {done} / {jobs.length} 張完成
-          </p>
-          <ul>
-            {jobs
-              .filter((j) => j.state !== "done" && j.state !== "dup")
-              .map((j) => (
-                <li key={j.key} className={`my-job ${j.state}`}>
-                  <span className="my-job-name">{j.name}</span>
-                  {j.state === "fail" ? (
-                    <>
-                      <span className="small">{j.error}</span>
-                      <button type="button" className="btn ghost small" onClick={() => retry(j)}>
-                        重試
-                      </button>
-                    </>
-                  ) : (
-                    <progress max={1} value={j.state === "send" ? j.progress : undefined} aria-label={j.name} />
-                  )}
-                </li>
-              ))}
-          </ul>
-        </div>
-      )}
-    </div>
-  );
-}
-
 function EditSheet({ p, doc, onClose, onSaved }: { p: MyPhoto; doc: TripDoc; onClose: () => void; onSaved: () => void }) {
   const [day, setDay] = useState(p.dayDate ?? "");
   const [item, setItem] = useState(p.itemId ?? "");
   const [caption, setCaption] = useState(p.caption ?? "");
+  const [category, setCategory] = useState(p.category ?? "");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const items: Item[] = doc.days.find((d) => d.date === day)?.items ?? [];
@@ -178,12 +90,23 @@ function EditSheet({ p, doc, onClose, onSaved }: { p: MyPhoto; doc: TripDoc; onC
           </label>
         )}
         <label>
+          分類
+          <select value={category} onChange={(e) => setCategory(e.target.value)}>
+            <option value="">還沒分類</option>
+            {CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
           說明
           <input type="text" maxLength={200} value={caption} onChange={(e) => setCaption(e.target.value)} />
         </label>
         {err && <p className="small error">{err}</p>}
         <div className="my-sheet-actions">
-          <button type="button" className="btn" disabled={busy} onClick={() => void call("PATCH", { dayDate: day || null, itemId: item || null, caption })}>
+          <button type="button" className="btn" disabled={busy} onClick={() => void call("PATCH", { dayDate: day || null, itemId: item || null, caption, category: isCategory(category) ? category : null })}>
             儲存
           </button>
           <button type="button" className="btn ghost" disabled={busy} onClick={onClose}>
@@ -308,7 +231,10 @@ export function MyPhotosPage({ access, doc, initialDay }: { access: PhotoAccessK
   const [pick, setPick] = useState<string | null>(initialDay ?? null);
   const [open, setOpen] = useState<{ list: MyPhoto[]; start: number } | null>(null);
   const [edit, setEdit] = useState<MyPhoto | null>(null);
-  const photos = useMemo(() => data?.photos ?? [], [data]);
+  const [cat, setCat] = useState<string | null>(null);
+  const all = useMemo(() => data?.photos ?? [], [data]);
+  const cats = CATEGORIES.filter((c) => all.some((p) => p.category === c));
+  const photos = useMemo(() => (cat ? all.filter((p) => p.category === cat) : all), [all, cat]);
   const unsorted = photos.filter((p) => !p.dayDate);
   const days = doc.days.filter((d) => photos.some((p) => p.dayDate === d.date));
   const shown = pick === UNSORTED ? [] : pick ? days.filter((d) => d.date === pick) : days;
@@ -347,6 +273,19 @@ export function MyPhotosPage({ access, doc, initialDay }: { access: PhotoAccessK
             )}
           </nav>
         )}
+        {data && cats.length > 1 && (
+          <nav className="my-chips my-cats" aria-label="選擇分類">
+            <button type="button" aria-pressed={!cat} onClick={() => setCat(null)}>
+              全部分類
+            </button>
+            {cats.map((c) => (
+              <button key={c} type="button" aria-pressed={cat === c} onClick={() => setCat(cat === c ? null : c)}>
+                {c}
+              </button>
+            ))}
+          </nav>
+        )}
+        {owner && data?.configured && <SortStage doc={doc} onUploaded={() => void reload()} />}
         {owner && (pick === UNSORTED || (!pick && unsorted.length > 0)) && (
           <section className="my-day">
             <h2>未分類</h2>
@@ -372,8 +311,9 @@ export function MyPhotosPage({ access, doc, initialDay }: { access: PhotoAccessK
             </section>
           );
         })}
-        {data && !photos.length && <p className="muted my-empty">{owner ? "還沒有照片。按「上傳照片」從手機選照片。" : "還沒有照片。"}</p>}
-        {owner && data?.configured && <Uploader onDone={() => void reload()} />}
+        {data && !photos.length && <p className="muted my-empty">還沒有照片。</p>}
+        {owner && data?.configured && <ClassifyPanel photos={all} onSaved={() => void reload()} />}
+        {owner && <ExportPanel doc={doc} photos={all} />}
         {owner && (
           <div className="my-tools">
             <button

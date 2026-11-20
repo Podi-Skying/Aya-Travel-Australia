@@ -6,6 +6,8 @@ import * as H from "@/server/handlers";
 import { allowSignIn } from "@/server/auth";
 import { dayFor, exifLocal, fileNameLocal, itemFor } from "@/domain/photo-day";
 import { placePhoto } from "@/server/my-photos";
+import { isScreenshotName, matchCategory, parseClassification, printRanges, toCsv, uniqueName, spiral, launchAt, sortDuration } from "@/domain/photo-sort";
+import { crc32, ZipWriter } from "@/domain/zip";
 import type { Item } from "@/domain/schema";
 
 /* Kai's own photos (docs/PHOTOS-PLAN.md): day sorting, access, and that guests learn nothing. */
@@ -192,6 +194,8 @@ describe("who can see them", () => {
     () => P.deleteMyPhoto(req("DELETE", `/api/my-photos/${id}`), idCtx(id)),
     () => P.getViewers(req("GET", "/api/my-photos/viewers")),
     () => P.postLink(req("POST", "/api/my-photos/links", {})),
+    () => P.postCheck(req("POST", "/api/my-photos/check", { fingerprints: [] })),
+    () => P.postCategories(req("POST", "/api/my-photos/categories", { items: [{ id, category: "美食" }] })),
   ];
 
   it("guests and strangers get the same 401, whether or not photos exist", async () => {
@@ -261,6 +265,8 @@ describe("who can see them", () => {
     expect(vp[0]).not.toHaveProperty("fileName");
     expect(viewer).not.toHaveProperty("usedBytes");
     expect((await P.patchMyPhoto(req("PATCH", `/api/my-photos/${photo.id}`, { caption: "x" }), idCtx(photo.id))).status).toBe(401);
+    expect((await P.postCategories(req("POST", "/api/my-photos/categories", { items: [{ id: photo.id, category: "美食" }] }))).status).toBe(401);
+    expect((await P.postCheck(req("POST", "/api/my-photos/check", { fingerprints: [] }))).status).toBe(401);
 
     signedOut();
     identity.email = null;
@@ -277,5 +283,120 @@ describe("who can see them", () => {
     const bad = await P.openViewerLink(new Request(`${ORIGIN}/p/${token}`), { params: Promise.resolve({ token }) });
     expect(bad.headers.get("location")).toContain("link=invalid");
     expect(bad.headers.get("set-cookie")).toBeNull();
+  });
+});
+
+const print = (s: string) => `1000:${sha(s)}`;
+
+describe("sorting stage helpers", () => {
+  it("knows screenshots by name and keeps them in 未分類 with the 截圖 category", () => {
+    for (const n of ["Screenshot_20261115-101500.png", "Screen Shot 2026-11-15 at 10.15.jpg", "螢幕截圖 2026-11-15.png", "スクリーンショット 2026-11-15.png", "ScreenRecording_11-15.MP4"]) expect(isScreenshotName(n)).toBe(true);
+    for (const n of ["IMG_1234.HEIC", "dji_export_20261115_photo_0034.jpeg", "screen-door.jpg"]) expect(isScreenshotName(n)).toBe(false);
+    const days = [{ date: "2026-11-15", items: [] }] as never;
+    expect(placePhoto({ fileName: "Screenshot_20261115-101500.png" }, { days })).toMatchObject({ dayDate: null, itemId: null, category: "截圖", takenLocal: "2026-11-15T10:15" });
+    expect(placePhoto({ fileName: "IMG_20261115_101500.jpg" }, { days })).toMatchObject({ dayDate: "2026-11-15", category: null });
+  });
+
+  it("reads every reply format a Claude chat gives back", () => {
+    const want = new Map([
+      [1, "美食"],
+      [2, "風景"],
+    ]);
+    expect(parseClassification('{"1":"美食","2":"風景"}', 5)).toEqual(want);
+    expect(parseClassification('Here you go:\n```json\n{"1": "美食", "2": "風景"}\n```', 5)).toEqual(want);
+    expect(parseClassification('{"results":[{"id":1,"category":"美食"},{"id":"2","category":"風景"}]}', 5)).toEqual(want);
+    expect(parseClassification('[{"id":1,"category":"美食"},{"id":2,"category":"風景"}]', 5)).toEqual(want);
+    expect(parseClassification("#1：美食\n#2: 風景", 5)).toEqual(want);
+    expect(parseClassification("1. 美食\n2、風景", 5)).toEqual(want);
+    expect(parseClassification("1 - 美食\n2 - 風景", 5)).toEqual(want);
+    // Fuzzy names, unknown names and out-of-range numbers.
+    expect(parseClassification('{"1":"美食咖啡","2":"cats","9":"風景","0":"風景"}', 5)).toEqual(new Map([[1, "美食"], [2, "其他"]]));
+    expect(parseClassification("no idea", 5).size).toBe(0);
+    expect(matchCategory("「合照」")).toBe("合照");
+    expect(matchCategory("景")).toBe("風景");
+  });
+
+  it("fingerprints read three 64 KB slices, or the whole small file once", () => {
+    expect(printRanges(1000)).toEqual([[0, 1000]]);
+    expect(printRanges(1_000_000)).toEqual([
+      [0, 65_536],
+      [467_232, 532_768],
+      [934_464, 1_000_000],
+    ]);
+  });
+
+  it("writes a valid STORE zip with UTF-8 names, and CSV that Excel reads", () => {
+    expect(crc32(new TextEncoder().encode("123456789"))).toBe(0xcbf43926);
+    const zip = new ZipWriter();
+    const a = new TextEncoder().encode("hello");
+    zip.add("11-15 第13天/洞穴.jpg", a, crc32(a), a.length, new Date(2026, 10, 15, 13, 20));
+    zip.add("未分類/x.jpg", a, crc32(a), a.length);
+    const parts = zip.finish();
+    const bytes = new Uint8Array(parts.reduce((n, p) => n + (p as Uint8Array).length, 0));
+    let o = 0;
+    for (const p of parts) {
+      bytes.set(p as Uint8Array, o);
+      o += (p as Uint8Array).length;
+    }
+    const v = new DataView(bytes.buffer);
+    expect(v.getUint32(0, true)).toBe(0x04034b50);
+    expect(v.getUint16(6, true)).toBe(0x0800);
+    const end = bytes.length - 22;
+    expect(v.getUint32(end, true)).toBe(0x06054b50);
+    expect(v.getUint16(end + 10, true)).toBe(2);
+    const cdAt = v.getUint32(end + 16, true);
+    expect(v.getUint32(cdAt, true)).toBe(0x02014b50);
+    expect(new TextDecoder().decode(bytes.slice(30, 30 + v.getUint16(26, true)))).toBe("11-15 第13天/洞穴.jpg");
+
+    const csv = toCsv([["檔名", "說明"], ["a,b.jpg", '=HYPERLINK("x")']]);
+    expect(csv.startsWith("\ufeff檔名,說明\r\n")).toBe(true);
+    expect(csv).toContain('"a,b.jpg"');
+    expect(csv).toContain(`"'=HYPERLINK(""x"")"`);
+    const taken = new Set<string>();
+    expect([uniqueName("a.jpg", taken), uniqueName("A.jpg", taken), uniqueName("a.jpg", taken)]).toEqual(["a.jpg", "A (2).jpg", "a (3).jpg"]);
+  });
+
+  it("lays out the pile and the launch times", () => {
+    const pts = Array.from({ length: 200 }, (_, i) => spiral(i, 200, 100, 20));
+    expect(Math.max(...pts.map((p) => Math.hypot(p.x, p.y)))).toBeLessThanOrEqual(100);
+    expect(sortDuration(10)).toBe(4000);
+    expect(sortDuration(10_000)).toBe(20000);
+    expect(launchAt(0, 100, 5000)).toBe(0);
+    expect(launchAt(100, 100, 5000)).toBe(5000);
+    // Slow start, then faster: the first quarter of the photos takes over 40% of the time.
+    expect(launchAt(25, 100, 5000)).toBeGreaterThan(2000);
+  });
+});
+
+describe("duplicates and categories (owner)", () => {
+  it("skips a photo whose fingerprint is already stored, and tells the sorting stage which are known", async () => {
+    const r = await P.postMyPhoto(upload({ sha256: sha("p1"), fingerprint: print("p1"), fileName: "IMG_1.jpg" }));
+    expect(r.status).toBe(201);
+    const first = (await json(r)).photo as { id: string };
+    // Same original file, re-encoded differently by the browser: other sha, same fingerprint.
+    const again = await P.postMyPhoto(upload({ sha256: sha("p1-other"), fingerprint: print("p1"), fileName: "IMG_1 copy.jpg" }));
+    expect(again.status).toBe(200);
+    expect(((await json(again)).photo as { id: string }).id).toBe(first.id);
+    expect(store.size).toBe(2);
+    expect((await P.postMyPhoto(upload({ sha256: sha("p2"), fingerprint: "bad", fileName: "x.jpg" }))).status).toBe(400);
+
+    const known = await json(await P.postCheck(req("POST", "/api/my-photos/check", { fingerprints: [print("p1"), print("p9")] })));
+    expect(known.known).toEqual([print("p1")]);
+    expect((await P.postCheck(req("POST", "/api/my-photos/check", { fingerprints: ["nope"] }))).status).toBe(400);
+  });
+
+  it("sets categories in bulk and by hand, and shows them in the list", async () => {
+    const ids: string[] = [];
+    for (const k of ["c1", "c2"]) ids.push(((await json(await P.postMyPhoto(upload({ sha256: sha(k), fileName: `${k}.jpg` })))).photo as { id: string }).id);
+    const shot = (await json(await P.postMyPhoto(upload({ sha256: sha("c3"), fileName: "Screenshot_20261115-101500.jpg" })))).photo as { id: string; category: string; dayDate: string | null };
+    expect(shot).toMatchObject({ category: "截圖", dayDate: null });
+
+    const r = await P.postCategories(req("POST", "/api/my-photos/categories", { items: [{ id: ids[0], category: "美食" }, { id: ids[1], category: "動物" }, { id: "00000000-0000-4000-8000-000000000000", category: "風景" }] }));
+    expect(await json(r)).toEqual({ updated: 2 });
+    expect((await P.postCategories(req("POST", "/api/my-photos/categories", { items: [{ id: ids[0], category: "咖啡" }] }))).status).toBe(400);
+    expect((await P.patchMyPhoto(req("PATCH", `/api/my-photos/${ids[1]}`, { category: "風景" }), idCtx(ids[1]))).status).toBe(200);
+    expect((await P.patchMyPhoto(req("PATCH", `/api/my-photos/${ids[1]}`, { category: "咖啡" }), idCtx(ids[1]))).status).toBe(400);
+    const list = (await json(await P.getMyPhotos(req("GET", "/api/my-photos")))).photos as { id: string; category: string | null }[];
+    expect(Object.fromEntries(list.map((p) => [p.id, p.category]))).toEqual({ [ids[0]]: "美食", [ids[1]]: "風景", [shot.id]: "截圖" });
   });
 });
