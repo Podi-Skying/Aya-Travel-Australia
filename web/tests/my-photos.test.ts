@@ -13,8 +13,17 @@ import type { Item } from "@/domain/schema";
 /* Kai's own photos (docs/PHOTOS-PLAN.md): day sorting, access, and that guests learn nothing. */
 
 const store = new Map<string, Uint8Array>();
+const types = new Map<string, string>();
 vi.mock("@/server/photo-blob", () => ({
   blobConfigured: () => process.env.BLOB_READ_WRITE_TOKEN === "test",
+  blobInfo: async (path: string) => (store.has(path) ? { size: store.get(path)!.length, contentType: types.get(path) ?? "video/mp4" } : null),
+  signedReadUrl: async (path: string, seconds: number) => `https://store.example/${path}?sig=x&ttl=${seconds}`,
+  readBlob: async (path: string) => (store.has(path) ? { stream: new Response(store.get(path)! as BlobPart).body!, contentType: types.get(path) ?? "video/mp4", size: store.get(path)!.length } : null),
+  // Stands in for handleUpload: runs the room check, then hands out a token.
+  videoUploadToken: async (_req: Request, body: { payload: { pathname: string; clientPayload: string | null } }, check: (p: string, c: string | null) => Promise<number>) => ({
+    type: "blob.generate-client-token",
+    clientToken: `token-for-${await check(body.payload.pathname, body.payload.clientPayload)}`,
+  }),
   putJpeg: async (path: string, bytes: Uint8Array) => {
     const p = `${path}-x1`;
     store.set(p, bytes);
@@ -44,6 +53,22 @@ function upload(meta: Record<string, unknown>, display = jpeg(2000), thumb = jpe
   return new Request(`${ORIGIN}/api/my-photos`, { method: "POST", headers: { host: "localhost:3000", origin: ORIGIN, ...headers }, body: form });
 }
 
+const VPATH = "trip-videos/0b6e3b1e-5d1c-4a8e-9c1e-2b1f3c4d5e6f/video.mp4";
+const tokenBody = (pathname: string, bytes: number) => ({ type: "blob.generate-client-token", payload: { pathname, multipart: false, clientPayload: JSON.stringify({ bytes }) } });
+/** What the browser does after the store took the video: poster, thumbnail and details. */
+function videoUpload(meta: Record<string, unknown>, poster = jpeg(2000), thumb = jpeg(300)) {
+  const form = new FormData();
+  form.append("display", new Blob([poster as BlobPart], { type: "image/jpeg" }), "poster.jpg");
+  form.append("thumb", new Blob([thumb as BlobPart], { type: "image/jpeg" }), "thumb.jpg");
+  form.append("meta", JSON.stringify({ width: 1280, height: 720, durationMs: 65_000, ...meta }));
+  return new Request(`${ORIGIN}/api/my-photos/video`, { method: "POST", headers: { host: "localhost:3000", origin: ORIGIN }, body: form });
+}
+/** A video the browser put in the store. */
+const putVideo = (path: string, bytes: number, type = "video/mp4") => {
+  store.set(path, new Uint8Array(bytes).fill(9));
+  types.set(path, type);
+};
+
 const json = async (r: Response) => (await r.json()) as Record<string, unknown>;
 const idCtx = (id: string) => ({ params: Promise.resolve({ id }) });
 const fileCtx = (id: string, size: string) => ({ params: Promise.resolve({ id, size }) });
@@ -53,6 +78,7 @@ beforeEach(async () => {
   asOwner();
   identity.email = null;
   store.clear();
+  types.clear();
   process.env.BLOB_READ_WRITE_TOKEN = "test";
   delete process.env.PHOTO_VIEWERS;
 });
@@ -196,6 +222,10 @@ describe("who can see them", () => {
     () => P.postLink(req("POST", "/api/my-photos/links", {})),
     () => P.postCheck(req("POST", "/api/my-photos/check", { fingerprints: [] })),
     () => P.postCategories(req("POST", "/api/my-photos/categories", { items: [{ id, category: "美食" }] })),
+    () => P.getMyPhotoFile(req("GET", `/api/my-photos/${id}/video`), fileCtx(id, "video")),
+    () => P.getMyPhotoFile(req("GET", `/api/my-photos/${id}/download`), fileCtx(id, "download")),
+    () => P.postVideoToken(req("POST", "/api/my-photos/video/token", tokenBody(VPATH, 1000))),
+    () => P.postVideo(videoUpload({ sha256: sha("v-guest"), fileName: "IMG_1.MOV", videoPath: VPATH })),
   ];
 
   it("guests and strangers get the same 401, whether or not photos exist", async () => {
@@ -469,5 +499,117 @@ describe("labels from Claude on Kai's Mac", () => {
     // Guests learn nothing about labels.
     signedOut();
     expect((await P.postCheck(req("POST", "/api/my-photos/check", { fingerprints: [print("L2")] }))).status).toBe(401);
+  });
+});
+
+describe("videos", () => {
+  it("reads a video's time from its header, picks the poster frame and the stored size", async () => {
+    const { quicktimeTime, posterTime, keepAsIs, targetSize, storageLevel, fitsStorage, isVideoFile, VIDEO_PATH, clock } = await import("@/domain/video");
+    // iPhone: wall time with its zone; cameras: UTC in the header; an empty header is 1904 or 1970.
+    expect(quicktimeTime("2026-11-15T14:30:12+1100", null)).toEqual({ exifTime: "2026:11:15 14:30:12", exifOffset: "+11:00" });
+    expect(exifLocal(quicktimeTime(null, new Date("2026-11-15T03:30:00Z"))!.exifTime, "+00:00")?.local).toBe("2026-11-15T14:30");
+    expect(quicktimeTime(null, new Date("1904-01-01T00:00:00Z"))).toBeNull();
+    expect(quicktimeTime("garbage", "not a date")).toBeNull();
+    expect(fileNameLocal("DJI_20261116093000_0001.MP4")).toEqual({ local: "2026-11-16T09:30", hasTime: true });
+    expect(posterTime(30)).toBe(1);
+    expect(posterTime(4)).toBeCloseTo(0.6);
+    expect(posterTime(NaN)).toBe(0);
+    expect(keepAsIs({ container: "mp4", codec: "avc", width: 1280, height: 720, bytes: 15_000_000, durationSec: 60 })).toBe(true);
+    expect(keepAsIs({ container: "mov", codec: "hevc", width: 3840, height: 2160, bytes: 400_000_000, durationSec: 60 })).toBe(false);
+    expect(keepAsIs({ container: "mp4", codec: "avc", width: 1920, height: 1080, bytes: 15_000_000, durationSec: 60 })).toBe(false);
+    expect(targetSize(3840, 2160)).toEqual({ width: 1280, height: 720 });
+    expect(targetSize(1080, 1920)).toEqual({ width: 720, height: 1280 });
+    expect(targetSize(640, 480)).toEqual({ width: 640, height: 480 });
+    expect([storageLevel(700_000_000), storageLevel(760_000_000), storageLevel(900_000_000)]).toEqual(["ok", "warn", "full"]);
+    expect(fitsStorage(880_000_000, 20_000_000)).toBe(true);
+    expect(fitsStorage(880_000_000, 20_000_001)).toBe(false);
+    expect(isVideoFile({ name: "IMG_0101.MOV" }) && isVideoFile({ name: "clip", type: "video/mp4" }) && !isVideoFile({ name: "a.jpg" })).toBe(true);
+    expect(VIDEO_PATH.test(VPATH) && VIDEO_PATH.test("trip-videos/0b6e3b1e-5d1c-4a8e-9c1e-2b1f3c4d5e6f/video-Ab12.mp4")).toBe(true);
+    expect(VIDEO_PATH.test("trip-photos/x/display.jpg") || VIDEO_PATH.test("../trip-videos/0b6e3b1e-5d1c-4a8e-9c1e-2b1f3c4d5e6f/video.mp4")).toBe(false);
+    expect([clock(65_000), clock(3_723_000)]).toEqual(["1:05", "1:02:03"]);
+  });
+
+  it("hands out an upload token only for a video path that fits, and refuses past 900 MB", async () => {
+    const ok = await P.postVideoToken(req("POST", "/api/my-photos/video/token", tokenBody(VPATH, 20_000_000)));
+    expect(ok.status).toBe(200);
+    expect(String((await json(ok)).clientToken)).toMatch(/^token-for-\d+$/);
+    expect((await P.postVideoToken(req("POST", "/api/my-photos/video/token", tokenBody("trip-photos/x/display.jpg", 10)))).status).toBe(400);
+    expect((await P.postVideoToken(req("POST", "/api/my-photos/video/token", tokenBody(VPATH, 600_000_000)))).status).toBe(400);
+    expect((await P.postVideoToken(req("POST", "/api/my-photos/video/token", { type: "blob.upload-completed", payload: {} }))).status).toBe(400);
+    // Fill the store to 880 MB: a 20 MB video plus its poster no longer fits.
+    putVideo("trip-videos/11111111-1111-4111-8111-111111111111/video.mp4", 1);
+    const { getDb, schema } = await import("@/server/db/client");
+    const { getCurrentTrip } = await import("@/server/trips");
+    const trip = (await getCurrentTrip({ githubId: "32431832" } as never))!;
+    const db = await getDb();
+    await db.insert(schema.tripPhotos).values({ tripId: trip.tripId, displayPath: "a", thumbPath: "b", bytes: 880_000_000, width: 1, height: 1, sha256: sha("big"), timeSource: "none", fileName: "big.mp4", uploadedBy: "32431832" });
+    const full = await P.postVideoToken(req("POST", "/api/my-photos/video/token", tokenBody(VPATH, 20_000_000)));
+    expect(full.status).toBe(507);
+    expect(String((await json(full)).error)).toContain("900 MB");
+    expect((await json(await P.getMyPhotos(req("GET", "/api/my-photos")))).limitBytes).toBe(1_000_000_000);
+  });
+
+  it("stores a video with its poster, plays it through a short-lived link, and deletes all of it", async () => {
+    const { day } = await seedDayWithItem();
+    putVideo(VPATH, 5_000_000);
+    const r = await P.postVideo(videoUpload({ sha256: sha("v1"), fingerprint: print("v1"), fileName: "IMG_0101.MOV", videoPath: VPATH, exifTime: `${day.date.replaceAll("-", ":")} 10:00:00`, exifOffset: "+11:00" }));
+    expect(r.status).toBe(201);
+    const v = (await json(r)).photo as { id: string; video: boolean; durationMs: number; dayDate: string };
+    expect(v).toMatchObject({ video: true, durationMs: 65_000, dayDate: day.date });
+    const list = await json(await P.getMyPhotos(req("GET", "/api/my-photos")));
+    expect(list.usedBytes).toBe(5_000_000 + 2000 + 300);
+    // The player gets a redirect to a 30-minute link; nothing is cached.
+    const play = await P.getMyPhotoFile(req("GET", `/api/my-photos/${v.id}/video`), fileCtx(v.id, "video"));
+    expect(play.status).toBe(302);
+    expect(play.headers.get("location")).toContain("ttl=1800");
+    expect(play.headers.get("cache-control")).toBe("no-store");
+    const dl = await P.getMyPhotoFile(req("GET", `/api/my-photos/${v.id}/download`), fileCtx(v.id, "download"));
+    expect(dl.status).toBe(200);
+    expect((await dl.arrayBuffer()).byteLength).toBe(5_000_000);
+    // The same path cannot make a second row; the same video again is a duplicate and its new copy is removed.
+    expect((await P.postVideo(videoUpload({ sha256: sha("v1b"), fileName: "IMG_0101.MOV", videoPath: VPATH }))).status).toBe(409);
+    const again = "trip-videos/22222222-2222-4222-8222-222222222222/video.mp4";
+    putVideo(again, 5_000_000);
+    const dup = await P.postVideo(videoUpload({ sha256: sha("v1"), fingerprint: print("v1"), fileName: "IMG_0101.MOV", videoPath: again }));
+    expect(dup.status).toBe(200);
+    expect(store.has(again)).toBe(false);
+    // Not a video, or not in the store: refused and cleaned up.
+    const bad = "trip-videos/33333333-3333-4333-8333-333333333333/video.mp4";
+    putVideo(bad, 10, "text/html");
+    expect((await P.postVideo(videoUpload({ sha256: sha("v2"), fileName: "x.mp4", videoPath: bad }))).status).toBe(415);
+    expect(store.has(bad)).toBe(false);
+    expect((await P.postVideo(videoUpload({ sha256: sha("v3"), fileName: "x.mp4", videoPath: "trip-videos/44444444-4444-4444-8444-444444444444/video.mp4" }))).status).toBe(400);
+    expect((await P.postVideo(videoUpload({ sha256: sha("v4"), fileName: "x.mp4", videoPath: "elsewhere/video.mp4" }))).status).toBe(400);
+    // A photo has no video link.
+    const photo = (await json(await P.postMyPhoto(upload({ sha256: sha("p9"), fileName: "IMG_9.jpg" })))).photo as { id: string };
+    expect((await P.getMyPhotoFile(req("GET", `/api/my-photos/${photo.id}/video`), fileCtx(photo.id, "video"))).status).toBe(404);
+    expect((await P.deleteMyPhoto(req("DELETE", `/api/my-photos/${v.id}`), idCtx(v.id))).status).toBe(200);
+    expect(store.has(VPATH)).toBe(false);
+  });
+
+  it("refuses a video that would pass 900 MB once it is in the store, and removes it", async () => {
+    const { getDb, schema } = await import("@/server/db/client");
+    const { getCurrentTrip } = await import("@/server/trips");
+    const trip = (await getCurrentTrip({ githubId: "32431832" } as never))!;
+    await (await getDb()).insert(schema.tripPhotos).values({ tripId: trip.tripId, displayPath: "a", thumbPath: "b", bytes: 898_000_000, width: 1, height: 1, sha256: sha("big2"), timeSource: "none", fileName: "big.mp4", uploadedBy: "32431832" });
+    putVideo(VPATH, 3_000_000);
+    const r = await P.postVideo(videoUpload({ sha256: sha("v5"), fileName: "IMG_5.MOV", videoPath: VPATH }));
+    expect(r.status).toBe(507);
+    expect(store.has(VPATH)).toBe(false);
+  });
+
+  it("guests never learn a video exists or where it is stored", async () => {
+    putVideo(VPATH, 1000);
+    const v = (await json(await P.postVideo(videoUpload({ sha256: sha("v6"), fileName: "IMG_3490.MOV", videoPath: VPATH })))).photo as { id: string; dayDate: string | null };
+    expect(v.dayDate).toBeNull();
+    signedOut();
+    for (const size of ["video", "download"]) {
+      const r = await P.getMyPhotoFile(req("GET", `/api/my-photos/${v.id}/${size}`), fileCtx(v.id, size));
+      expect(r.status).toBe(401);
+      expect(r.headers.get("location")).toBeNull();
+    }
+    const pub = await (await H.getPublicHome()).text();
+    expect(pub).not.toContain("trip-videos/");
+    expect(pub).not.toContain(v.id);
   });
 });

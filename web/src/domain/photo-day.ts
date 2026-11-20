@@ -48,10 +48,11 @@ export function exifLocal(raw: string | null | undefined, offset?: string | null
 
 /**
  * A date in a file name: the first 8-digit 20YYMMDD group that is a real date (dji_export_20261115_photo_0034,
- * IMG_20261115_143012, 20261115_143012). A 6-digit HHMMSS right after it gives the time.
+ * IMG_20261115_143012, 20261115_143012, DJI_20261116093000_0001). A 6-digit HHMMSS right after it, or
+ * joined to it, gives the time.
  */
 export function fileNameLocal(name: string): { local: string; hasTime: boolean } | null {
-  for (const m of name.matchAll(/(?<!\d)(20\d{2})(\d{2})(\d{2})(?!\d)(?:[_-](\d{2})(\d{2})(\d{2})(?!\d))?/g)) {
+  for (const m of name.matchAll(/(?<!\d)(20\d{2})(\d{2})(\d{2})(?:[_-]?(\d{2})(\d{2})(\d{2}))?(?!\d)/g)) {
     const [y, mo, d] = [m[1], m[2], m[3]].map(Number);
     if (!validDate(y, mo, d)) continue;
     const date = `${m[1]}-${m[2]}-${m[3]}`;

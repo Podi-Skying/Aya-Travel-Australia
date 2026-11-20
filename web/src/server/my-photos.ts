@@ -6,11 +6,12 @@ import { HttpError } from "./http";
 import type { Owner } from "./owner";
 import type { PhotoAccess } from "./photo-access";
 import { getCurrentTrip } from "./trips";
-import { blobConfigured, deleteBlobs, putJpeg, readJpeg } from "./photo-blob";
+import { blobConfigured, blobInfo, deleteBlobs, putJpeg, readBlob, readJpeg, signedReadUrl } from "./photo-blob";
 import { dayFor, exifLocal, fileNameLocal, itemFor, type TimeSource } from "@/domain/photo-day";
 import { CATEGORIES, FINGERPRINT, isCategory, isScreenshotName, SCREENSHOT } from "@/domain/photo-sort";
 import type { TripDoc } from "@/domain/schema";
 import { toPublicDoc } from "@/domain/privacy";
+import { fitsStorage, MAX_VIDEO_BYTES, storageCaps, STORAGE_LIMIT_BYTES, VIDEO_PATH, VIDEO_TYPES } from "@/domain/video";
 
 /* Kai's own photos (docs/PHOTOS-PLAN.md): rows in Neon, bytes in the private Blob store. */
 
@@ -18,10 +19,10 @@ const { tripPhotos, photoLabels } = schema;
 
 export const MAX_DISPLAY = 3_000_000;
 export const MAX_THUMB = 300_000;
-/** Vercel Blob Hobby stores 1 GB; stop well before it so Blob is never locked for 30 days. */
-export const QUOTA_BYTES = 950_000_000;
+/** Uploads stop at 90 % of the Blob store (src/domain/media.ts), so it is never locked for 30 days. */
+export const QUOTA_BYTES = storageCaps().refuse;
 
-export type MyPhoto = { id: string; w: number; h: number; dayDate: string | null; itemId: string | null; takenLocal: string | null; caption: string | null; category: string | null; lat?: number | null; lng?: number | null; fileName?: string; manual?: boolean };
+export type MyPhoto = { id: string; w: number; h: number; dayDate: string | null; itemId: string | null; takenLocal: string | null; caption: string | null; category: string | null; video?: true; durationMs?: number | null; lat?: number | null; lng?: number | null; fileName?: string; manual?: boolean };
 
 export const uploadMeta = z.object({
   sha256: z.string().regex(/^[0-9a-f]{64}$/),
@@ -36,6 +37,13 @@ export const uploadMeta = z.object({
   height: z.number().int().min(1).max(4096),
 });
 export type UploadMeta = z.infer<typeof uploadMeta>;
+
+/** A video: the poster frame goes up like a photo, the video itself is already in the store at `videoPath`. */
+export const videoMeta = uploadMeta.extend({ videoPath: z.string().regex(VIDEO_PATH), durationMs: z.number().int().min(0).max(24 * 3600_000).nullish() });
+export type VideoMeta = z.infer<typeof videoMeta>;
+
+/** What the browser says before it puts a video in the store. */
+export const videoTokenPayload = z.object({ bytes: z.number().int().min(1).max(MAX_VIDEO_BYTES) }).strict();
 
 export const patchBody = z
   .object({
@@ -69,11 +77,12 @@ export function placePhoto(meta: Pick<UploadMeta, "exifTime" | "exifOffset" | "f
 }
 
 function view(r: typeof tripPhotos.$inferSelect, owner: boolean): MyPhoto {
-  const base = { id: r.id, w: r.width, h: r.height, dayDate: r.dayDate, itemId: r.itemId, takenLocal: r.takenLocal, caption: r.caption, category: r.category };
+  const base: MyPhoto = { id: r.id, w: r.width, h: r.height, dayDate: r.dayDate, itemId: r.itemId, takenLocal: r.takenLocal, caption: r.caption, category: r.category };
+  if (r.mediaType === "video") Object.assign(base, { video: true, durationMs: r.durationMs });
   return owner ? { ...base, lat: r.lat, lng: r.lng, fileName: r.fileName, manual: r.manual } : base;
 }
 
-async function usedBytes(tripId: string): Promise<number> {
+export async function usedBytes(tripId: string): Promise<number> {
   const db = await getDb();
   const r = await db.select({ n: sql<number>`coalesce(sum(${tripPhotos.bytes}), 0)::bigint` }).from(tripPhotos).where(eq(tripPhotos.tripId, tripId));
   return Number(r[0]?.n ?? 0);
@@ -85,17 +94,49 @@ export async function listPhotos(access: PhotoAccess) {
   const owner = access.kind === "owner";
   // Viewers see sorted photos only; 未分類 is the owner's inbox.
   const photos = rows.filter((r) => owner || r.dayDate).map((r) => view(r, owner));
-  return { configured: blobConfigured(), photos, ...(owner ? { usedBytes: await usedBytes(access.tripId), quotaBytes: QUOTA_BYTES } : {}) };
+  return { configured: blobConfigured(), photos, ...(owner ? { usedBytes: await usedBytes(access.tripId), quotaBytes: QUOTA_BYTES, limitBytes: STORAGE_LIMIT_BYTES } : {}) };
 }
 
-export async function uploadPhoto(owner: Owner, tripId: string, display: Uint8Array, thumb: Uint8Array, meta: UploadMeta): Promise<{ photo: MyPhoto; duplicate: boolean }> {
+export function uploadPhoto(owner: Owner, tripId: string, display: Uint8Array, thumb: Uint8Array, meta: UploadMeta): Promise<{ photo: MyPhoto; duplicate: boolean }> {
+  return storeMedia(owner, tripId, display, thumb, meta, null);
+}
+
+const FULL = "空間快滿了，這個檔案放不下（上限 900 MB，免費方案 1 GB）";
+
+/**
+ * Finishes a video the browser already put in the store: checks the file is there, is a video, is the size
+ * the store reports and still fits; otherwise the file is deleted again. The poster frame is stored like a photo.
+ */
+export async function uploadVideo(owner: Owner, tripId: string, poster: Uint8Array, thumb: Uint8Array, meta: VideoMeta): Promise<{ photo: MyPhoto; duplicate: boolean }> {
+  if (!blobConfigured()) throw new HttpError(503, "照片儲存空間還沒設定");
+  const db = await getDb();
+  const taken = await db.select({ id: tripPhotos.id }).from(tripPhotos).where(eq(tripPhotos.videoPath, meta.videoPath)).limit(1);
+  if (taken[0]) throw new HttpError(409, "這支影片已經存過");
+  const info = await blobInfo(meta.videoPath);
+  if (!info) throw new HttpError(400, "找不到上傳的影片，請再試一次");
+  const drop = () => deleteBlobs([meta.videoPath]).catch(() => {});
+  if (!(VIDEO_TYPES as readonly string[]).includes(info.contentType.split(";")[0]) || info.size > MAX_VIDEO_BYTES) {
+    await drop();
+    throw new HttpError(415, "只接受 MP4、MOV 或 WebM 影片");
+  }
+  try {
+    const r = await storeMedia(owner, tripId, poster, thumb, meta, { path: meta.videoPath, bytes: info.size, durationMs: meta.durationMs ?? null });
+    if (r.duplicate) await drop();
+    return r;
+  } catch (e) {
+    await drop();
+    throw e;
+  }
+}
+
+async function storeMedia(owner: Owner, tripId: string, display: Uint8Array, thumb: Uint8Array, meta: UploadMeta, video: { path: string; bytes: number; durationMs: number | null } | null): Promise<{ photo: MyPhoto; duplicate: boolean }> {
   if (!blobConfigured()) throw new HttpError(503, "照片儲存空間還沒設定");
   if (!isJpeg(display) || !isJpeg(thumb)) throw new HttpError(415, "只接受 JPEG");
   if (display.length > MAX_DISPLAY || thumb.length > MAX_THUMB) throw new HttpError(413, "照片太大");
   const db = await getDb();
   const dup = await findDuplicate(tripId, meta);
   if (dup) return { photo: view(dup, true), duplicate: true };
-  if ((await usedBytes(tripId)) + display.length + thumb.length > QUOTA_BYTES) throw new HttpError(507, "照片空間快滿了（1 GB 上限）");
+  if (!fitsStorage(await usedBytes(tripId), display.length + thumb.length + (video?.bytes ?? 0))) throw new HttpError(507, FULL);
   const trip = await getCurrentTrip(owner);
   const doc = trip?.doc ?? { days: [] };
   const place = placePhoto(meta, doc);
@@ -121,7 +162,8 @@ export async function uploadPhoto(owner: Owner, tripId: string, display: Uint8Ar
         tripId,
         displayPath: paths[0],
         thumbPath: paths[1],
-        bytes: display.length + thumb.length,
+        bytes: display.length + thumb.length + (video?.bytes ?? 0),
+        ...(video ? { mediaType: "video", videoPath: video.path, durationMs: video.durationMs } : {}),
         width: meta.width,
         height: meta.height,
         sha256: meta.sha256,
@@ -247,7 +289,7 @@ export async function updatePhoto(owner: Owner, tripId: string, id: string, body
 
 export async function deletePhoto(tripId: string, id: string) {
   const row = await ownRow(tripId, id);
-  await deleteBlobs([row.displayPath, row.thumbPath]);
+  await deleteBlobs([row.displayPath, row.thumbPath, ...(row.videoPath ? [row.videoPath] : [])]);
   const db = await getDb();
   await db.delete(tripPhotos).where(eq(tripPhotos.id, row.id));
 }
@@ -278,6 +320,38 @@ export async function photoStream(access: PhotoAccess, id: string, size: "thumb"
   if (access.kind !== "owner" && !row.dayDate) throw new HttpError(404, "找不到");
   if (!blobConfigured()) return null;
   return readJpeg(size === "thumb" ? row.thumbPath : row.displayPath);
+}
+
+/** Before a video goes up: the largest size the browser may put in the store, or an error when it will not fit. */
+export async function videoRoom(tripId: string, pathname: string, payload: string | null): Promise<number> {
+  if (!blobConfigured()) throw new HttpError(503, "照片儲存空間還沒設定");
+  if (!VIDEO_PATH.test(pathname)) throw new HttpError(400, "影片路徑不對");
+  let parsed: unknown = null;
+  try {
+    parsed = JSON.parse(payload ?? "null");
+  } catch {}
+  const p = videoTokenPayload.safeParse(parsed);
+  if (!p.success) throw new HttpError(400, "影片資料格式錯誤");
+  const used = await usedBytes(tripId);
+  // room for the poster and thumbnail too
+  if (!fitsStorage(used, p.data.bytes + MAX_DISPLAY + MAX_THUMB)) throw new HttpError(507, FULL);
+  return Math.min(MAX_VIDEO_BYTES, storageCaps().refuse - used - MAX_DISPLAY - MAX_THUMB);
+}
+
+/** A 30-minute link to the video for the player (the store serves ranges, so seeking works). */
+export async function videoLink(access: PhotoAccess, id: string): Promise<string | null> {
+  const row = await ownRow(access.tripId, id);
+  if (access.kind !== "owner" && !row.dayDate) throw new HttpError(404, "找不到");
+  if (!row.videoPath || !blobConfigured()) return null;
+  return signedReadUrl(row.videoPath, 1800);
+}
+
+/** The video file itself, streamed through the site (downloads, where a redirect to the store would hit CORS). */
+export async function videoFile(access: PhotoAccess, id: string) {
+  const row = await ownRow(access.tripId, id);
+  if (access.kind !== "owner" && !row.dayDate) throw new HttpError(404, "找不到");
+  if (!row.videoPath || !blobConfigured()) return null;
+  return readBlob(row.videoPath);
 }
 
 /** The trip as this person may see it: the owner's own document, or the redacted public one for viewers. */

@@ -4,9 +4,11 @@ import { Cormorant_Garamond, Noto_Serif_TC } from "next/font/google";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { thumbUrl, type MyPhoto } from "@/client/my-photos";
 import { fingerprint, preparePhoto, readExif, sendPhoto, tinyThumb, type Exif } from "@/client/photo-upload";
+import { NeedsMac, prepareVideo, readVideo, sendVideo, videoThumb, type VideoInfo } from "@/client/video-upload";
 import { dayFor, exifLocal, fileNameLocal } from "@/domain/photo-day";
 import { bezier, isCategory, isScreenshotName, launchAt, pileThumb, sortDuration, spiral, type Category } from "@/domain/photo-sort";
 import type { TripDoc } from "@/domain/schema";
+import { COMPRESSED_DIR, gbOrMb, isVideoFile, mb, storageCaps, storageLevel, STORAGE_LIMIT_BYTES } from "@/domain/video";
 import { ClassifySteps, ExportPanel, LibraryClassify } from "./PhotoTools";
 
 /*
@@ -24,19 +26,24 @@ const accent = Cormorant_Garamond({ weight: "600", style: "italic", subsets: ["l
 export const UNSORTED = "unsorted";
 const DUP = "dup";
 const IMAGE_EXT = /\.(jpe?g|png|gif|webp|bmp|tiff?|heic|heif|avif)$/i;
-const VIDEO_EXT = /\.(mp4|mov|m4v|webm|avi|mkv|3gp)$/i;
 const TILE = 18;
 const GAP = 3;
 const SKIN_KEY = "aya-photos-skin";
 const WD = ["日", "一", "二", "三", "四", "五", "六"];
 
 type Up = "wait" | "send" | "done" | "fail";
-type Entry = { key: string; file: File; thumb: string | null; print: string; exif: Exif; target: string; screenshot: boolean; category: Category | null; labelled: boolean; rot: number; z: number; scanned: boolean; up: Up; error?: string };
+type Entry = { key: string; file: File; video: boolean; info?: VideoInfo; thumb: string | null; print: string; exif: Exif; target: string; screenshot: boolean; category: Category | null; labelled: boolean; rot: number; z: number; scanned: boolean; up: Up; error?: string; needsMac?: boolean };
 type Phase = "idle" | "scan" | "ready" | "fly" | "upload" | "done";
 type Section = "add" | "classify" | "export" | "look" | "who";
 
 const isImage = (f: File) => !f.name.startsWith(".") && (f.type.startsWith("image/") || IMAGE_EXT.test(f.name));
-const isVideo = (f: File) => f.type.startsWith("video/") || VIDEO_EXT.test(f.name);
+const OTHER_VIDEO = /\.(avi|mkv|3gp|mts|m2ts)$/i;
+
+/* where a dropped file sat in its folder, so a copy in 照片待分類/已壓縮 can stand in for its original */
+const dropPath = new WeakMap<File, string>();
+const pathOf = (f: File) => dropPath.get(f) ?? (f.webkitRelativePath || f.name);
+const inCompressed = (f: File) => pathOf(f).split("/").includes(COMPRESSED_DIR);
+const stem = (name: string) => name.replace(/\.[^.]*$/, "").toLowerCase();
 const short = (date: string) => `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
 const weekday = (date: string) => WD[new Date(`${date}T12:00:00`).getDay()];
 const reducedMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -46,7 +53,9 @@ async function filesFromDrop(items: DataTransferItemList): Promise<File[]> {
   const out: File[] = [];
   const walk = async (e: FileSystemEntry): Promise<void> => {
     if (e.isFile) {
-      out.push(await new Promise<File>((ok, bad) => (e as FileSystemFileEntry).file(ok, bad)));
+      const f = await new Promise<File>((ok, bad) => (e as FileSystemFileEntry).file(ok, bad));
+      dropPath.set(f, e.fullPath.replace(/^\//, ""));
+      out.push(f);
       return;
     }
     if (!e.isDirectory || e.name.startsWith(".")) return;
@@ -94,13 +103,14 @@ export type SorterProps = {
   photos: MyPhoto[];
   configured: boolean;
   usedBytes?: number;
+  limitBytes?: number;
   onUploaded: () => void;
   onOpenDay: (target: string) => void;
   who: ReactNode;
   setup: ReactNode;
 };
 
-export function Sorter({ doc, photos, configured, usedBytes, onUploaded, onOpenDay, who, setup }: SorterProps) {
+export function Sorter({ doc, photos, configured, usedBytes, limitBytes = STORAGE_LIMIT_BYTES, onUploaded, onOpenDay, who, setup }: SorterProps) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [entries, setEntries] = useState<Entry[]>([]);
   const [read, setRead] = useState(0);
@@ -203,7 +213,6 @@ export function Sorter({ doc, photos, configured, usedBytes, onUploaded, onOpenD
 
   const flush = useCallback(() => {
     frame.current = 0;
-    let inDays = 0;
     let used = 0;
     for (const t of targets) {
       const n = (landed.current.get(t) ?? 0) + (t === DUP ? 0 : (base.get(t)?.length ?? 0));
@@ -211,18 +220,13 @@ export function Sorter({ doc, photos, configured, usedBytes, onUploaded, onOpenD
       const num = card?.querySelector<HTMLElement>(".srt-n");
       if (num) num.textContent = String(n);
       card?.classList.toggle("has", n > 0);
-      if (t !== UNSORTED && t !== DUP) {
-        inDays += landed.current.get(t) ?? 0;
-        if (n) used++;
-      }
+      if (t !== UNSORTED && t !== DUP && n) used++;
     }
     const put = (k: string, v: number) => {
       const el = stat.current.get(k);
       if (el) el.textContent = v.toLocaleString();
     };
-    put("days", inDays);
     put("used", used);
-    put("unsorted", landed.current.get(UNSORTED) ?? 0);
     put("dup", landed.current.get(DUP) ?? 0);
   }, [targets, base]);
 
@@ -242,7 +246,7 @@ export function Sorter({ doc, photos, configured, usedBytes, onUploaded, onOpenD
       const card = cards.current.get(e.target);
       if (card && slot && e.thumb) {
         const tile = document.createElement("i");
-        tile.className = "srt-tile new";
+        tile.className = `srt-tile new${e.video ? " vid" : ""}`;
         tile.style.backgroundImage = `url(${e.thumb})`;
         tile.style.gridColumn = String(slot.col + 1);
         tile.style.gridRow = String(slot.row + 1);
@@ -278,16 +282,20 @@ export function Sorter({ doc, photos, configured, usedBytes, onUploaded, onOpenD
     if (phase !== "idle" && phase !== "done") return;
     if (phase === "done") reset();
     setPanel(null);
-    const images = list.filter(isImage);
-    const video = list.filter(isVideo).length;
-    if (!images.length) return say(video ? "影片這一版還不收，請選照片。" : "沒有找到照片。");
-    if (video) say(`影片這一版還不收，略過 ${video} 支。`);
+    /* a video Kai's Mac already shrank (照片待分類/已壓縮) stands in for its original */
+    const shrunk = new Set(list.filter((f) => isVideoFile(f) && inCompressed(f)).map((f) => stem(f.name)));
+    const replaced = list.filter((f) => isVideoFile(f) && !inCompressed(f) && shrunk.has(stem(f.name)));
+    const media = list.filter((f) => (isImage(f) || isVideoFile(f)) && !replaced.includes(f));
+    const other = list.filter((f) => OTHER_VIDEO.test(f.name)).length;
+    if (!media.length) return say(other ? "這種影片格式還不收，請用 MP4 或 MOV。" : "沒有找到照片或影片。");
+    if (other) say(`略過 ${other} 個不支援的影片格式（請用 MP4 或 MOV）。`);
     const my = ++token.current;
     setPhase("scan");
     setRead(0);
-    const fresh: Entry[] = images.map((file) => ({
+    const fresh: Entry[] = media.map((file) => ({
       key: `s${++seq.current}`,
       file,
+      video: isVideoFile(file),
       thumb: null,
       print: "",
       exif: { exifTime: null, exifOffset: null, lat: null, lng: null },
@@ -304,10 +312,15 @@ export function Sorter({ doc, photos, configured, usedBytes, onUploaded, onOpenD
     const done: Entry[] = [];
     let n = 0;
     await pool(fresh, 4, async (e) => {
-      const [print, exif, thumb] = await Promise.all([fingerprint(e.file).catch(() => ""), readExif(e.file), tinyThumb(e.file)]);
+      let print: string, exif: Exif, thumb: string | null, info: VideoInfo | undefined;
+      if (e.video) {
+        [print, info] = await Promise.all([fingerprint(e.file).catch(() => ""), readVideo(e.file)]);
+        exif = info.exif;
+        thumb = await videoThumb(e.file, info.durationSec);
+      } else [print, exif, thumb] = await Promise.all([fingerprint(e.file).catch(() => ""), readExif(e.file), tinyThumb(e.file)]);
       if (token.current !== my) return;
       const local = exifLocal(exif.exifTime, exif.exifOffset)?.local ?? fileNameLocal(e.file.name)?.local ?? null;
-      const next: Entry = { ...e, print, exif, thumb, scanned: true, category: e.screenshot ? "截圖" : null, target: e.screenshot ? UNSORTED : (dayFor(local, days) ?? UNSORTED) };
+      const next: Entry = { ...e, print, exif, info, thumb, scanned: true, category: e.screenshot ? "截圖" : null, target: e.screenshot ? UNSORTED : (dayFor(local, days) ?? UNSORTED) };
       done.push(next);
       setRead(++n);
       setEntries((es) => es.map((x) => (x.key === e.key ? next : x)));
@@ -378,7 +391,7 @@ export function Sorter({ doc, photos, configured, usedBytes, onUploaded, onOpenD
     flush();
     const list = entries;
     const left = list.filter((e) => e.target !== DUP && !e.category).length;
-    if (left && !classified) say(`${left} 張還沒分類，之後可以在「設定」裡分。`);
+    if (left && !classified) say(`${left} 個還沒分類，之後可以在「設定」裡分。`);
     setPanel(null);
     if (reducedMotion() || !stage.current || !center.current || !layer.current) {
       for (const e of list) land(e, null);
@@ -432,7 +445,7 @@ export function Sorter({ doc, photos, configured, usedBytes, onUploaded, onOpenD
         const src = pileImgs.current.get(e.key);
         if (src) src.style.visibility = "hidden";
         const el = document.createElement("i");
-        el.className = "srt-fly";
+        el.className = `srt-fly${e.video ? " vid" : ""}`;
         el.style.width = el.style.height = `${size}px`;
         if (e.thumb) el.style.backgroundImage = `url(${e.thumb})`;
         layer.current!.append(el);
@@ -465,6 +478,7 @@ export function Sorter({ doc, photos, configured, usedBytes, onUploaded, onOpenD
 
   /* ---------- 3. upload ---------- */
   const [sent, setSent] = useState(0);
+  const [videoNote, setVideoNote] = useState<string | null>(null);
   const upload = async (list: Entry[], my: number) => {
     const work = list.filter((e) => e.target !== DUP && e.up !== "done");
     if (!configured) {
@@ -472,27 +486,62 @@ export function Sorter({ doc, photos, configured, usedBytes, onUploaded, onOpenD
       say("照片儲存空間還沒設定，這次只整理不上傳。");
       return;
     }
+    const level = storageLevel(usedBytes ?? 0, limitBytes);
+    if (level === "full") {
+      setPhase("done");
+      say(`空間快滿了（已用 ${mb(usedBytes ?? 0)} / ${gbOrMb(limitBytes)}），這次只整理不上傳。`);
+      return;
+    }
+    if (level === "warn") say(`空間已用 ${mb(usedBytes ?? 0)} / ${gbOrMb(limitBytes)}，快滿了。`);
     setSent(0);
     const mark = (key: string, patch: Partial<Entry>) => setEntries((es) => es.map((x) => (x.key === key ? { ...x, ...patch } : x)));
-    await pool(work, 3, async (e) => {
-      if (token.current !== my) return;
-      mark(e.key, { up: "send", error: undefined });
-      try {
-        const p = await preparePhoto(e.file, { fingerprint: e.print || undefined, exif: e.exif, category: e.category });
-        const r = await sendPhoto(p, () => {});
-        if (r.status !== 200 && r.status !== 201) throw new Error((r.body as { error?: string } | null)?.error ?? `錯誤 ${r.status}`);
-        mark(e.key, { up: "done" });
-        setSent((n) => n + 1);
-      } catch (err) {
-        mark(e.key, { up: "fail", error: (err as Error).message === "network" ? "網路中斷" : (err as Error).message });
-      }
-    });
+    const check = (r: { status: number; body: unknown }) => {
+      if (r.status !== 200 && r.status !== 201) throw new Error((r.body as { error?: string } | null)?.error ?? `錯誤 ${r.status}`);
+    };
+    const fail = (e: Entry, err: unknown) =>
+      mark(e.key, err instanceof NeedsMac ? { up: "fail", needsMac: true, error: err.message } : { up: "fail", error: (err as Error).message === "network" ? "網路中斷" : (err as Error).message });
+    /* photos three at a time, then videos one at a time (shrinking one already uses the whole machine) */
+    await pool(
+      work.filter((e) => !e.video),
+      3,
+      async (e) => {
+        if (token.current !== my) return;
+        mark(e.key, { up: "send", error: undefined });
+        try {
+          check(await sendPhoto(await preparePhoto(e.file, { fingerprint: e.print || undefined, exif: e.exif, category: e.category }), () => {}));
+          mark(e.key, { up: "done" });
+          setSent((n) => n + 1);
+        } catch (err) {
+          fail(e, err);
+        }
+      },
+    );
+    await pool(
+      work.filter((e) => e.video && !e.needsMac),
+      1,
+      async (e) => {
+        if (token.current !== my) return;
+        mark(e.key, { up: "send", error: undefined });
+        const name = e.file.name;
+        try {
+          const p = await prepareVideo(e.file, { fingerprint: e.print || undefined, info: e.info, category: e.category }, (f) => setVideoNote(`壓縮 ${name} ${Math.round(f * 100)}%`));
+          setVideoNote(`上傳 ${name}`);
+          check(await sendVideo(p, (f) => setVideoNote(`上傳 ${name} ${Math.round(f * 100)}%`)));
+          mark(e.key, { up: "done" });
+          setSent((n) => n + 1);
+        } catch (err) {
+          fail(e, err);
+        }
+      },
+    );
+    setVideoNote(null);
     if (token.current !== my) return;
     setPhase("done");
     onUploaded();
   };
 
-  const failed = entries.filter((e) => e.up === "fail");
+  const failed = entries.filter((e) => e.up === "fail" && !e.needsMac);
+  const needMac = entries.filter((e) => e.needsMac);
   const retry = () => {
     if (!failed.length) return;
     setPhase("upload");
@@ -525,23 +574,25 @@ export function Sorter({ doc, photos, configured, usedBytes, onUploaded, onOpenD
   const todo = entries.filter((e) => e.scanned && e.target !== DUP && !e.category);
   const labelledCount = entries.filter((e) => e.labelled).length;
   const toSend = entries.filter((e) => e.target !== DUP).length;
+  const batchVideos = entries.filter((e) => e.video).length;
+  const libVideos = photos.filter((p) => p.video).length;
 
   const status =
     phase === "idle"
       ? photos.length
-        ? `已有 ${photos.length.toLocaleString()} 張照片`
-        : "還沒加入照片"
+        ? `已有 ${(photos.length - libVideos).toLocaleString()} 張照片${libVideos ? `、${libVideos} 支影片` : ""}`
+        : "還沒加入照片或影片"
       : phase === "scan"
         ? `讀取中 ${read} / ${entries.length}`
         : phase === "ready"
-          ? `已讀取 ${entries.length} 張・找到 ${dupCount} 張重複`
+          ? `已讀取 ${entries.length} 個檔案・找到 ${dupCount} 個重複`
           : phase === "fly"
             ? "整理中…"
             : phase === "upload"
-              ? `上傳中 ${sent} / ${toSend}`
+              ? (videoNote ?? `上傳中 ${sent} / ${toSend}`)
               : "完成";
   const needClassify = phase === "ready" && todo.length > 0 && !classified;
-  const label = phase === "idle" ? "加入照片" : phase === "scan" ? "讀取中…" : needClassify ? "分類" : phase === "ready" ? "開始整理" : phase === "fly" ? "整理中…" : "下載";
+  const label = phase === "idle" ? "加入照片／影片" : phase === "scan" ? "讀取中…" : needClassify ? "分類" : phase === "ready" ? "開始整理" : phase === "fly" ? "整理中…" : "下載";
   const main = () => {
     if (phase === "idle") setPanel("add");
     else if (needClassify) setPanel("classify");
@@ -580,7 +631,7 @@ export function Sorter({ doc, photos, configured, usedBytes, onUploaded, onOpenD
         </div>
         <div className="srt-grid">
           {list.slice(0, 80).map((p) => (
-            <i key={p.id} className="srt-tile" style={{ backgroundImage: `url(${thumbUrl(p.id)})` }} />
+            <i key={p.id} className={`srt-tile${p.video ? " vid" : ""}`} style={{ backgroundImage: `url(${thumbUrl(p.id)})` }} />
           ))}
         </div>
       </li>
@@ -597,7 +648,6 @@ export function Sorter({ doc, photos, configured, usedBytes, onUploaded, onOpenD
     </div>
   );
 
-  const sortedLib = photos.filter((p) => p.dayDate).length;
 
   return (
     <div
@@ -612,7 +662,7 @@ export function Sorter({ doc, photos, configured, usedBytes, onUploaded, onOpenD
         void filesFromDrop(e.dataTransfer.items).then(add);
       }}
     >
-      <input ref={fileInput} type="file" accept="image/*,.heic,.heif" multiple hidden onChange={(e) => (void add([...(e.target.files ?? [])]), (e.target.value = ""))} />
+      <input ref={fileInput} type="file" accept="image/*,.heic,.heif,video/mp4,video/quicktime,video/webm,.mp4,.mov,.m4v,.webm" multiple hidden onChange={(e) => (void add([...(e.target.files ?? [])]), (e.target.value = ""))} />
       <input ref={dirInput} type="file" multiple hidden {...{ webkitdirectory: "" }} onChange={(e) => (void add([...(e.target.files ?? [])]), (e.target.value = ""))} />
 
       <header className="srt-top">
@@ -641,10 +691,10 @@ export function Sorter({ doc, photos, configured, usedBytes, onUploaded, onOpenD
       </header>
 
       <div className="srt-stats">
-        {statCell("total", "總照片", phase === "idle" ? photos.length : entries.length)}
-        {statCell("days", "已分天", phase === "idle" ? sortedLib : 0, "dark")}
-        {statCell("used", "天數", 0, "light")}
-        {statCell("unsorted", "未分類", phase === "idle" ? (base.get(UNSORTED)?.length ?? 0) : 0)}
+        {statCell("total", "總檔案", phase === "idle" ? photos.length : entries.length)}
+        {statCell("videos", "影片", phase === "idle" ? libVideos : batchVideos, "dark")}
+        {statCell("photos", "照片", phase === "idle" ? photos.length - libVideos : entries.length - batchVideos, "light")}
+        {statCell("used", "天數", 0)}
         {statCell("dup", "重複", 0)}
       </div>
 
@@ -668,16 +718,16 @@ export function Sorter({ doc, photos, configured, usedBytes, onUploaded, onOpenD
           </div>
           {phase === "idle" && (
             <div className="srt-drop" style={{ width: radius * 2, height: radius * 2 }}>
-              <p className="srt-drop-t">把照片拖到這裡</p>
+              <p className="srt-drop-t">把照片或影片拖到這裡</p>
               <div className="srt-row">
                 <button type="button" className="srt-btn gold" onClick={() => dirInput.current?.click()}>
                   選擇資料夾
                 </button>
                 <button type="button" className="srt-btn" onClick={() => fileInput.current?.click()}>
-                  選擇照片
+                  選擇檔案
                 </button>
               </div>
-              <p className="srt-note">照片只有你看得到，原始檔不會被改動</p>
+              <p className="srt-note">只有你看得到，原始檔不會被改動</p>
             </div>
           )}
           {showPile && (
@@ -688,7 +738,7 @@ export function Sorter({ doc, photos, configured, usedBytes, onUploaded, onOpenD
                   <i
                     key={e.key}
                     ref={(el) => void (el ? pileImgs.current.set(e.key, el) : pileImgs.current.delete(e.key))}
-                    className={`srt-chip${e.thumb ? "" : " blank"}${e.scanned ? " in" : ""}`}
+                    className={`srt-chip${e.thumb ? "" : " blank"}${e.scanned ? " in" : ""}${e.video ? " vid" : ""}`}
                     style={{
                       width: size,
                       height: size,
@@ -719,24 +769,25 @@ export function Sorter({ doc, photos, configured, usedBytes, onUploaded, onOpenD
                   <path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </span>
-              <b>{(entries.length - dupCount).toLocaleString()} 張照片整理好了</b>
+              <b>{(entries.length - dupCount).toLocaleString()} 個檔案整理好了</b>
               <span>
-                分到 {new Set(entries.filter((e) => e.target !== DUP && e.target !== UNSORTED).map((e) => e.target)).size} 天 · {dupCount} 張重複
+                分到 {new Set(entries.filter((e) => e.target !== DUP && e.target !== UNSORTED).map((e) => e.target)).size} 天 · {dupCount} 個重複
               </span>
-              {phase === "upload" && (
+              {phase === "upload" && <span className="srt-up">{videoNote ?? `上傳中 ${sent} / ${toSend}`}</span>}
+              {phase === "done" && needMac.length > 0 && (
                 <span className="srt-up">
-                  上傳中 {sent} / {toSend}
+                  {needMac.length} 支影片太大，這個瀏覽器壓不了：請放進 Mac 的「照片待分類」，我幫你壓縮
                 </span>
               )}
               {phase === "done" && (
                 <div className="srt-row">
                   {failed.length > 0 && (
                     <button type="button" className="srt-btn gold" onClick={retry}>
-                      重試 {failed.length} 張
+                      重試 {failed.length} 個
                     </button>
                   )}
                   <button type="button" className="srt-btn" onClick={reset}>
-                    再加照片
+                    再加檔案
                   </button>
                 </div>
               )}
@@ -765,18 +816,18 @@ export function Sorter({ doc, photos, configured, usedBytes, onUploaded, onOpenD
         <button type="button" className="srt-close" onClick={() => setPanel(null)} aria-label="關閉設定">
           ×
         </button>
-        <PanelSection id="add" open={panel} title="1. 加入照片">
-          <p className="srt-note">選照片或整個資料夾，也可以直接拖進畫面。只收照片，影片這一版先不收。</p>
+        <PanelSection id="add" open={panel} title="1. 加入照片和影片">
+          <p className="srt-note">選照片、影片或整個資料夾，也可以直接拖進畫面。影片會先壓成 720p 再上傳，原始檔不會被改動。</p>
           <div className="srt-row">
             <button type="button" className="srt-btn gold" onClick={() => dirInput.current?.click()}>
               選擇資料夾
             </button>
             <button type="button" className="srt-btn" onClick={() => fileInput.current?.click()}>
-              選擇照片
+              選擇檔案
             </button>
           </div>
           {!configured && setup}
-          {configured && usedBytes != null && <p className="srt-note">已用 {Math.round(usedBytes / 1_000_000)} MB / 1 GB</p>}
+          {configured && usedBytes != null && <StorageMeter used={usedBytes} limit={limitBytes} />}
           <button
             type="button"
             className="srt-link"
@@ -795,11 +846,11 @@ export function Sorter({ doc, photos, configured, usedBytes, onUploaded, onOpenD
           {phase === "ready" || phase === "scan" ? (
             <>
               <p className="srt-note">
-                這批：已在 Mac 分好 {labelledCount} 張，還沒分 {todo.length} 張
+                這批：已在 Mac 分好 {labelledCount} 個，還沒分 {todo.length} 個
               </p>
               {todo.length ? (
                 <ClassifySteps
-                  items={todo.map((e) => ({ key: e.key, src: e.thumb }))}
+                  items={todo.map((e) => ({ key: e.key, src: e.thumb, video: e.video }))}
                   say={say}
                   onApply={async (map) => {
                     setEntries((es) => es.map((e) => (map.has(e.key) ? { ...e, category: map.get(e.key)! } : e)));
@@ -855,6 +906,25 @@ export function Sorter({ doc, photos, configured, usedBytes, onUploaded, onOpenD
           {toast}
         </p>
       )}
+    </div>
+  );
+}
+
+/** 已用 x MB / 1 GB, with the 75 % warning and the 90 % stop line (src/domain/video.ts). */
+function StorageMeter({ used, limit }: { used: number; limit: number }) {
+  const level = storageLevel(used, limit);
+  const caps = storageCaps(limit);
+  return (
+    <div className={`srt-meter ${level}`}>
+      <p className="srt-note">
+        已用 {mb(used)} / {gbOrMb(limit)}
+        {level === "warn" && "・快滿了"}
+        {level === "full" && "・已滿，不再上傳"}
+      </p>
+      <div className="srt-meter-bar" role="meter" aria-valuemin={0} aria-valuemax={limit} aria-valuenow={used} aria-label="儲存空間">
+        <i style={{ width: `${Math.min(100, (used / limit) * 100)}%` }} />
+        <b style={{ left: `${(caps.refuse / limit) * 100}%` }} aria-hidden />
+      </div>
     </div>
   );
 }

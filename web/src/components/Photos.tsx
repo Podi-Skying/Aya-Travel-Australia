@@ -13,7 +13,8 @@ import type { Photo } from "@/domain/schema";
  * tracks drags 1:1, projects momentum to choose the slide and settles with a critically damped spring.
  */
 
-export type DayPhoto = { id: string; name: string; photo: Photo };
+/** `video`: Kai's own videos play in the viewer; `photo` is then the poster frame. */
+export type DayPhoto = { id: string; name: string; photo: Photo; video?: string };
 
 /** Plain-text source for a photo (Kai 2026-10-26: no link icons); the page URL stays in the data. */
 export const creditText = (photo: Photo) => [photo.site, photo.credit, photo.license].filter(Boolean).join("・");
@@ -26,7 +27,7 @@ export function mapsPhotoLink(query: string) {
 
 /** Writes a transform to a slide (kept outside the component so the hook-immutability lint sees a plain DOM write). */
 function setSlideTransform(track: HTMLElement | null, i: number, transform: string) {
-  const el = track?.children[i]?.querySelector("img");
+  const el = track?.children[i]?.querySelector<HTMLElement>("img, video");
   if (el) el.style.transform = transform;
 }
 
@@ -55,11 +56,11 @@ export function PhotoViewer({ photos, start, onClose }: { photos: DayPhoto[]; st
     const p = photos[idx.current];
     const thumb = document.querySelector<HTMLElement>(`[data-photo-id="${p.id}"]`)?.getBoundingClientRect();
     const slide = track.current?.children[idx.current] as HTMLElement | undefined;
-    const img = slide?.querySelector("img");
+    const img = slide?.querySelector<HTMLImageElement | HTMLVideoElement>("img, video");
     if (!thumb?.width || !slide || !img) return null;
     const r = slide.getBoundingClientRect();
-    const iw = img.naturalWidth || p.photo.w || thumb.width;
-    const ih = img.naturalHeight || p.photo.h || thumb.height;
+    const iw = (img instanceof HTMLImageElement ? img.naturalWidth : img.videoWidth) || p.photo.w || thumb.width;
+    const ih = (img instanceof HTMLImageElement ? img.naturalHeight : img.videoHeight) || p.photo.h || thumb.height;
     const fit = Math.min(1, r.width / iw, (r.height - CHROME) / ih);
     return { dx: thumb.left + thumb.width / 2 - (r.left + r.width / 2), dy: thumb.top + thumb.height / 2 - (r.top + r.height / 2), s: thumb.width / (iw * fit) };
   }, [photos]);
@@ -149,8 +150,20 @@ export function PhotoViewer({ photos, start, onClose }: { photos: DayPhoto[]; st
     return () => window.removeEventListener("keydown", onKey, true);
   }, [close, go]);
 
+  /* only the video on screen keeps playing */
+  useEffect(() => {
+    const slides = track.current?.children;
+    if (!slides) return;
+    [...slides].forEach((s, i) => {
+      const v = s.querySelector("video");
+      if (v && i !== index && !v.paused) v.pause();
+    });
+  }, [index]);
+
   function down(e: ReactPointerEvent) {
     if (e.button !== 0 || closing.current) return;
+    // The player's own controls (seek bar, volume) are not a swipe.
+    if ((e.target as HTMLElement).closest("video") && e.clientY > (e.target as HTMLElement).getBoundingClientRect().bottom - 56) return;
     anims.current.x?.();
     anims.current.y?.();
     drag.current = { id: e.pointerId, x0: e.clientX - st.current.x, y0: e.clientY - st.current.y, axis: null, hist: [{ t: e.timeStamp, x: e.clientX, y: e.clientY }] };
@@ -202,8 +215,12 @@ export function PhotoViewer({ photos, start, onClose }: { photos: DayPhoto[]; st
       <div className="viewer-track" ref={track}>
         {photos.map((x) => (
           <div className="viewer-slide" key={x.id}>
-            {/* eslint-disable-next-line @next/next/no-img-element -- hotlinked full-size photo */}
-            <img src={x.photo.url} alt={x.name} referrerPolicy="no-referrer" draggable={false} />
+            {x.video ? (
+              <video src={x.video} poster={x.photo.url} controls playsInline preload="none" aria-label={x.name} />
+            ) : (
+              /* eslint-disable-next-line @next/next/no-img-element -- hotlinked full-size photo */
+              <img src={x.photo.url} alt={x.name} referrerPolicy="no-referrer" draggable={false} />
+            )}
           </div>
         ))}
       </div>

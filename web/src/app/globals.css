@@ -437,7 +437,7 @@ html, body { overflow-x: clip; }
 .viewer::before { content: ""; position: absolute; inset: 0; background: rgba(24, 23, 20, .94); opacity: var(--scrim); }
 .viewer-track { position: absolute; inset: 0; display: flex; will-change: transform; }
 .viewer-slide { flex: 0 0 100%; height: 100%; display: grid; place-items: center; }
-.viewer-slide img { max-width: 100%; max-height: calc(100% - 128px); object-fit: contain; user-select: none; -webkit-user-drag: none; transform-origin: center; will-change: transform; border-radius: 4px; }
+.viewer-slide img, .viewer-slide video { max-width: 100%; max-height: calc(100% - 128px); object-fit: contain; user-select: none; -webkit-user-drag: none; transform-origin: center; will-change: transform; border-radius: 4px; }
 .viewer-bar { position: absolute; top: env(safe-area-inset-top); left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; opacity: var(--scrim); color: #faf7f0; }
 .viewer-count { font-size: .8rem; font-variant-numeric: tabular-nums; padding-right: 8px; }
 .viewer-btn { width: 44px; height: 44px; display: grid; place-items: center; border: 0; border-radius: 50%; background: rgba(250, 247, 240, .16); color: #faf7f0; cursor: pointer; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }

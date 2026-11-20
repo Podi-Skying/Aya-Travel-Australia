@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { SiteHeader } from "./SiteHeader";
 import { PhotoViewer } from "./Photos";
+import { clock } from "@/domain/video";
 import { itemName, photosOfDay, thumbUrl, useMyPhotos, viewerPhotos, type MyPhoto, type MyPhotosData, type PhotoAccessKind } from "@/client/my-photos";
 import { CATEGORIES, isCategory } from "@/domain/photo-sort";
 import { Sorter, UNSORTED } from "./Sorter";
@@ -21,9 +22,14 @@ export function PhotoGrid({ photos, onOpen, onEdit }: { photos: MyPhoto[]; onOpe
     <ul className="my-grid">
       {photos.map((p) => (
         <li key={p.id}>
-          <button type="button" className="my-thumb" data-photo-id={`my-${p.id}`} onClick={() => onOpen(p)} aria-label={p.caption || "照片"}>
+          <button type="button" className="my-thumb" data-photo-id={`my-${p.id}`} onClick={() => onOpen(p)} aria-label={p.caption || (p.video ? "影片" : "照片")}>
             {/* eslint-disable-next-line @next/next/no-img-element -- private, auth-checked bytes */}
             <img src={thumbUrl(p.id)} alt="" loading="lazy" decoding="async" width={p.w} height={p.h} onError={(e) => (e.currentTarget.style.visibility = "hidden")} />
+            {p.video && (
+              <span className="my-play" aria-hidden>
+                ▶{p.durationMs ? <small>{clock(p.durationMs)}</small> : null}
+              </span>
+            )}
           </button>
           {onEdit && (
             <button type="button" className="my-edit" onClick={() => onEdit(p)} aria-label="編輯這張照片">
@@ -295,6 +301,7 @@ export function MyPhotosPage({ access, doc, initialDay }: { access: PhotoAccessK
             photos={all}
             configured={data?.configured ?? true}
             usedBytes={data?.usedBytes}
+            limitBytes={data?.limitBytes}
             onUploaded={() => void reload()}
             onOpenDay={setPick}
             who={<WhoCanSee />}

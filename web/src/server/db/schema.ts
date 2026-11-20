@@ -148,6 +148,11 @@ export const tripPhotos = pgTable(
     caption: text("caption"),
     /** One of CATEGORIES in src/domain/photo-sort.ts, or null until classified. */
     category: text("category"),
+    /** 'photo' or 'video'. A video's poster frame is the display and thumbnail JPEG. */
+    mediaType: text("media_type").notNull().default("photo"),
+    /** The compressed video in the private store (src/domain/media.ts VIDEO_PATH), and its length. */
+    videoPath: text("video_path"),
+    durationMs: integer("duration_ms"),
     fileName: text("file_name").notNull(),
     uploadedBy: text("uploaded_by").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
