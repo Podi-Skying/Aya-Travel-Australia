@@ -176,6 +176,14 @@ Kai asked to apply a third-party guide for a local photo sorter (an HTML page th
 - 分類 and 下載 open as bottom sheets on a translucent material that rises from the bottom edge and leaves the same way. The classify task dims the page; the download sheet does not. Reduced transparency makes the sheet solid; reduced motion turns the slide into fades.
 - Wayfinding: the gallery's 我的照片 mode links to /photos (「整理與下載 ›」); the header links back to 行程 and 散步.
 
+## PDF layout and local classification (2026-11-20, third pass)
+
+- **Layout:** /photos follows the look of the guide Kai sent: a header with the owner's name and one main button (加入照片, 分類, 開始整理, 下載), a stats row (總照片, 已分天, 天數, 未分類, 重複), day cards in two columns around a central pile with rings, and a 設定 panel on the right (add, classify, export, look, who can see). A navy and a light skin are kept in `localStorage`. The site's fonts are used; no text, branding or images from the guide are copied. `src/components/Sorter.tsx` replaces `SortStage.tsx`. Clicking a day card opens that day's photos.
+- **Export to a folder:** 「存到資料夾」 (Chrome and Edge, `showDirectoryPicker`) writes one sub-folder per day; ZIP and CSV stay.
+- **Local classification on Kai's Mac:** originals go in `照片待分類/` next to the repository, never inside it. `npm run photos:scan` fingerprints them with the browser's function (`fingerprintOf`), reads the day from EXIF or the file name, and writes numbered contact sheets and a manifest to a temp folder. Claude looks at the sheets and writes the answers; `npm run photos:apply -- <file>` stores them in `photo_labels` (migration `0005_photo_labels.sql`, keyed by trip and fingerprint, source `local-claude`). Nothing is uploaded by the script.
+- **How labels are used:** `POST /api/my-photos/check` returns the labels for the fingerprints it is asked about, so the sorter shows the category before upload. On upload the server applies the label's category, and the label's day when the photo is not a screenshot. `saveLabels` also back-fills photos already uploaded: the category only where it is empty, the day only when it was not set by hand.
+- **Checks:** `tsc` clean; `vitest` 263/263, including fingerprint parity between the script and the browser; `next build` passes. Codex review still unavailable until 2026-11-25.
+
 ## Review status (2026-11-20)
 
 - Built on branch `feat/my-photos` from `f28aef0`.

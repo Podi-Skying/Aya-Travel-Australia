@@ -33,6 +33,22 @@ export const isScreenshotName = (name: string) => SCREENSHOT_NAME.test(name);
 export const FINGERPRINT = /^\d{1,12}:[0-9a-f]{64}$/;
 export const PRINT_CHUNK = 65_536;
 
+/**
+ * The fingerprint itself, shared by the browser and the local classify script so both give the same print
+ * for the same file. `read(a, b)` returns bytes a..b of the file.
+ */
+export async function fingerprintOf(size: number, read: (a: number, b: number) => Promise<ArrayBuffer | Uint8Array>): Promise<string> {
+  const parts = await Promise.all(printRanges(size).map(([a, b]) => read(a, b)));
+  const all = new Uint8Array(parts.reduce((n, p) => n + p.byteLength, 0));
+  let o = 0;
+  for (const p of parts) {
+    all.set(p instanceof Uint8Array ? p : new Uint8Array(p), o);
+    o += p.byteLength;
+  }
+  const d = await crypto.subtle.digest("SHA-256", all);
+  return `${size}:${[...new Uint8Array(d)].map((x) => x.toString(16).padStart(2, "0")).join("")}`;
+}
+
 /** The byte ranges a fingerprint reads, merged so a small file is read once. */
 export function printRanges(size: number): [number, number][] {
   if (size <= PRINT_CHUNK * 3) return [[0, size]];
